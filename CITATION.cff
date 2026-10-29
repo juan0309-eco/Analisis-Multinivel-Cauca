@@ -7,6 +7,8 @@ authors:
     given-names: "Juan Pablo"
     affiliation: "Universidad del Cauca"
 version: "1.0"
+doi: "10.5281/zenodo.23777593"
+repository-code: "https://github.com/juan0309-eco/Analisis-Multinivel-Cauca"
 license: MIT
 abstract: "Do-files de Stata 17 y registros de ejecución de una tesis de pregrado en Economía que estima modelos multinivel de estudiante, sede y municipio sobre las cohortes 2018-2023 de Saber 11 en las sedes oficiales del Cauca (Colombia). No incluye datos; las fuentes se describen en el README."
 keywords:

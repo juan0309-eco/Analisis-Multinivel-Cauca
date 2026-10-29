@@ -2,9 +2,9 @@
 
 Código de la tesis de pregrado en Economía de Juan Pablo Muñoz Paz (Universidad del Cauca, 2026), *Análisis multinivel del desempeño escolar: una evaluación de los efectos institucionales y macro-territoriales del Cauca en el sector oficial (2018-2023)*, dirigida por Juan José Caicedo Collazos. El estudio usa modelos multinivel de estudiante, sede y municipio sobre las cohortes 2018-2023 de Saber 11.
 
-- **DOI de esta versión:** `[DOI de Zenodo]`
-- **Repositorio:** `[URL del repositorio]`
-- **Cómo citar:** Muñoz Paz, J. P. (2026). *Cadena de procesamiento en Stata de «Análisis multinivel del desempeño escolar: una evaluación de los efectos institucionales y macro-territoriales del Cauca en el sector oficial (2018-2023)»* (Versión 1.0) [Software]. Zenodo. `https://doi.org/[DOI]`
+- **DOI de esta versión:** [10.5281/zenodo.23777593](https://doi.org/10.5281/zenodo.23777593)
+- **Repositorio:** https://github.com/juan0309-eco/Analisis-Multinivel-Cauca
+- **Cómo citar:** Muñoz Paz, J. P. (2026). *Cadena de procesamiento en Stata de «Análisis multinivel del desempeño escolar: una evaluación de los efectos institucionales y macro-territoriales del Cauca en el sector oficial (2018-2023)»* (Versión 1.0) [Software]. Zenodo. https://doi.org/10.5281/zenodo.23777593
 
 El repositorio contiene los do-files, los registros de ejecución (logs) y este archivo. **No contiene datos**: ni los microdatos ni los paneles construidos a partir de ellos. Las fuentes se descargan de los portales oficiales del apartado 2 y se citan en el apartado «Fuentes de datos y software» del informe.
 
