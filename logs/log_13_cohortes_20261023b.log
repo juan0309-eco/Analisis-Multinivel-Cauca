@@ -1,0 +1,2198 @@
+---------------------------------------------------------------------------------------------
+      name:  fase13
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_13_cohortes_20261023b.l
+> og
+  log type:  text
+ opened on:  23 Oct 2026, 17:15:38
+
+. 
+. timer clear
+
+. timer on 1
+
+. 
+. * ---------------------------------------------------------------------------
+. * INTERRUPTORES DE BLOQUE
+. * ---------------------------------------------------------------------------
+. * Estado tras las corridas del 22 de octubre:
+. *   log_13_cohortes_20261022.log   bloques [0] y [1]. [0] dejo
+. *                                  C3_Base_Trabajo_20261022.dta y [1] dejo
+. *                                  MC_cohortes_20261022.ster y
+. *                                  C3_holm_20261022.dta. No repetirlos.
+. *   log_13_cohortes_20261022b.log  bloques [2] y [3], con el bloque [3] sin
+. *                                  z_posgrado combinado y con las columnas
+. *                                  truncadas. Esta corrida los repite ya
+. *                                  parcheados; son unos dos minutos.
+. local hacer_prep   = 0    // [0] verificaciones e identificadores. Rapido.
+
+. local hacer_inter  = 0    // [1] LENTO: agrupado con interacciones, 20 imput.
+
+. local hacer_oaxaca = 1    // [2] LENTO: Oaxaca-Blinder, 5 imputaciones
+
+. local hacer_rubin  = 1    // [3] combinacion de Rubin. Rapido.
+
+. 
+. * ---------------------------------------------------------------------------
+. * BLOQUES DE VARIABLES. Identicos a los del 08_estimacion_v5.do, bloque [2.4]
+. * ---------------------------------------------------------------------------
+. global v_n1 mujer edad repitente lectura_30min libros_26omas ///
+>             trabaja_mas20 internet_hogar computador_hogar
+
+. 
+. global v_n2 ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>             dotacion_tic rural ju_unica tecnico tecnico_academico ///
+>             cole_femenino
+
+. 
+. * $v_n2 SIN rural y SIN pct_planta: esas dos entran por la via de `##`, que ya
+. * incluye sus efectos principales. Repetirlas produce las notas de colinealidad
+. * que C5 documento en el apartado 6.2 y ensucia el log sin cambiar el modelo.
+. global v_n2_int ln_matricula ratio_alumnos_docente z_posgrado ///
+>                 dotacion_tic ju_unica tecnico tecnico_academico ///
+>                 cole_femenino
+
+. 
+. * Lista de la Oaxaca PRINCIPAL: $v_n2 sin z_posgrado. Ver bloque [0.9].
+. global v_n2_oax ln_matricula ratio_alumnos_docente pct_planta ///
+>                 dotacion_tic rural ju_unica tecnico tecnico_academico ///
+>                 cole_femenino
+
+. 
+. * Estructura aleatoria de C1, textual.
+. global RE "|| mcpio_id: || mcpio_id: R.year || sede_id: || sede_anio:"
+
+. 
+. 
+. ********************************************************************************
+. * [0] PREPARACION Y VERIFICACIONES
+. ********************************************************************************
+. 
+. if `hacer_prep' == 1 {
+. 
+.     display _newline(2) "{hline 78}"
+.     display "[0] PREPARACION"
+.     display "{hline 78}"
+. 
+.     timer clear 2
+.     timer on 2
+. 
+.     use "Base_Estimacion.dta", clear
+. 
+.     * Base_Estimacion.dta ya trae sede_id y mcpio_id creados y registrados como
+.     * regulares por el bloque [2.3] del 08. Aqui solo se anade sede_anio.
+.     * Una a una: `drop` es todo o nada, y con datos mi hay que desregistrar
+.     * antes de borrar (misma nota del bloque [1] del 11).
+.     foreach v in sede_anio {
+  2.         capture mi unregister `v'
+  3.         capture drop `v'
+  4.     }
+.     egen long sede_anio = group(cole_cod_dane_sede year)
+.     mi register regular sede_anio
+.     mi update
+. 
+.     display _newline "--- Verificacion de identificadores ---"
+.     quietly count if missing(sede_anio) | missing(sede_id) | missing(mcpio_id)
+.     display "Filas sin identificador: " r(N) " (debe ser 0)"
+.     assert r(N) == 0
+. 
+.     display _newline "--- Variables que exige este script ---"
+.     foreach v in punt_global cwc_inse c_inse_prom_sede c_inse ///
+>                  estu_inse_individual indice_vuln year {
+  2.         confirm variable `v'
+  3.     }
+.     foreach v of global v_n1 {
+  2.         confirm variable `v'
+  3.     }
+.     foreach v of global v_n2 {
+  2.         confirm variable `v'
+  3.     }
+.     display "Todas presentes."
+. 
+.     display _newline "--- Tamano de las dos cohortes de la Oaxaca ---"
+.     quietly count if _mi_m == 1 & year == 2018
+.     local n18 = r(N)
+.     quietly count if _mi_m == 1 & year == 2023
+.     local n23 = r(N)
+.     display "2018: `n18'   2023: `n23'   (esperados 11.456 y 12.366)"
+. 
+.     display _newline "--- Medias brutas del puntaje, para enmarcar la Oaxaca ---"
+.     tabstat punt_global edad repitente estu_inse_individual ///
+>         if _mi_m == 1 & inlist(year, 2018, 2023), by(year) ///
+>         stat(n mean sd) format(%9.4f)
+. 
+.     save "C3_Base_Trabajo_`fbase'.dta", replace
+. 
+.     timer off 2
+.     display _newline "--- Tiempo del bloque [0] ---"
+.     timer list 2
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [0.9] REGLA DE DECISION, IMPRESA ANTES DE ESTIMAR NADA
+. ********************************************************************************
+. * Se imprime dentro del propio log, como hicieron C5 (apartado 4.1) y C7
+. * (bloque 0.9), para que la constancia de su anterioridad no dependa del
+. * registro escrito en el chat.
+. 
+. display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+
+. display "[0.9] FAMILIA DE CONTRASTES Y CORRECCION POR MULTIPLICIDAD"
+[0.9] FAMILIA DE CONTRASTES Y CORRECCION POR MULTIPLICIDAD
+
+. display "      FIJADAS ANTES DE ESTIMAR. NINGUN UMBRAL SE MUEVE DESPUES."
+      FIJADAS ANTES DE ESTIMAR. NINGUN UMBRAL SE MUEVE DESPUES.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. display ""
+
+
+. display "FAMILIA F-C3. Cuatro pruebas CONJUNTAS, una por cada afirmacion de"
+FAMILIA F-C3. Cuatro pruebas CONJUNTAS, una por cada afirmacion de
+
+. display "cambio entre cohortes que el Capitulo 4 sostiene hoy:"
+cambio entre cohortes que el Capitulo 4 sostiene hoy:
+
+. display ""
+
+
+. display "  T1  i(2019/2023).year#c.rural             -> 4.3.2 'se consolido'"
+  T1  i(2019/2023).year#c.rural             -> 4.3.2 'se consolido'
+
+. display "  T2  i(2019/2023).year#c.pct_planta        -> 4.3.2 'crece de 15,3 a 17,4'"
+  T2  i(2019/2023).year#c.pct_planta        -> 4.3.2 'crece de 15,3 a 17,4'
+
+. display "  T3  i(2019/2023).year#c.cwc_inse          -> 4.3.2 vaiven de beta_w"
+  T3  i(2019/2023).year#c.cwc_inse          -> 4.3.2 vaiven de beta_w
+
+. display "  T4  i(2019/2023).year#c.c_inse_prom_sede  -> 4.3.2 'la brecha se ensancha'"
+  T4  i(2019/2023).year#c.c_inse_prom_sede  -> 4.3.2 'la brecha se ensancha'
+
+. display ""
+
+
+. display "Cada T es UN contraste conjunto de cinco coeficientes, no cinco pruebas."
+Cada T es UN contraste conjunto de cinco coeficientes, no cinco pruebas.
+
+. display ""
+
+
+. display "CORRECCION: Holm sobre las cuatro, al 5 %. Umbrales por orden creciente"
+CORRECCION: Holm sobre las cuatro, al 5 %. Umbrales por orden creciente
+
+. display "de p: 0,0125 / 0,0167 / 0,0250 / 0,0500."
+de p: 0,0125 / 0,0167 / 0,0250 / 0,0500.
+
+. display ""
+
+
+. display "PROCEDIMIENTO ANIDADO: solo una T que supere Holm habilita a examinar"
+PROCEDIMIENTO ANIDADO: solo una T que supere Holm habilita a examinar
+
+. display "sus anos por separado, con Holm sobre las cinco comparaciones DENTRO de"
+sus anos por separado, con Holm sobre las cinco comparaciones DENTRO de
+
+. display "esa variable. Si la conjunta no supera Holm, NINGUN ano individual se"
+esa variable. Si la conjunta no supera Holm, NINGUN ano individual se
+
+. display "reporta como significativo y la afirmacion del Capitulo 4 se retira."
+reporta como significativo y la afirmacion del Capitulo 4 se retira.
+
+. display ""
+
+
+. display "NO ENTRAN EN LA FAMILIA: cole_femenino x ano y tecnico_academico x ano."
+NO ENTRAN EN LA FAMILIA: cole_femenino x ano y tecnico_academico x ano.
+
+. display "El Capitulo 4 no afirma tendencia sobre ellas. Ampliar la familia tras"
+El Capitulo 4 no afirma tendencia sobre ellas. Ampliar la familia tras
+
+. display "ver T1-T4 seria lo que C7 rechazo con la variable minas."
+ver T1-T4 seria lo que C7 rechazo con la variable minas.
+
+. display ""
+
+
+. display "OAXACA-BLINDER: NO es confirmatoria. Sin correccion por multiplicidad y"
+OAXACA-BLINDER: NO es confirmatoria. Sin correccion por multiplicidad y
+
+. display "sin promocion de ninguna contribucion individual a hallazgo. Se reporta"
+sin promocion de ninguna contribucion individual a hallazgo. Se reporta
+
+. display "el reparto agregado y SOLO EL SIGNO de las contribuciones de edad y"
+el reparto agregado y SOLO EL SIGNO de las contribuciones de edad y
+
+. display "repitente, que es lo que la fila 4 de C3 necesita."
+repitente, que es lo que la fila 4 de C3 necesita.
+
+. display ""
+
+
+. display "ESPECIFICACION DE LA OAXACA, fijada aqui:"
+ESPECIFICACION DE LA OAXACA, fijada aqui:
+
+. display "  - La principal va SIN z_posgrado. El borrador de C3 sostenia que su"
+  - La principal va SIN z_posgrado. El borrador de C3 sostenia que su
+
+. display "    aporte de composicion es cero por estar estandarizada por ano;"
+    aporte de composicion es cero por estar estandarizada por ano;
+
+. display "    C7 (apartado 4.1) demuestra que es falso: promediada POR ESTUDIANTE"
+    C7 (apartado 4.1) demuestra que es falso: promediada POR ESTUDIANTE
+
+. display "    vale 0,2841 en 2018 y 0,0102 en 2023. Incluirla atribuiria a"
+    vale 0,2841 en 2018 y 0,0102 en 2023. Incluirla atribuiria a
+
+. display "    composicion un cambio de criterio de reporte del DANE."
+    composicion un cambio de criterio de reporte del DANE.
+
+. display "  - Se corre una variante CON z_posgrado solo para medir cuanto mueve."
+  - Se corre una variante CON z_posgrado solo para medir cuanto mueve.
+
+. display "  - Se usa estu_inse_individual SIN centrar: c_inse esta centrado en"
+  - Se usa estu_inse_individual SIN centrar: c_inse esta centrado en
+
+. display "    cada ano y borraria la diferencia de composicion que se busca."
+    cada ano y borraria la diferencia de composicion que se busca.
+
+. display "  - La version sin INSE existe porque el indice salta entre 2019 y 2020"
+  - La version sin INSE existe porque el indice salta entre 2019 y 2020
+
+. display "    por una razon que el diccionario del ICFES no documenta [4.1.2]."
+    por una razon que el diccionario del ICFES no documenta [4.1.2].
+
+. display "  - cole_femenino entra, pero su contribucion detallada NO se interpreta:"
+  - cole_femenino entra, pero su contribucion detallada NO se interpreta:
+
+. display "    30 sede-ano en todo el periodo."
+    30 sede-ano en todo el periodo.
+
+. display "  - Cinco imputaciones, combinadas por las reglas de Rubin, y se reporta"
+  - Cinco imputaciones, combinadas por las reglas de Rubin, y se reporta
+
+. display "    ademas el rango entre imputaciones, como hace C1 (apartado 6)."
+    ademas el rango entre imputaciones, como hace C1 (apartado 6).
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. 
+. ********************************************************************************
+. * [1] AGRUPADO CON INTERACCIONES VARIABLE X ANO
+. ********************************************************************************
+. * Centrado al cluster, igual que el bloque [1] de 12_composicional.do, porque
+. * las afirmaciones que se contrastan son las de las Tablas 10 y 11. Las filas
+. * de rural y pct_planta son identicas bajo los dos esquemas de centrado
+. * (apartado 4.3.1), de modo que T1 y T2 valen igual para la Tabla 8.
+. 
+. if `hacer_inter' == 1 {
+. 
+.     display _newline(2) "{hline 78}"
+.     display "[1] AGRUPADO CON INTERACCIONES VARIABLE X ANO"
+.     display "{hline 78}"
+. 
+.     capture confirm file "C3_Base_Trabajo_`fbase'.dta"
+.     if _rc != 0 {
+.         display as error "No se encuentra C3_Base_Trabajo_`fbase'.dta."
+.         display as error "Correr el bloque [0] o ajustar el local fbase."
+.         exit 601
+.     }
+.     use "C3_Base_Trabajo_`fbase'.dta", clear
+. 
+.     timer clear 3
+.     timer on 3
+. 
+.     mi estimate, dots post: mixed punt_global                            ///
+>         c.cwc_inse##ib2018.year                                          ///
+>         c.c_inse_prom_sede##ib2018.year                                  ///
+>         c.rural##ib2018.year                                             ///
+>         c.pct_planta##ib2018.year                                        ///
+>         $v_n1 $v_n2_int indice_vuln                                      ///
+>         $RE , reml
+. 
+.     timer off 3
+.     display _newline "--- Tiempo del bloque [1] ---"
+.     timer list 3
+. 
+.     estimates save "MC_cohortes_`hoy'.ster", replace
+. 
+.     * Los nombres REALES antes de tocar nada. Es la leccion del ensayo 11a.
+.     display _newline "--- Nombres reales de los parametros ---"
+.     matrix list e(b)
+. 
+.     * ------------------------------------------------------------------
+.     * [1.1] Las cuatro pruebas conjuntas de la familia F-C3
+.     * ------------------------------------------------------------------
+.     display _newline "{hline 78}"
+.     display "[1.1] FAMILIA F-C3: CUATRO CONTRASTES CONJUNTOS"
+.     display "{hline 78}"
+. 
+.     tempname ph
+.     postfile `ph' str4 prueba str24 variable double chi2 df p ///
+>         using "C3_holm_`hoy'.dta", replace
+. 
+.     local k = 1
+.     foreach v in rural pct_planta cwc_inse c_inse_prom_sede {
+  2. 
+.         local nom : word `k' of "T1" "T2" "T3" "T4"
+  3. 
+.         display _newline "--- `nom': i(2019/2023).year#c.`v' ---"
+  4. 
+.         * En `mixed` el termino se almacena con el factor delante. Si la
+.         * primera escritura falla con r(111), se intenta la inversa antes de
+.         * rendirse, y se deja constancia.
+.         capture noisily testparm i(2019/2023).year#c.`v'
+  5.         if _rc != 0 {
+  6.             display as error "Fallo la primera escritura (codigo " _rc ")."
+  7.             display as error "Intentando c.`v'#i(2019/2023).year."
+  8.             capture noisily testparm c.`v'#i(2019/2023).year
+  9.         }
+ 10. 
+.         if _rc == 0 {
+ 11.             post `ph' ("`nom'") ("`v'") (r(chi2)) (r(df)) (r(p))
+ 12.         }
+ 13.         else {
+ 14.             display as error "`nom' no se pudo contrastar. Leer los nombres"
+ 15.             display as error "del matrix list e(b) de arriba y corregirlos."
+ 16.             post `ph' ("`nom'") ("`v'") (.) (.) (.)
+ 17.         }
+ 18. 
+.         local ++k
+ 19.     }
+. 
+.     postclose `ph'
+. 
+.     * ------------------------------------------------------------------
+.     * [1.2] Holm sobre las cuatro pruebas
+.     * ------------------------------------------------------------------
+.     display _newline "{hline 78}"
+.     display "[1.2] CORRECCION DE HOLM SOBRE LA FAMILIA F-C3"
+.     display "{hline 78}"
+. 
+.     preserve
+.         use "C3_holm_`hoy'.dta", clear
+.         sort p
+.         generate int orden   = _n
+.         generate double umbral = 0.05 / (4 - orden + 1)
+. 
+.         * Holm es secuencial: en cuanto una prueba falla, todas las siguientes
+.         * fallan tambien, aunque su p sea menor que su propio umbral.
+.         generate byte pasa = .
+.         local corto = 0
+.         forvalues i = 1/`=_N' {
+  2.             if `corto' == 0 & p[`i'] <= umbral[`i'] {
+  3.                 quietly replace pasa = 1 in `i'
+  4.             }
+  5.             else {
+  6.                 quietly replace pasa = 0 in `i'
+  7.                 local corto = 1
+  8.             }
+  9.         }
+. 
+.         format p umbral %9.4f
+.         format chi2 %9.2f
+.         list prueba variable chi2 df p umbral pasa, clean noobs
+. 
+.         display _newline "pasa = 1: la afirmacion correspondiente del Capitulo 4"
+.         display "puede sostenerse y se habilita el examen por anos."
+.         display "pasa = 0: la afirmacion SE RETIRA. No se reporta ningun ano"
+.         display "individual como significativo, cualquiera que sea su p."
+. 
+.         save "C3_holm_`hoy'.dta", replace
+.     restore
+. 
+.     * ------------------------------------------------------------------
+.     * [1.3] Comparaciones por ano: DESCRIPTIVAS mientras Holm no habilite
+.     * ------------------------------------------------------------------
+.     * Se imprimen siempre, porque el texto nuevo necesita la magnitud de la
+.     * diferencia 2023 frente a 2018 aunque no sea significativa. Lo que NO se
+.     * hace es leer su significancia si la conjunta no paso Holm.
+.     display _newline "{hline 78}"
+.     display "[1.3] DIFERENCIA 2023 FRENTE A 2018, POR VARIABLE"
+.     display "ATENCION: descriptivas. Su p NO se lee si la conjunta no paso Holm."
+.     display "{hline 78}"
+. 
+.     foreach v in rural pct_planta cwc_inse c_inse_prom_sede {
+  2.         display _newline "--- `v': 2023 frente a 2018 ---"
+  3.         capture noisily lincom _b[2023.year#c.`v']
+  4.         if _rc != 0 {
+  5.             display as error "Nombre no encontrado. Probar _b[c.`v'#2023.year]."
+  6.             capture noisily lincom _b[c.`v'#2023.year]
+  7.         }
+  8.     }
+. 
+.     display _newline "--- Pendiente de cada ano, para las cuatro variables ---"
+.     display "Cada una es la suma del termino principal y su interaccion."
+.     foreach v in rural pct_planta cwc_inse c_inse_prom_sede {
+  2.         display _newline "=== `v' ==="
+  3.         display "2018 (referencia):"
+  4.         capture noisily lincom _b[`v']
+  5.         forvalues a = 2019/2023 {
+  6.             display "`a':"
+  7.             capture noisily lincom _b[`v'] + _b[`a'.year#c.`v']
+  8.         }
+  9.     }
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [2] OAXACA-BLINDER, 2018 FRENTE A 2023
+. ********************************************************************************
+. * `oaxaca` no admite mixed ni mi estimate de forma fiable, de modo que se corre
+. * dentro de un bucle sobre imputaciones y se combina por Rubin en el bloque [3].
+. *
+. * ORDEN OBLIGATORIO: mi extract PRIMERO, egen/generate DESPUES. Al reves se
+. * crean variables sin registrar en el conjunto mi, que es el error E4 de C5.
+. *
+. * Cuatro especificaciones por imputacion:
+. *   A  principal       sin z_posgrado, CON estu_inse_individual
+. *   B  sin INSE        sin z_posgrado, sin estu_inse_individual
+. *   C  con z_posgrado  solo para medir cuanto mueve (C7, apartado 4.1)
+. *   D  sin INSE y con z_posgrado
+. 
+. if `hacer_oaxaca' == 1 {
+. 
+.     display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+.     display "[2] DESCOMPOSICION DE OAXACA-BLINDER, 2018 FRENTE A 2023"
+[2] DESCOMPOSICION DE OAXACA-BLINDER, 2018 FRENTE A 2023
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     capture which oaxaca
+.     if _rc != 0 {
+.         capture ssc install oaxaca, replace
+.         if _rc != 0 {
+.             display as error "No se pudo instalar oaxaca. Instalarlo a mano y"
+.             display as error "volver a correr SOLO este bloque."
+.             exit 601
+.         }
+.     }
+. 
+.     timer clear 4
+.     timer on 4
+. 
+.     * Las cadenas van holgadas a proposito: "D_sinINSE_posg" son 14 caracteres
+.     * y "exp_estu_inse_individual" son 24. Con str12 y str16 se truncarian sin
+.     * aviso, y el bloque [3] no encontraria nunca esas filas al compararlas por
+.     * nombre. Es un fallo silencioso, no un error de ejecucion.
+.     tempname po
+.     postfile `po' int m str16 espec str32 componente ///
+>         double b se using "C3_oaxaca_`hoy'.dta", replace
+(file C3_oaxaca_20261023b.dta not found)
+. 
+.     forvalues m = 1/5 {
+  2. 
+.         display _newline(2) "{hline 78}"
+  3.         display "IMPUTACION `m'"
+  4.         display "{hline 78}"
+  5. 
+.         use "C3_Base_Trabajo_`fbase'.dta", clear
+  6.         mi extract `m', clear
+  7. 
+.         keep if inlist(year, 2018, 2023)
+  8.         generate byte y2023 = (year == 2023)
+  9. 
+.         quietly count
+ 10.         display "Observaciones de las dos cohortes: " r(N)
+ 11. 
+.         forvalues e = 1/4 {
+ 12. 
+.             * `detalle' lista las contribuciones individuales que se extraen.
+.             * En las especificaciones sin INSE no se pide esa fila, para que el
+.             * log no se llene de avisos de una variable que no esta en el
+.             * modelo a proposito.
+.             if `e' == 1 {
+ 13.                 local nom     "A_principal"
+ 14.                 local lista   "estu_inse_individual $v_n1 $v_n2_oax"
+ 15.                 local detalle "edad repitente estu_inse_individual"
+ 16.             }
+ 17.             if `e' == 2 {
+ 18.                 local nom     "B_sinINSE"
+ 19.                 local lista   "$v_n1 $v_n2_oax"
+ 20.                 local detalle "edad repitente"
+ 21.             }
+ 22.             if `e' == 3 {
+ 23.                 local nom     "C_conposg"
+ 24.                 local lista   "estu_inse_individual $v_n1 $v_n2"
+ 25.                 local detalle "edad repitente estu_inse_individual z_posgrado"
+ 26.             }
+ 27.             if `e' == 4 {
+ 28.                 local nom     "D_sinINSE_posg"
+ 29.                 local lista   "$v_n1 $v_n2"
+ 30.                 local detalle "edad repitente z_posgrado"
+ 31.             }
+ 32. 
+.             display _newline "--- Oaxaca, m = `m', especificacion `nom' ---"
+ 33. 
+.             capture noisily oaxaca punt_global `lista',      ///
+>                 by(y2023) pooled vce(cluster sede_id) detail
+ 34. 
+.             if _rc != 0 {
+ 35.                 display as error "oaxaca fallo (codigo " _rc "). Reintentando"
+ 36.                 display as error "con la opcion relax. SI ESE REINTENTO"
+ 37.                 display as error "FUNCIONA, hay una variable omitida en una de"
+ 38.                 display as error "las dos cohortes: identificarla ANTES de"
+ 39.                 display as error "interpretar nada."
+ 40.                 capture noisily oaxaca punt_global `lista',  ///
+>                     by(y2023) pooled vce(cluster sede_id) detail relax
+ 41.             }
+ 42. 
+.             if _rc == 0 {
+ 43. 
+.                 * Los nombres REALES, una sola vez, antes de extraer nada.
+.                 * oaxaca organiza e(b) por ECUACIONES: el reparto agregado vive
+.                 * en `overall' y el detalle en `explained' y `unexplained'.
+.                 * Escribir _b[difference] sin la ecuacion no encuentra nada, y
+.                 * dentro de un `capture post' eso no da error: simplemente no
+.                 * escribe la fila y el bloque [3] sale vacio.
+.                 if `m' == 1 & `e' == 1 {
+ 44.                     display _newline "--- Nombres reales de e(b) en oaxaca ---"
+ 45.                     matrix list e(b)
+ 46.                     display _newline "Si las ecuaciones NO se llaman overall,"
+ 47.                     display "explained y unexplained, corregir las lineas de"
+ 48.                     display "abajo antes de seguir."
+ 49.                 }
+ 50. 
+.                 foreach c in difference explained unexplained {
+ 51.                     capture post `po' (`m') ("`nom'") ("`c'") ///
+>                         (_b[overall:`c']) (_se[overall:`c'])
+ 52.                     if _rc != 0 {
+ 53.                         display as error "No se pudo leer overall:`c'."
+ 54.                     }
+ 55.                 }
+ 56. 
+.                 * Contribuciones detalladas que la fila 4 de C3 necesita.
+.                 foreach c of local detalle {
+ 57.                     capture post `po' (`m') ("`nom'") ("exp_`c'") ///
+>                         (_b[explained:`c']) (_se[explained:`c'])
+ 58.                     if _rc != 0 {
+ 59.                         display as error "No se pudo leer explained:`c'."
+ 60.                     }
+ 61.                 }
+ 62.             }
+ 63.             else {
+ 64.                 display as error "`nom' no se estimo en m = `m'."
+ 65.             }
+ 66.         }
+ 67.     }
+
+
+------------------------------------------------------------------------------
+IMPUTACION 1
+------------------------------------------------------------------------------
+(45,928 observations deleted)
+Observaciones de las dos cohortes: 23822
+
+--- Oaxaca, m = 1, especificacion A_principal ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.065952   113.98   0.000     231.4221    239.5205
+              group_2 |   236.3955   2.001029   118.14   0.000     232.4736    240.3175
+           difference |  -.9242385   1.038135    -0.89   0.373    -2.958945    1.110468
+            explained |  -.9294771   1.136043    -0.82   0.413    -3.156081    1.297126
+          unexplained |   .0052386   1.249893     0.00   0.997    -2.444507    2.454984
+----------------------+----------------------------------------------------------------
+explained             |
+ estu_inse_individual |  -.5622378   .1721892    -3.27   0.001    -.8997224   -.2247531
+                mujer |   .0032975   .0774239     0.04   0.966    -.1484506    .1550455
+                 edad |  -2.071173   .2021693   -10.24   0.000    -2.467417   -1.674928
+            repitente |   .6869688    .133581     5.14   0.000     .4251548    .9487828
+        lectura_30min |   .2101127   .0614131     3.42   0.001     .0897453    .3304801
+        libros_26omas |   .3638442   .0581739     6.25   0.000     .2498254     .477863
+        trabaja_mas20 |   .0424155   .0189855     2.23   0.025     .0052047    .0796263
+       internet_hogar |  -.9850378   .2863172    -3.44   0.001    -1.546209   -.4238663
+     computador_hogar |   .0018493   .0058934     0.31   0.754    -.0097015       .0134
+         ln_matricula |   .3031836   .2030459     1.49   0.135     -.094779    .7011462
+ratio_alumnos_docente |   .0493709   .2537378     0.19   0.846     -.447946    .5466878
+           pct_planta |   .2920007   .2836718     1.03   0.303    -.2639858    .8479872
+         dotacion_tic |   .0095205    .042802     0.22   0.824    -.0743698    .0934108
+                rural |   .0924731   .0894001     1.03   0.301    -.0827479    .2676941
+             ju_unica |   .5787393   .8904929     0.65   0.516    -1.166595    2.324073
+              tecnico |   .0018241   .0256831     0.07   0.943    -.0485139    .0521621
+    tecnico_academico |  -.1149232   .0895878    -1.28   0.200     -.290512    .0606656
+        cole_femenino |   .1682943   .1064147     1.58   0.114    -.0402746    .3768632
+----------------------+----------------------------------------------------------------
+unexplained           |
+ estu_inse_individual |  -3.276212   5.179294    -0.63   0.527    -13.42744    6.875018
+                mujer |  -.1525262   .6514548    -0.23   0.815    -1.429354    1.124302
+                 edad |  -28.40819   8.106873    -3.50   0.000    -44.29737   -12.51901
+            repitente |  -.2279914   .2324392    -0.98   0.327    -.6835639    .2275811
+        lectura_30min |  -1.262309   .3953606    -3.19   0.001    -2.037201   -.4874162
+        libros_26omas |  -.1096801   .2464844    -0.44   0.656    -.5927806    .3734204
+        trabaja_mas20 |  -.1506954   .0896684    -1.68   0.093    -.3264423    .0250515
+       internet_hogar |    .392389    .673927     0.58   0.560    -.9284838    1.713262
+     computador_hogar |  -.9418497    .583816    -1.61   0.107    -2.086108    .2024087
+         ln_matricula |   -14.6069   14.72633    -0.99   0.321    -43.46998    14.25618
+ratio_alumnos_docente |   6.649509    9.96941     0.67   0.505    -12.89018    26.18919
+           pct_planta |   5.957671    4.81489     1.24   0.216    -3.479341    15.39468
+         dotacion_tic |  -.7699006   1.590939    -0.48   0.628    -3.888083    2.348282
+                rural |   2.334627   1.237917     1.89   0.059     -.091646      4.7609
+             ju_unica |   1.081488   .5916204     1.83   0.068    -.0780665    2.241043
+              tecnico |   .0554451   .9611357     0.06   0.954    -1.828346    1.939236
+    tecnico_academico |   .3781878    .366461     1.03   0.302    -.3400625    1.096438
+        cole_femenino |  -.4214733   .3382959    -1.25   0.213    -1.084521    .2415744
+                _cons |   33.48365    16.1229     2.08   0.038     1.883354    65.08395
+---------------------------------------------------------------------------------------
+
+--- Nombres reales de e(b) en oaxaca ---
+
+e(b)[1,42]
+         overall:      overall:      overall:      overall:      overall:    explained:
+         group_1       group_2    difference     explained   unexplained  estu_inse_~l
+y1     235.47128     236.39552    -.92423855    -.92947713     .00523858    -.56223778
+
+       explained:    explained:    explained:    explained:    explained:    explained:
+           mujer          edad     repitente  lectura_30~n  libros_26~as  trabaja_m~20
+y1     .00329745    -2.0711728     .68696881     .21011273     .36384418     .04241554
+
+       explained:    explained:    explained:    explained:    explained:    explained:
+    internet_h~r  computador~r  ln_matricula  ratio_alum~e    pct_planta  dotacion_tic
+y1    -.98503783     .00184927      .3031836     .04937093     .29200066     .00952054
+
+       explained:    explained:    explained:    explained:    explained:  unexplained:
+           rural      ju_unica       tecnico  tecnico_ac~o  cole_femen~o  estu_inse_~l
+y1     .09247311     .57873931     .00182406    -.11492321     .16829432    -3.2762123
+
+     unexplained:  unexplained:  unexplained:  unexplained:  unexplained:  unexplained:
+           mujer          edad     repitente  lectura_30~n  libros_26~as  trabaja_m~20
+y1     -.1525262    -28.408188    -.22799143    -1.2623087     -.1096801     -.1506954
+
+     unexplained:  unexplained:  unexplained:  unexplained:  unexplained:  unexplained:
+    internet_h~r  computador~r  ln_matricula  ratio_alum~e    pct_planta  dotacion_tic
+y1     .39238897    -.94184971    -14.606903     6.6495087     5.9576707    -.76990057
+
+     unexplained:  unexplained:  unexplained:  unexplained:  unexplained:  unexplained:
+           rural      ju_unica       tecnico  tecnico_ac~o  cole_femen~o         _cons
+y1     2.3346268     1.0814881     .05544514     .37818782    -.42147332      33.48365
+
+Si las ecuaciones NO se llaman overall,
+explained y unexplained, corregir las lineas de
+abajo antes de seguir.
+
+--- Oaxaca, m = 1, especificacion B_sinINSE ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.063737   114.10   0.000     231.4264    239.5161
+              group_2 |   236.3955   2.000434   118.17   0.000     232.4747    240.3163
+           difference |  -.9242385   1.040552    -0.89   0.374    -2.963684    1.115207
+            explained |  -1.049448   1.145722    -0.92   0.360    -3.295021    1.196125
+          unexplained |   .1252094   1.258574     0.10   0.921    -2.341551    2.591969
+----------------------+----------------------------------------------------------------
+explained             |
+                mujer |    .003355   .0787754     0.04   0.966    -.1510419    .1577519
+                 edad |  -2.126451   .2079048   -10.23   0.000    -2.533937   -1.718965
+            repitente |    .700992   .1341738     5.22   0.000     .4380161    .9639678
+        lectura_30min |   .2119315   .0619223     3.42   0.001     .0905661    .3332969
+        libros_26omas |   .4299948    .064577     6.66   0.000     .3034262    .5565634
+        trabaja_mas20 |   .0432642   .0192848     2.24   0.025     .0054667    .0810616
+       internet_hogar |  -1.715982   .3183171    -5.39   0.000    -2.339872   -1.092092
+     computador_hogar |    .008647   .0251988     0.34   0.731    -.0407418    .0580357
+         ln_matricula |   .3204892   .2069686     1.55   0.122    -.0851619    .7261403
+ratio_alumnos_docente |   .0494014   .2538987     0.19   0.846     -.448231    .5470338
+           pct_planta |    .296908   .2883535     1.03   0.303    -.2682545    .8620705
+         dotacion_tic |   .0096916   .0434591     0.22   0.824    -.0754866    .0948698
+                rural |   .0968639   .0929302     1.04   0.297    -.0852759    .2790038
+             ju_unica |   .5615729   .8950684     0.63   0.530    -1.192729    2.315875
+              tecnico |   .0019156   .0269614     0.07   0.943    -.0509277     .054759
+    tecnico_academico |  -.1140455   .0889686    -1.28   0.200    -.2884207    .0603297
+        cole_femenino |   .1720036   .1087903     1.58   0.114    -.0412214    .3852286
+----------------------+----------------------------------------------------------------
+unexplained           |
+                mujer |  -.1296585   .6589441    -0.20   0.844    -1.421165    1.161848
+                 edad |  -27.72838    8.29252    -3.34   0.001    -43.98142   -11.47534
+            repitente |  -.2366798   .2315908    -1.02   0.307    -.6905893    .2172298
+        lectura_30min |  -1.244219   .3938398    -3.16   0.002    -2.016131   -.4723074
+        libros_26omas |  -.1249235   .2483707    -0.50   0.615    -.6117211    .3618741
+        trabaja_mas20 |   -.164485   .0898311    -1.83   0.067    -.3405506    .0115807
+       internet_hogar |   .2171273   .6411109     0.34   0.735    -1.039427    1.473682
+     computador_hogar |  -1.085135   .5044835    -2.15   0.031    -2.073904   -.0963652
+         ln_matricula |  -13.67489   14.69601    -0.93   0.352    -42.47854    15.12875
+ratio_alumnos_docente |   6.727271   10.03333     0.67   0.503    -12.93769    26.39223
+           pct_planta |    6.04156   4.886869     1.24   0.216    -3.536526    15.61965
+         dotacion_tic |   -.639724   1.590947    -0.40   0.688    -3.757923    2.478475
+                rural |     2.3942   1.233557     1.94   0.052    -.0235265    4.811927
+             ju_unica |   1.104469   .5913059     1.87   0.062    -.0544694    2.263407
+              tecnico |   .0041912   .9634648     0.00   0.997    -1.884165    1.892548
+    tecnico_academico |   .3854265    .367419     1.05   0.294    -.3347015    1.105555
+        cole_femenino |  -.4274156   .3399737    -1.26   0.209    -1.093752    .2389207
+                _cons |   28.70648   15.73354     1.82   0.068    -2.130693    59.54364
+---------------------------------------------------------------------------------------
+
+--- Oaxaca, m = 1, especificacion C_conposg ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.099134   112.18   0.000     231.3571    239.5855
+              group_2 |   236.3955     1.9927   118.63   0.000     232.4899    240.3011
+           difference |  -.9242385   1.151777    -0.80   0.422     -3.18168    1.333203
+            explained |  -.0861866   1.260859    -0.07   0.946    -2.557425    2.385052
+          unexplained |  -.8380519   1.341695    -0.62   0.532    -3.467725    1.791621
+----------------------+----------------------------------------------------------------
+explained             |
+ estu_inse_individual |  -.5464049   .1678927    -3.25   0.001    -.8754686   -.2173412
+                mujer |   .0032535    .076391     0.04   0.966    -.1464702    .1529771
+                 edad |  -2.050633   .1991373   -10.30   0.000    -2.440935   -1.660331
+            repitente |     .65395   .1289427     5.07   0.000     .4012269    .9066731
+        lectura_30min |   .2085654   .0609541     3.42   0.001     .0890977    .3280332
+        libros_26omas |    .355234   .0570228     6.23   0.000     .2434713    .4669967
+        trabaja_mas20 |   .0414248   .0185973     2.23   0.026     .0049747    .0778749
+       internet_hogar |  -.9222957   .2780929    -3.32   0.001    -1.467348   -.3772436
+     computador_hogar |   .0019814   .0062447     0.32   0.751    -.0102581    .0142208
+         ln_matricula |   .3034827   .1964634     1.54   0.122    -.0815785    .6885439
+ratio_alumnos_docente |   .0446604   .2295986     0.19   0.846    -.4053446    .4946653
+           pct_planta |   .2688745   .2611169     1.03   0.303    -.2429052    .7806542
+           z_posgrado |   1.023152   .4613664     2.22   0.027     .1188908    1.927414
+         dotacion_tic |   .0131117   .0566438     0.23   0.817    -.0979081    .1241315
+                rural |   .0855173   .0837989     1.02   0.307    -.0787256    .2497601
+             ju_unica |   .3691444   .8404528     0.44   0.661    -1.278113    2.016402
+              tecnico |   .0021449   .0301496     0.07   0.943    -.0569473    .0612371
+    tecnico_academico |  -.1113576   .0873227    -1.28   0.202    -.2825069    .0597917
+        cole_femenino |   .1700069    .107317     1.58   0.113    -.0403306    .3803444
+----------------------+----------------------------------------------------------------
+unexplained           |
+ estu_inse_individual |  -5.303253    5.01192    -1.06   0.290    -15.12643    4.519929
+                mujer |  -.0570279   .6439161    -0.09   0.929     -1.31908    1.205025
+                 edad |  -29.92409   7.903043    -3.79   0.000    -45.41377   -14.43442
+            repitente |  -.3153212   .2481221    -1.27   0.204    -.8016316    .1709892
+        lectura_30min |  -1.278438   .4021671    -3.18   0.001    -2.066671   -.4902048
+        libros_26omas |  -.1722922   .2462357    -0.70   0.484    -.6549053    .3103209
+        trabaja_mas20 |  -.1284917   .0879457    -1.46   0.144    -.3008621    .0438788
+       internet_hogar |   .3836431   .6694422     0.57   0.567    -.9284395    1.695726
+     computador_hogar |  -.8590452   .5839103    -1.47   0.141    -2.003488    .2853979
+         ln_matricula |  -10.44079   14.60655    -0.71   0.475    -39.06911    18.18753
+ratio_alumnos_docente |   1.280777    9.36077     0.14   0.891    -17.06599    19.62755
+           pct_planta |  -2.437658   4.993339    -0.49   0.625    -12.22442    7.349106
+           z_posgrado |   .4936989   .3611763     1.37   0.172    -.2141937    1.201591
+         dotacion_tic |  -.7256563   1.625363    -0.45   0.655    -3.911309    2.459996
+                rural |   3.207649   1.362419     2.35   0.019     .5373564    5.877941
+             ju_unica |   1.189116   .6248338     1.90   0.057    -.0355357    2.413768
+              tecnico |   .8332306   1.048185     0.79   0.427    -1.221174    2.887636
+    tecnico_academico |   .2554224   .3609498     0.71   0.479    -.4520262    .9628709
+        cole_femenino |   -.482926   .3160053    -1.53   0.126    -1.102285    .1364329
+                _cons |   43.64341   16.86019     2.59   0.010     10.59804    76.68878
+---------------------------------------------------------------------------------------
+
+--- Oaxaca, m = 1, especificacion D_sinINSE_posg ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.097398   112.27   0.000     231.3605    239.5821
+              group_2 |   236.3955   1.992246   118.66   0.000     232.4908    240.3003
+           difference |  -.9242385   1.155517    -0.80   0.424    -3.189011    1.340534
+            explained |  -.1976739   1.269252    -0.16   0.876    -2.685363    2.290015
+          unexplained |  -.7265646   1.350467    -0.54   0.591    -3.373431    1.920302
+----------------------+----------------------------------------------------------------
+explained             |
+                mujer |   .0033091    .077698     0.04   0.966    -.1489761    .1555944
+                 edad |  -2.104221   .2046949   -10.28   0.000    -2.505416   -1.703026
+            repitente |   .6673768   .1295607     5.15   0.000     .4134425    .9213111
+        lectura_30min |   .2103234   .0614478     3.42   0.001     .0898879    .3307588
+        libros_26omas |   .4194586   .0632897     6.63   0.000     .2954131    .5435042
+        trabaja_mas20 |   .0422434   .0188849     2.24   0.025     .0052296    .0792572
+       internet_hogar |  -1.632154   .3066194    -5.32   0.000    -2.233117   -1.031191
+     computador_hogar |   .0085873   .0250236     0.34   0.731     -.040458    .0576326
+         ln_matricula |   .3202998   .2003066     1.60   0.110    -.0722939    .7128935
+ratio_alumnos_docente |   .0446616   .2296101     0.19   0.846    -.4053659    .4946891
+           pct_planta |   .2735034   .2655249     1.03   0.303    -.2469158    .7939226
+           z_posgrado |   1.029322   .4636234     2.22   0.026     .1206365    1.938007
+         dotacion_tic |   .0132996   .0573939     0.23   0.817    -.0991903    .1257895
+                rural |   .0897417   .0871653     1.03   0.303    -.0810991    .2605826
+             ju_unica |   .3512005   .8450169     0.42   0.678    -1.305002    2.007403
+              tecnico |   .0022358   .0314207     0.07   0.943    -.0593475    .0638192
+    tecnico_academico |  -.1104833     .08671    -1.27   0.203    -.2804317    .0594651
+        cole_femenino |   .1736214   .1096295     1.58   0.113    -.0412485    .3884914
+----------------------+----------------------------------------------------------------
+unexplained           |
+                mujer |  -.0164644   .6498454    -0.03   0.980    -1.290138    1.257209
+                 edad |  -28.68417   8.053831    -3.56   0.000    -44.46939   -12.89896
+            repitente |  -.3292302   .2477344    -1.33   0.184    -.8147808    .1563204
+        lectura_30min |  -1.262963   .4009082    -3.15   0.002    -2.048729   -.4771976
+        libros_26omas |  -.2134439   .2494984    -0.86   0.392    -.7024518     .275564
+        trabaja_mas20 |  -.1416031    .088047    -1.61   0.108    -.3141719    .0309658
+       internet_hogar |   .0475169   .6239201     0.08   0.939    -1.175344    1.270378
+     computador_hogar |  -1.113596   .5070699    -2.20   0.028    -2.107434    -.119757
+         ln_matricula |  -9.745459   14.65342    -0.67   0.506    -38.46564    18.97472
+ratio_alumnos_docente |   1.336889   9.416166     0.14   0.887    -17.11846    19.79223
+           pct_planta |  -2.432711   5.055318    -0.48   0.630    -12.34095    7.475531
+           z_posgrado |   .5002331   .3599529     1.39   0.165    -.2052616    1.205728
+         dotacion_tic |  -.5965072   1.625418    -0.37   0.714    -3.782268    2.589254
+                rural |   3.292552   1.362453     2.42   0.016     .6221926    5.962911
+             ju_unica |   1.215655   .6242296     1.95   0.051    -.0078127    2.439122
+              tecnico |   .7818156   1.050872     0.74   0.457    -1.277855    2.841486
+    tecnico_academico |   .2625841   .3624556     0.72   0.469    -.4478158    .9729841
+        cole_femenino |  -.4925625   .3200022    -1.54   0.124    -1.119755    .1346304
+                _cons |   36.86491   16.33443     2.26   0.024     4.850004    68.87981
+---------------------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------
+IMPUTACION 2
+------------------------------------------------------------------------------
+(45,928 observations deleted)
+Observaciones de las dos cohortes: 23822
+
+--- Oaxaca, m = 2, especificacion A_principal ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.064697   114.05   0.000     231.4245     239.518
+              group_2 |   236.3955   1.999812   118.21   0.000      232.476    240.3151
+           difference |  -.9242385   1.035869    -0.89   0.372    -2.954504    1.106027
+            explained |  -.8021484   1.133645    -0.71   0.479    -3.024052    1.419755
+          unexplained |  -.1220901   1.251096    -0.10   0.922    -2.574193    2.330013
+----------------------+----------------------------------------------------------------
+explained             |
+ estu_inse_individual |  -.5748634    .167425    -3.43   0.001    -.9030103   -.2467165
+                mujer |   .0032832   .0770891     0.04   0.966    -.1478087    .1543751
+                 edad |  -2.074472   .2020993   -10.26   0.000     -2.47058   -1.678365
+            repitente |   .6888055   .1336138     5.16   0.000     .4269272    .9506839
+        lectura_30min |   .1918154   .0568564     3.37   0.001     .0803789    .3032519
+        libros_26omas |   .3422571   .0560435     6.11   0.000     .2324139    .4521002
+        trabaja_mas20 |   .0417568    .019737     2.12   0.034     .0030729    .0804406
+       internet_hogar |  -.8921029   .2802899    -3.18   0.001    -1.441461   -.3427449
+     computador_hogar |   .0055205   .0089761     0.62   0.539    -.0120724    .0231134
+         ln_matricula |   .3236218   .2101475     1.54   0.124    -.0882598    .7355033
+ratio_alumnos_docente |   .0674804   .2479413     0.27   0.785    -.4184755    .5534363
+           pct_planta |   .3258184   .2822302     1.15   0.248    -.2273428    .8789795
+         dotacion_tic |   .0208173   .0540709     0.39   0.700    -.0851596    .1267942
+                rural |    .092388   .0893253     1.03   0.301    -.0826863    .2674623
+             ju_unica |   .5790358    .888597     0.65   0.515    -1.162582    2.320654
+              tecnico |   .0023378   .0262286     0.09   0.929    -.0490693    .0537448
+    tecnico_academico |  -.1140418   .0891069    -1.28   0.201    -.2886881    .0606045
+        cole_femenino |   .1683942   .1064763     1.58   0.114    -.0402955    .3770839
+----------------------+----------------------------------------------------------------
+unexplained           |
+ estu_inse_individual |  -4.751317    5.33641    -0.89   0.373    -15.21049    5.707855
+                mujer |  -.2137493   .6457253    -0.33   0.741    -1.479348    1.051849
+                 edad |  -29.56117   8.143108    -3.63   0.000    -45.52137   -13.60097
+            repitente |  -.2335882   .2318058    -1.01   0.314    -.6879192    .2207429
+        lectura_30min |   -.897714   .3860531    -2.33   0.020    -1.654364   -.1410639
+        libros_26omas |  -.0821782   .2560015    -0.32   0.748    -.5839318    .4195755
+        trabaja_mas20 |  -.1452868   .0913381    -1.59   0.112    -.3243061    .0337326
+       internet_hogar |   .5836271   .6746436     0.87   0.387      -.73865    1.905904
+     computador_hogar |  -.9145545   .6007531    -1.52   0.128    -2.092009       .2629
+         ln_matricula |  -15.46733   14.66164    -1.05   0.291    -44.20362    13.26895
+ratio_alumnos_docente |   7.238492   9.946922     0.73   0.467    -12.25712     26.7341
+           pct_planta |   6.849793   4.818467     1.42   0.155     -2.59423    16.29382
+         dotacion_tic |   -.638799   1.468537    -0.43   0.664    -3.517078    2.239481
+                rural |   2.367726   1.223865     1.93   0.053    -.0310062    4.766458
+             ju_unica |    1.05294   .5887941     1.79   0.074    -.1010756    2.206955
+              tecnico |   .1594614   .9670036     0.16   0.869    -1.735831    2.054754
+    tecnico_academico |   .4111654    .369314     1.11   0.266    -.3126766    1.135007
+        cole_femenino |  -.4117155   .3315296    -1.24   0.214    -1.061502    .2380707
+                _cons |   34.53211   16.18408     2.13   0.033     2.811887    66.25232
+---------------------------------------------------------------------------------------
+
+--- Oaxaca, m = 2, especificacion B_sinINSE ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.062403   114.17   0.000      231.429    239.5135
+              group_2 |   236.3955   1.999272   118.24   0.000      232.477     240.314
+           difference |  -.9242385   1.038643    -0.89   0.374    -2.959942    1.111465
+            explained |  -.9233066   1.144533    -0.81   0.420     -3.16655    1.319937
+          unexplained |  -.0009319   1.260357    -0.00   0.999    -2.471186    2.469322
+----------------------+----------------------------------------------------------------
+explained             |
+                mujer |   .0033495   .0786455     0.04   0.966    -.1507928    .1574918
+                 edad |   -2.13165   .2081047   -10.24   0.000    -2.539527   -1.723772
+            repitente |   .7034218    .134237     5.24   0.000     .4403222    .9665215
+        lectura_30min |   .1932717   .0572554     3.38   0.001     .0810532    .3054901
+        libros_26omas |   .4067655   .0620729     6.55   0.000     .2851048    .5284262
+        trabaja_mas20 |   .0427458    .020118     2.12   0.034     .0033152    .0821764
+       internet_hogar |  -1.654856   .3202118    -5.17   0.000    -2.282459   -1.027252
+     computador_hogar |   .0232819   .0275989     0.84   0.399    -.0308108    .0773747
+         ln_matricula |   .3428403   .2143621     1.60   0.110    -.0773017    .7629824
+ratio_alumnos_docente |   .0675689   .2482737     0.27   0.786    -.4190387    .5541765
+           pct_planta |   .3314621   .2869714     1.16   0.248    -.2309915    .8939157
+         dotacion_tic |   .0209625   .0542105     0.39   0.699     -.085288    .1272131
+                rural |   .0969619   .0930134     1.04   0.297    -.0853411    .2792649
+             ju_unica |   .5689639   .8936798     0.64   0.524    -1.182616    2.320544
+              tecnico |   .0024441   .0274064     0.09   0.929    -.0512714    .0561596
+    tecnico_academico |  -.1130046    .088397    -1.28   0.201    -.2862595    .0602503
+        cole_femenino |   .1721636    .108898     1.58   0.114    -.0412726    .3855998
+----------------------+----------------------------------------------------------------
+unexplained           |
+                mujer |   -.181806   .6536705    -0.28   0.781    -1.462977    1.099365
+                 edad |  -28.69442   8.299227    -3.46   0.001     -44.9606   -12.42823
+            repitente |  -.2494217   .2313459    -1.08   0.281    -.7028514     .204008
+        lectura_30min |  -.8869541   .3850238    -2.30   0.021    -1.641587   -.1323213
+        libros_26omas |  -.1118143   .2553067    -0.44   0.661    -.6122063    .3885777
+        trabaja_mas20 |  -.1610126   .0916153    -1.76   0.079    -.3405753    .0185501
+       internet_hogar |   .3047547   .6479005     0.47   0.638     -.965107    1.574616
+     computador_hogar |  -1.145771   .5231363    -2.19   0.029    -2.171099   -.1204429
+         ln_matricula |  -14.48995   14.63602    -0.99   0.322    -43.17603    14.19612
+ratio_alumnos_docente |   7.257172   10.01428     0.72   0.469    -12.37045    26.88479
+           pct_planta |   6.805322   4.875921     1.40   0.163    -2.751307    16.36195
+         dotacion_tic |  -.4681625   1.465363    -0.32   0.749    -3.340222    2.403897
+                rural |   2.460448   1.220585     2.02   0.044     .0681451     4.85275
+             ju_unica |   1.079748   .5888186     1.83   0.067    -.0743151    2.233811
+              tecnico |   .0998212   .9684711     0.10   0.918    -1.798347     1.99799
+    tecnico_academico |   .4190896   .3707657     1.13   0.258    -.3075977    1.145777
+        cole_femenino |  -.4174741   .3343765    -1.25   0.212     -1.07284    .2378919
+                _cons |    28.3795   15.59729     1.82   0.069     -2.19062    58.94962
+---------------------------------------------------------------------------------------
+
+--- Oaxaca, m = 2, especificacion C_conposg ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.097733   112.25   0.000     231.3598    239.5828
+              group_2 |   236.3955   1.991788   118.69   0.000     232.4917    240.2994
+           difference |  -.9242385   1.150538    -0.80   0.422    -3.179252    1.330775
+            explained |   .0794073   1.260745     0.06   0.950    -2.391607    2.550422
+          unexplained |  -1.003646   1.341674    -0.75   0.454    -3.633278    1.625987
+----------------------+----------------------------------------------------------------
+explained             |
+ estu_inse_individual |   -.564778   .1634571    -3.46   0.001    -.8851481   -.2444079
+                mujer |   .0032384   .0760384     0.04   0.966    -.1457941     .152271
+                 edad |  -2.053538   .1990783   -10.32   0.000    -2.443724   -1.663351
+            repitente |   .6549929    .128836     5.08   0.000     .4024791    .9075068
+        lectura_30min |   .1911887   .0566465     3.38   0.001     .0801637    .3022138
+        libros_26omas |   .3346952   .0550284     6.08   0.000     .2268415    .4425489
+        trabaja_mas20 |   .0418128   .0197163     2.12   0.034     .0031696     .080456
+       internet_hogar |  -.8137892   .2726114    -2.99   0.003    -1.348098   -.2794806
+     computador_hogar |   .0054751   .0089142     0.61   0.539    -.0119965    .0229467
+         ln_matricula |   .3224404   .2030434     1.59   0.112    -.0755173    .7203982
+ratio_alumnos_docente |   .0605668   .2226987     0.27   0.786    -.3759147    .4970483
+           pct_planta |    .300879   .2604566     1.16   0.248    -.2096065    .8113644
+           z_posgrado |   1.041466   .4667262     2.23   0.026     .1266991    1.956232
+         dotacion_tic |   .0325232   .0664925     0.49   0.625    -.0977996    .1628461
+                rural |   .0856907   .0839085     1.02   0.307     -.078767    .2501485
+             ju_unica |   .3739607   .8391418     0.45   0.656    -1.270727    2.018648
+              tecnico |   .0027077   .0303058     0.09   0.929    -.0566906     .062106
+    tecnico_academico |  -.1102877    .086716    -1.27   0.203    -.2802479    .0596726
+        cole_femenino |   .1701623   .1074119     1.58   0.113    -.0403611    .3806857
+----------------------+----------------------------------------------------------------
+unexplained           |
+ estu_inse_individual |  -6.876753    5.20331    -1.32   0.186    -17.07505    3.321548
+                mujer |  -.1162158   .6383991    -0.18   0.856    -1.367455    1.135023
+                 edad |  -31.07244   7.937918    -3.91   0.000    -46.63047    -15.5144
+            repitente |  -.3228988   .2479809    -1.30   0.193    -.8089325    .1631349
+        lectura_30min |  -.9158694    .397423    -2.30   0.021    -1.694804   -.1369347
+        libros_26omas |  -.1316211   .2573889    -0.51   0.609     -.636094    .3728518
+        trabaja_mas20 |  -.1179275   .0905081    -1.30   0.193    -.2953201    .0594652
+       internet_hogar |   .5684102   .6737161     0.84   0.399    -.7520491     1.88887
+     computador_hogar |  -.8235839   .6040321    -1.36   0.173    -2.007465    .3602973
+         ln_matricula |   -11.7108   14.58323    -0.80   0.422     -40.2934    16.87181
+ratio_alumnos_docente |   1.692621   9.329954     0.18   0.856    -16.59375      19.979
+           pct_planta |  -1.425965   4.995931    -0.29   0.775    -11.21781    8.365881
+           z_posgrado |   .5006041   .3627059     1.38   0.168    -.2102864    1.211495
+         dotacion_tic |  -.8317898   1.541654    -0.54   0.590    -3.853377    2.189797
+                rural |   3.194628    1.33862     2.39   0.017     .5709803    5.818275
+             ju_unica |   1.162853   .6222998     1.87   0.062    -.0568319    2.382539
+              tecnico |   .9302047   1.054915     0.88   0.378    -1.137392    2.997801
+    tecnico_academico |   .2919395   .3631085     0.80   0.421    -.4197401    1.003619
+        cole_femenino |  -.4751823   .3105695    -1.53   0.126    -1.083887    .1335227
+                _cons |   45.47613   16.97475     2.68   0.007     12.20624    78.74603
+---------------------------------------------------------------------------------------
+
+--- Oaxaca, m = 2, especificacion D_sinINSE_posg ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.095844   112.35   0.000     231.3635    239.5791
+              group_2 |   236.3955   1.991318   118.71   0.000     232.4926    240.2984
+           difference |  -.9242385   1.153864    -0.80   0.423    -3.185771    1.337294
+            explained |  -.0360668   1.269875    -0.03   0.977    -2.524976    2.452843
+          unexplained |  -.8881717   1.350931    -0.66   0.511    -3.535947    1.759604
+----------------------+----------------------------------------------------------------
+explained             |
+                mujer |   .0033034   .0775631     0.04   0.966    -.1487175    .1553243
+                 edad |  -2.109624   .2049334   -10.29   0.000    -2.511286   -1.707961
+            repitente |   .6692156   .1295069     5.17   0.000     .4153868    .9230444
+        lectura_30min |   .1926168   .0570391     3.38   0.001     .0808223    .3044113
+        libros_26omas |   .3980369   .0609956     6.53   0.000     .2784878    .5175861
+        trabaja_mas20 |   .0427846   .0200907     2.13   0.033     .0034077    .0821616
+       internet_hogar |  -1.562791   .3099718    -5.04   0.000    -2.170325   -.9552575
+     computador_hogar |   .0229235   .0271696     0.84   0.399     -.030328    .0761751
+         ln_matricula |   .3413157   .2072172     1.65   0.100    -.0648225    .7474539
+ratio_alumnos_docente |   .0606259   .2229252     0.27   0.786    -.3762995    .4975512
+           pct_planta |   .3063229   .2650237     1.16   0.248     -.213114    .8257598
+           z_posgrado |   1.045659   .4683706     2.23   0.026     .1276699    1.963649
+         dotacion_tic |   .0327131   .0667365     0.49   0.624    -.0980881    .1635142
+                rural |   .0901571   .0874806     1.03   0.303    -.0813017     .261616
+             ju_unica |   .3632403   .8442455     0.43   0.667     -1.29145    2.017931
+              tecnico |   .0028137    .031482     0.09   0.929    -.0588899    .0645173
+    tecnico_academico |  -.1092536   .0860106    -1.27   0.204    -.2778314    .0593241
+        cole_femenino |   .1738724   .1097935     1.58   0.113    -.0413189    .3890638
+----------------------+----------------------------------------------------------------
+unexplained           |
+                mujer |  -.0640485   .6442981    -0.10   0.921     -1.32685    1.198753
+                 edad |  -29.61912   8.060547    -3.67   0.000     -45.4175   -13.82074
+            repitente |  -.3443984   .2475888    -1.39   0.164    -.8296636    .1408667
+        lectura_30min |  -.9067247   .3966268    -2.29   0.022    -1.684099   -.1293504
+        libros_26omas |  -.1888892   .2581763    -0.73   0.464    -.6949055    .3171271
+        trabaja_mas20 |  -.1331539   .0907804    -1.47   0.142    -.3110803    .0447724
+       internet_hogar |   .1234577    .630286     0.20   0.845     -1.11188    1.358796
+     computador_hogar |  -1.171016   .5250173    -2.23   0.026    -2.200031   -.1420005
+         ln_matricula |  -10.99118   14.63876    -0.75   0.453    -39.68262    17.70026
+ratio_alumnos_docente |   1.690997   9.390422     0.18   0.857    -16.71389    20.09589
+           pct_planta |   -1.54059   5.047266    -0.31   0.760    -11.43305    8.351869
+           z_posgrado |   .5084779   .3618121     1.41   0.160    -.2006608    1.217617
+         dotacion_tic |  -.6643569   1.537191    -0.43   0.666    -3.677197    2.348483
+                rural |   3.312761   1.338978     2.47   0.013     .6884124     5.93711
+             ju_unica |   1.194469    .621749     1.92   0.055    -.0241362    2.413075
+              tecnico |    .867881   1.055597     0.82   0.411    -1.201052    2.936814
+    tecnico_academico |   .3000496   .3653357     0.82   0.411    -.4159952    1.016094
+        cole_femenino |  -.4845715   .3154881    -1.54   0.125    -1.102917    .1337739
+                _cons |   37.22178   16.25328     2.29   0.022     5.365936    69.07763
+---------------------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------
+IMPUTACION 3
+------------------------------------------------------------------------------
+(45,928 observations deleted)
+Observaciones de las dos cohortes: 23822
+
+--- Oaxaca, m = 3, especificacion A_principal ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.067469   113.89   0.000     231.4191    239.5234
+              group_2 |   236.3955   2.000495   118.17   0.000     232.4746    240.3164
+           difference |  -.9242385   1.034081    -0.89   0.371       -2.951    1.102523
+            explained |  -.8492118   1.142665    -0.74   0.457    -3.088793     1.39037
+          unexplained |  -.0750268   1.256159    -0.06   0.952    -2.537054       2.387
+----------------------+----------------------------------------------------------------
+explained             |
+ estu_inse_individual |  -.5616336   .1686721    -3.33   0.001    -.8922249   -.2310424
+                mujer |   .0032666   .0766985     0.04   0.966    -.1470597    .1535928
+                 edad |  -2.077422    .202695   -10.25   0.000    -2.474697   -1.680147
+            repitente |    .685191   .1334175     5.14   0.000     .4236975    .9466844
+        lectura_30min |   .2333329   .0574309     4.06   0.000     .1207704    .3458953
+        libros_26omas |     .35674   .0584275     6.11   0.000     .2422242    .4712557
+        trabaja_mas20 |   .0356032   .0181063     1.97   0.049     .0001156    .0710909
+       internet_hogar |  -.9673094   .2782381    -3.48   0.001    -1.512646   -.4219728
+     computador_hogar |   .0042638   .0080192     0.53   0.595    -.0114535    .0199811
+         ln_matricula |   .3214874   .2107602     1.53   0.127    -.0915951    .7345698
+ratio_alumnos_docente |   .0420503    .248988     0.17   0.866    -.4459572    .5300579
+           pct_planta |   .3226129    .285219     1.13   0.258     -.236406    .8816319
+         dotacion_tic |   .0173706   .0515911     0.34   0.736     -.083746    .1184873
+                rural |    .093156   .0899684     1.04   0.300    -.0831787    .2694908
+             ju_unica |   .5864171   .8893768     0.66   0.510    -1.156729    2.329564
+              tecnico |  -.0042745   .0263518    -0.16   0.871     -.055923     .047374
+    tecnico_academico |  -.1079597   .0868959    -1.24   0.214    -.2782726    .0623532
+        cole_femenino |   .1678954   .1062174     1.58   0.114    -.0402869    .3760777
+----------------------+----------------------------------------------------------------
+unexplained           |
+ estu_inse_individual |  -3.122553   5.095405    -0.61   0.540    -13.10936    6.864258
+                mujer |  -.2319821   .6464972    -0.36   0.720    -1.499093    1.035129
+                 edad |  -29.32057   8.186531    -3.58   0.000    -45.36588   -13.27526
+            repitente |  -.2317002   .2303449    -1.01   0.314    -.6831679    .2197675
+        lectura_30min |  -.8692134   .3908355    -2.22   0.026    -1.635237   -.1031899
+        libros_26omas |  -.1527199   .2494296    -0.61   0.540     -.641593    .3361532
+        trabaja_mas20 |  -.1304492   .0905612    -1.44   0.150    -.3079459    .0470475
+       internet_hogar |   .4306656   .6550515     0.66   0.511    -.8532118    1.714543
+     computador_hogar |  -1.058617    .590503    -1.79   0.073    -2.215982    .0987477
+         ln_matricula |  -14.56915   14.65676    -0.99   0.320    -43.29587    14.15757
+ratio_alumnos_docente |   6.489843    9.95335     0.65   0.514    -13.01836    25.99805
+           pct_planta |   6.574777   4.824152     1.36   0.173    -2.880388    16.02994
+         dotacion_tic |  -.8173421   1.510059    -0.54   0.588    -3.777003    2.142319
+                rural |   2.350558   1.230257     1.91   0.056    -.0607003    4.761817
+             ju_unica |   1.076949   .5915223     1.82   0.069    -.0824134    2.236311
+              tecnico |   .0493219    .962116     0.05   0.959    -1.836391    1.935035
+    tecnico_academico |   .3949109   .3683966     1.07   0.284    -.3271331    1.116955
+        cole_femenino |  -.4166317    .334305    -1.25   0.213    -1.071857    .2385941
+                _cons |   33.47888   16.12859     2.08   0.038     1.867424    65.09033
+---------------------------------------------------------------------------------------
+
+--- Oaxaca, m = 3, especificacion B_sinINSE ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.065159   114.02   0.000     231.4236    239.5189
+              group_2 |   236.3955   1.999931   118.20   0.000     232.4757    240.3153
+           difference |  -.9242385   1.035995    -0.89   0.372    -2.954751    1.106274
+            explained |  -.9682195   1.152117    -0.84   0.401    -3.226328    1.289889
+          unexplained |    .043981   1.263251     0.03   0.972    -2.431946    2.519908
+----------------------+----------------------------------------------------------------
+explained             |
+                mujer |   .0033292   .0781697     0.04   0.966    -.1498805    .1565389
+                 edad |  -2.132217   .2084985   -10.23   0.000    -2.540867   -1.723567
+            repitente |   .6984446   .1339448     5.21   0.000     .4359176    .9609716
+        lectura_30min |   .2354785   .0579251     4.07   0.000     .1219473    .3490097
+        libros_26omas |   .4228955   .0650856     6.50   0.000     .2953301     .550461
+        trabaja_mas20 |   .0363851   .0184089     1.98   0.048     .0003044    .0724658
+       internet_hogar |  -1.706778   .3207433    -5.32   0.000    -2.335423   -1.078133
+     computador_hogar |   .0174157    .026789     0.65   0.516    -.0350898    .0699212
+         ln_matricula |   .3401458   .2149555     1.58   0.114    -.0811592    .7614508
+ratio_alumnos_docente |   .0420836   .2491885     0.17   0.866    -.4463169    .5304841
+           pct_planta |   .3275985   .2895268     1.13   0.258    -.2398637    .8950606
+         dotacion_tic |   .0175634    .052009     0.34   0.736    -.0843724    .1194993
+                rural |   .0977383   .0936413     1.04   0.297    -.0857953     .281272
+             ju_unica |   .5721675   .8945526     0.64   0.522    -1.181123    2.325458
+              tecnico |   -.004501   .0276864    -0.16   0.871    -.0587654    .0497634
+    tecnico_academico |  -.1074552   .0864403    -1.24   0.214    -.2768751    .0619647
+        cole_femenino |   .1714859   .1085248     1.58   0.114    -.0412188    .3841906
+----------------------+----------------------------------------------------------------
+unexplained           |
+                mujer |  -.2255466   .6545119    -0.34   0.730    -1.508366    1.057273
+                 edad |  -28.86007   8.349531    -3.46   0.001    -45.22485   -12.49529
+            repitente |  -.2419869   .2302341    -1.05   0.293    -.6932374    .2092637
+        lectura_30min |  -.8535039   .3903582    -2.19   0.029    -1.618592   -.0884159
+        libros_26omas |  -.1595784   .2427521    -0.66   0.511    -.6353638    .3162071
+        trabaja_mas20 |  -.1446778   .0908754    -1.59   0.111    -.3227904    .0334347
+       internet_hogar |   .2570102   .6451285     0.40   0.690    -1.007418    1.521439
+     computador_hogar |  -1.194282   .5206492    -2.29   0.022    -2.214735   -.1738282
+         ln_matricula |  -13.54834   14.63098    -0.93   0.354    -42.22453    15.12786
+ratio_alumnos_docente |    6.50779   10.01783     0.65   0.516     -13.1268    26.14238
+           pct_planta |   6.613152   4.884112     1.35   0.176    -2.959532    16.18584
+         dotacion_tic |   -.678119   1.508522    -0.45   0.653    -3.634768    2.278531
+                rural |   2.415593   1.224247     1.97   0.048     .0161122    4.815073
+             ju_unica |   1.099579   .5908447     1.86   0.063    -.0584549    2.257614
+              tecnico |  -.0073367   .9636218    -0.01   0.994    -1.896001    1.881327
+    tecnico_academico |   .4047626   .3699321     1.09   0.274     -.320291    1.129816
+        cole_femenino |  -.4198147   .3355721    -1.25   0.211    -1.077524    .2378946
+                _cons |   29.07934   15.54962     1.87   0.061    -1.397346    59.55604
+---------------------------------------------------------------------------------------
+
+--- Oaxaca, m = 3, especificacion C_conposg ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.100343   112.11   0.000     231.3547    239.5879
+              group_2 |   236.3955   1.992254   118.66   0.000     232.4908    240.3003
+           difference |  -.9242385   1.150462    -0.80   0.422    -3.179103    1.330626
+            explained |   .0023659    1.26905     0.00   0.999    -2.484926    2.489658
+          unexplained |  -.9266045   1.344921    -0.69   0.491    -3.562601    1.709392
+----------------------+----------------------------------------------------------------
+explained             |
+ estu_inse_individual |  -.5442994   .1638931    -3.32   0.001    -.8655241   -.2230747
+                mujer |   .0032229   .0756745     0.04   0.966    -.1450963    .1515422
+                 edad |  -2.056895    .199681   -10.30   0.000    -2.448262   -1.665527
+            repitente |   .6516401   .1286632     5.06   0.000     .3994648    .9038155
+        lectura_30min |    .233295   .0573694     4.07   0.000      .120853     .345737
+        libros_26omas |   .3471473   .0572139     6.07   0.000     .2350101    .4592845
+        trabaja_mas20 |   .0350343   .0178363     1.96   0.050     .0000758    .0699927
+       internet_hogar |  -.9091227   .2725001    -3.34   0.001    -1.443213   -.3750323
+     computador_hogar |   .0042714   .0080143     0.53   0.594    -.0114364    .0199792
+         ln_matricula |     .32228   .2037631     1.58   0.114    -.0770884    .7216484
+ratio_alumnos_docente |    .037853   .2241927     0.17   0.866    -.4015567    .4772627
+           pct_planta |   .2976075   .2629459     1.13   0.258    -.2177569    .8129719
+           z_posgrado |   1.033016    .467271     2.21   0.027     .1171819    1.948851
+         dotacion_tic |   .0246562   .0677639     0.36   0.716    -.1081586     .157471
+                rural |   .0860981   .0842795     1.02   0.307    -.0790868     .251283
+             ju_unica |   .3760537   .8385555     0.45   0.654    -1.267485    2.019592
+              tecnico |  -.0049329    .030161    -0.16   0.870    -.0640473    .0541816
+    tecnico_academico |  -.1042409   .0844553    -1.23   0.217    -.2697703    .0612884
+        cole_femenino |    .169681   .1071587     1.58   0.113    -.0403462    .3797083
+----------------------+----------------------------------------------------------------
+unexplained           |
+ estu_inse_individual |  -5.097229   4.944847    -1.03   0.303    -14.78895    4.594494
+                mujer |  -.1351411   .6398628    -0.21   0.833    -1.389249    1.118967
+                 edad |  -30.79757   7.968043    -3.87   0.000    -46.41465   -15.18049
+            repitente |  -.3202507   .2464317    -1.30   0.194     -.803248    .1627467
+        lectura_30min |   -.885544   .3988252    -2.22   0.026    -1.667227    -.103861
+        libros_26omas |  -.2034338   .2482872    -0.82   0.413    -.6900678    .2832001
+        trabaja_mas20 |   -.105145   .0888206    -1.18   0.236    -.2792302    .0689403
+       internet_hogar |    .421273   .6508103     0.65   0.517    -.8542919    1.696838
+     computador_hogar |  -.9767926   .5918666    -1.65   0.099     -2.13683    .1832446
+         ln_matricula |  -10.82805   14.57613    -0.74   0.458    -39.39675    17.74064
+ratio_alumnos_docente |   1.031233   9.345044     0.11   0.912    -17.28472    19.34718
+           pct_planta |   -1.78056   4.993585    -0.36   0.721    -11.56781    8.006686
+           z_posgrado |   .4936048   .3635786     1.36   0.175    -.2189961    1.206206
+         dotacion_tic |  -.8913391   1.565159    -0.57   0.569    -3.958994    2.176316
+                rural |   3.179674   1.343574     2.37   0.018     .5463172    5.813031
+             ju_unica |   1.181991   .6248327     1.89   0.059    -.0426581    2.406641
+              tecnico |   .8389202   1.052465     0.80   0.425    -1.223874    2.901714
+    tecnico_academico |   .2761917   .3620469     0.76   0.446    -.4334072    .9857907
+        cole_femenino |  -.4806717   .3136495    -1.53   0.125    -1.095413      .13407
+                _cons |   44.15223   16.87088     2.62   0.009     11.08591    77.21855
+---------------------------------------------------------------------------------------
+
+--- Oaxaca, m = 3, especificacion D_sinINSE_posg ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.098535   112.21   0.000     231.3582    239.5843
+              group_2 |   236.3955    1.99163   118.69   0.000      232.492     240.299
+           difference |  -.9242385   1.153467    -0.80   0.423    -3.184992    1.336515
+            explained |  -.1073583   1.277188    -0.08   0.933    -2.610601    2.395885
+          unexplained |  -.8168803   1.352567    -0.60   0.546    -3.467863    1.834102
+----------------------+----------------------------------------------------------------
+explained             |
+                mujer |   .0032834   .0770932     0.04   0.966    -.1478166    .1543833
+                 edad |  -2.109853   .2052576   -10.28   0.000    -2.512151   -1.707556
+            repitente |   .6642619    .129207     5.14   0.000     .4110209     .917503
+        lectura_30min |   .2353737   .0578517     4.07   0.000     .1219864     .348761
+        libros_26omas |   .4111847   .0636311     6.46   0.000     .2864699    .5358994
+        trabaja_mas20 |   .0357881   .0181271     1.97   0.048     .0002596    .0713166
+       internet_hogar |  -1.625237   .3109048    -5.23   0.000    -2.234599   -1.015875
+     computador_hogar |   .0170148   .0261763     0.65   0.516    -.0342899    .0683195
+         ln_matricula |    .340364   .2078527     1.64   0.102    -.0670198    .7477477
+ratio_alumnos_docente |   .0378577    .224225     0.17   0.866    -.4016152    .4773307
+           pct_planta |   .3022741   .2669679     1.13   0.258    -.2209734    .8255216
+           z_posgrado |   1.039793   .4698274     2.21   0.027     .1189482    1.960638
+         dotacion_tic |   .0248908   .0683163     0.36   0.716    -.1090068    .1587883
+                rural |   .0904918   .0877678     1.03   0.303      -.08153    .2625136
+             ju_unica |   .3608667   .8436534     0.43   0.669    -1.292664    2.014397
+              tecnico |  -.0051567   .0314894    -0.16   0.870    -.0668748    .0565615
+    tecnico_academico |  -.1037277    .083999    -1.23   0.217    -.2683628    .0609073
+        cole_femenino |   .1731717   .1093989     1.58   0.113    -.0412462    .3875896
+----------------------+----------------------------------------------------------------
+unexplained           |
+                mujer |  -.1102539   .6458543    -0.17   0.864    -1.376105    1.155597
+                 edad |  -29.80171   8.098386    -3.68   0.000    -45.67426   -13.92917
+            repitente |  -.3354951   .2464839    -1.36   0.173    -.8185947    .1476045
+        lectura_30min |   -.872047   .3985659    -2.19   0.029    -1.653222   -.0908721
+        libros_26omas |  -.2366895   .2439026    -0.97   0.332    -.7147298    .2413508
+        trabaja_mas20 |  -.1186549   .0890223    -1.33   0.183    -.2931353    .0558256
+       internet_hogar |   .0926792   .6281657     0.15   0.883    -1.138503    1.323861
+     computador_hogar |  -1.221704    .521674    -2.34   0.019    -2.244166   -.1992415
+         ln_matricula |  -10.04797   14.62183    -0.69   0.492    -38.70623    18.61028
+ratio_alumnos_docente |   1.020643   9.397583     0.11   0.914    -17.39828    19.43957
+           pct_planta |  -1.823866   5.044501    -0.36   0.718    -11.71091    8.063173
+           z_posgrado |   .5007996   .3624752     1.38   0.167    -.2096387    1.211238
+         dotacion_tic |  -.7559827   1.563772    -0.48   0.629    -3.820919    2.308954
+                rural |   3.270581   1.341918     2.44   0.015     .6404698    5.900692
+             ju_unica |   1.208287   .6238094     1.94   0.053    -.0143565    2.430931
+              tecnico |   .7843728   1.053695     0.74   0.457    -1.280832    2.849577
+    tecnico_academico |   .2861764   .3638896     0.79   0.432    -.4270342     .999387
+        cole_femenino |  -.4874182   .3168646    -1.54   0.124    -1.108461    .1336251
+                _cons |   37.83138   16.19122     2.34   0.019     6.097173    69.56559
+---------------------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------
+IMPUTACION 4
+------------------------------------------------------------------------------
+(45,928 observations deleted)
+Observaciones de las dos cohortes: 23822
+
+--- Oaxaca, m = 4, especificacion A_principal ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.066879   113.93   0.000     231.4203    239.5223
+              group_2 |   236.3955   2.000089   118.19   0.000     232.4754    240.3156
+           difference |  -.9242385   1.031629    -0.90   0.370    -2.946194    1.097717
+            explained |  -.8641578   1.139564    -0.76   0.448    -3.097662    1.369346
+          unexplained |  -.0600807   1.247965    -0.05   0.962    -2.506048    2.385886
+----------------------+----------------------------------------------------------------
+explained             |
+ estu_inse_individual |  -.5515325   .1663304    -3.32   0.001     -.877534    -.225531
+                mujer |   .0032719   .0768232     0.04   0.966    -.1472988    .1538425
+                 edad |    -2.0752   .2026761   -10.24   0.000    -2.472438   -1.677962
+            repitente |   .6843109    .133387     5.13   0.000     .4228771    .9457447
+        lectura_30min |   .2491984   .0604787     4.12   0.000     .1306622    .3677345
+        libros_26omas |    .335555   .0562107     5.97   0.000     .2253841    .4457259
+        trabaja_mas20 |   .0408679   .0202314     2.02   0.043      .001215    .0805208
+       internet_hogar |  -.9717403   .2782481    -3.49   0.000    -1.517096   -.4263841
+     computador_hogar |   .0053181    .008938     0.60   0.552       -.0122    .0228362
+         ln_matricula |   .3129993     .20467     1.53   0.126    -.0881466    .7141452
+ratio_alumnos_docente |    .028666   .2535892     0.11   0.910    -.4683597    .5256918
+           pct_planta |   .3442835   .2834422     1.21   0.224     -.211253      .89982
+         dotacion_tic |   .0124654   .0427496     0.29   0.771    -.0713223    .0962531
+                rural |   .0899106   .0875233     1.03   0.304    -.0816319    .2614531
+             ju_unica |    .568655   .8891415     0.64   0.522     -1.17403     2.31134
+              tecnico |  -.0022786   .0248492    -0.09   0.927    -.0509821    .0464248
+    tecnico_academico |   -.106908   .0865069    -1.24   0.217    -.2764584    .0626424
+        cole_femenino |   .1679999   .1062542     1.58   0.114    -.0402546    .3762544
+----------------------+----------------------------------------------------------------
+unexplained           |
+ estu_inse_individual |  -3.802001   5.316452    -0.72   0.475    -14.22206    6.618055
+                mujer |  -.1708128   .6506324    -0.26   0.793    -1.446029    1.104403
+                 edad |  -29.03797   8.079163    -3.59   0.000    -44.87284    -13.2031
+            repitente |  -.2249027   .2303962    -0.98   0.329     -.676471    .2266657
+        lectura_30min |  -1.089658   .4071016    -2.68   0.007    -1.887562   -.2917531
+        libros_26omas |  -.1127224    .262196    -0.43   0.667    -.6266172    .4011724
+        trabaja_mas20 |  -.1177281   .0891951    -1.32   0.187    -.2925472     .057091
+       internet_hogar |   .5693426   .7052702     0.81   0.420    -.8129616    1.951647
+     computador_hogar |  -.8850901   .5782978    -1.53   0.126    -2.018533    .2483528
+         ln_matricula |  -13.79757   14.61384    -0.94   0.345    -42.44018    14.84503
+ratio_alumnos_docente |   7.187164   10.03831     0.72   0.474    -12.48756    26.86189
+           pct_planta |   6.100661   4.828524     1.26   0.206    -3.363072    15.56439
+         dotacion_tic |   .0727161   1.469636     0.05   0.961    -2.807717     2.95315
+                rural |   2.474105   1.248395     1.98   0.047     .0272958    4.920914
+             ju_unica |   1.087253    .592932     1.83   0.067    -.0748725    2.249378
+              tecnico |   .0174634   .9719491     0.02   0.986    -1.887522    1.922449
+    tecnico_academico |   .3856296   .3679897     1.05   0.295     -.335617    1.106876
+        cole_femenino |  -.4129653   .3324723    -1.24   0.214    -1.064599    .2386685
+                _cons |   31.69701   16.30814     1.94   0.052    -.2663581    63.66037
+---------------------------------------------------------------------------------------
+
+--- Oaxaca, m = 4, especificacion B_sinINSE ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.064459   114.06   0.000      231.425    239.5175
+              group_2 |   236.3955   1.999186   118.25   0.000     232.4772    240.3139
+           difference |  -.9242385   1.033013    -0.89   0.371    -2.948907     1.10043
+            explained |  -.9771548   1.148975    -0.85   0.395    -3.229105    1.274796
+          unexplained |   .0529162   1.256013     0.04   0.966    -2.408824    2.514656
+----------------------+----------------------------------------------------------------
+explained             |
+                mujer |   .0033336   .0782725     0.04   0.966    -.1500777    .1567449
+                 edad |   -2.13075   .2083481   -10.23   0.000    -2.539105   -1.722396
+            repitente |   .6971708   .1339631     5.20   0.000      .434608    .9597336
+        lectura_30min |   .2517822   .0610663     4.12   0.000     .1320945    .3714699
+        libros_26omas |   .4003588   .0627668     6.38   0.000     .2773381    .5233795
+        trabaja_mas20 |   .0415082   .0204922     2.03   0.043     .0013442    .0816722
+       internet_hogar |  -1.700186   .3167847    -5.37   0.000    -2.321073   -1.079299
+     computador_hogar |   .0194074   .0273327     0.71   0.478    -.0341637    .0729785
+         ln_matricula |    .330492   .2087595     1.58   0.113    -.0786691    .7396531
+ratio_alumnos_docente |   .0286876   .2537815     0.11   0.910    -.4687149    .5260902
+           pct_planta |    .349475   .2876134     1.22   0.224    -.2142369     .913187
+         dotacion_tic |   .0127271   .0430106     0.30   0.767    -.0715722    .0970264
+                rural |   .0943499    .091066     1.04   0.300    -.0841362    .2728359
+             ju_unica |   .5612265   .8934167     0.63   0.530    -1.189838    2.312291
+              tecnico |  -.0023883   .0260261    -0.09   0.927    -.0533984    .0486219
+    tecnico_academico |  -.1060583   .0858897    -1.23   0.217     -.274399    .0622825
+        cole_femenino |    .171709    .108636     1.58   0.114    -.0412137    .3846316
+----------------------+----------------------------------------------------------------
+unexplained           |
+                mujer |  -.1472016   .6580363    -0.22   0.823    -1.436929    1.142526
+                 edad |  -28.29384   8.208484    -3.45   0.001    -44.38217    -12.2055
+            repitente |  -.2323492   .2297207    -1.01   0.312    -.6825935    .2178952
+        lectura_30min |  -1.079108   .4054461    -2.66   0.008    -1.873768   -.2844482
+        libros_26omas |  -.1332972   .2543334    -0.52   0.600    -.6317816    .3651872
+        trabaja_mas20 |  -.1313154   .0893085    -1.47   0.141    -.3063568     .043726
+       internet_hogar |   .3588793   .6497399     0.55   0.581    -.9145876    1.632346
+     computador_hogar |  -1.067492   .5125422    -2.08   0.037    -2.072057   -.0629279
+         ln_matricula |  -12.72774   14.55298    -0.87   0.382    -41.25106    15.79558
+ratio_alumnos_docente |   7.226796   10.09257     0.72   0.474    -12.55428    27.00788
+           pct_planta |   6.124969   4.897453     1.25   0.211    -3.473863     15.7238
+         dotacion_tic |   .2306186   1.467609     0.16   0.875    -2.645842    3.107079
+                rural |    2.53763   1.242489     2.04   0.041     .1023959    4.972863
+             ju_unica |   1.112887   .5927478     1.88   0.060    -.0488778    2.274651
+              tecnico |  -.0319935   .9719461    -0.03   0.974    -1.936973    1.872986
+    tecnico_academico |   .3917559   .3695353     1.06   0.289    -.3325201    1.116032
+        cole_femenino |  -.4198441   .3350771    -1.25   0.210    -1.076583    .2368949
+                _cons |   26.33356    15.6778     1.68   0.093    -4.394362    57.06148
+---------------------------------------------------------------------------------------
+
+--- Oaxaca, m = 4, especificacion C_conposg ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.099841   112.14   0.000     231.3557    239.5869
+              group_2 |   236.3955      1.992   118.67   0.000     232.4913    240.2998
+           difference |  -.9242385   1.147753    -0.81   0.421    -3.173794    1.325316
+            explained |  -.0066528   1.265033    -0.01   0.996    -2.486072    2.472766
+          unexplained |  -.9175858   1.338449    -0.69   0.493    -3.540898    1.705727
+----------------------+----------------------------------------------------------------
+explained             |
+ estu_inse_individual |  -.5362186   .1621674    -3.31   0.001    -.8540609   -.2183762
+                mujer |   .0032261   .0757489     0.04   0.966    -.1452391    .1516913
+                 edad |  -2.054794   .1997169   -10.29   0.000    -2.446232   -1.663356
+            repitente |   .6514222   .1287983     5.06   0.000     .3989823    .9038622
+        lectura_30min |   .2470417   .0599595     4.12   0.000     .1295232    .3645602
+        libros_26omas |   .3258279   .0551899     5.90   0.000     .2176578    .4339981
+        trabaja_mas20 |   .0402286    .019926     2.02   0.043     .0011743    .0792829
+       internet_hogar |  -.9157893   .2729056    -3.36   0.001    -1.450674   -.3809041
+     computador_hogar |   .0054459   .0090785     0.60   0.549    -.0123477    .0232395
+         ln_matricula |   .3119024   .1979458     1.58   0.115    -.0760642    .6998691
+ratio_alumnos_docente |   .0259089   .2292231     0.11   0.910    -.4233602    .4751781
+           pct_planta |   .3178321   .2614716     1.22   0.224    -.1946429    .8303071
+           z_posgrado |   1.036823   .4648067     2.23   0.026     .1258182    1.947827
+         dotacion_tic |   .0220404   .0538802     0.41   0.682    -.0835627    .1276436
+                rural |   .0831524   .0820994     1.01   0.311    -.0777595    .2440642
+             ju_unica |   .3654978   .8394699     0.44   0.663    -1.279833    2.010829
+              tecnico |   -.002645   .0287614    -0.09   0.927    -.0590163    .0537263
+    tecnico_academico |  -.1033019   .0841211    -1.23   0.219    -.2681762    .0615724
+        cole_femenino |   .1697467   .1071769     1.58   0.113    -.0403163    .3798096
+----------------------+----------------------------------------------------------------
+unexplained           |
+ estu_inse_individual |  -5.750158   5.176074    -1.11   0.267    -15.89508     4.39476
+                mujer |   -.072291   .6431689    -0.11   0.911    -1.332879    1.188297
+                 edad |  -30.58264   7.884193    -3.88   0.000    -46.03538   -15.12991
+            repitente |   -.315425   .2465529    -1.28   0.201    -.7986598    .1678099
+        lectura_30min |  -1.105602   .4135489    -2.67   0.008    -1.916143   -.2950615
+        libros_26omas |  -.1558582   .2625224    -0.59   0.553    -.6703928    .3586763
+        trabaja_mas20 |  -.0924994   .0876816    -1.05   0.291    -.2643521    .0793534
+       internet_hogar |   .5427845   .7006015     0.77   0.438    -.8303692    1.915938
+     computador_hogar |  -.7978236   .5812119    -1.37   0.170    -1.936978    .3413309
+         ln_matricula |  -10.11256   14.55552    -0.69   0.487    -38.64086    18.41574
+ratio_alumnos_docente |   1.603447   9.434155     0.17   0.865    -16.88716    20.09405
+           pct_planta |  -2.121957   4.992186    -0.43   0.671    -11.90646    7.662548
+           z_posgrado |   .4899773   .3613882     1.36   0.175    -.2183306    1.198285
+         dotacion_tic |  -.1017159    1.53613    -0.07   0.947    -3.112474    2.909043
+                rural |    3.29732   1.366005     2.41   0.016     .6200002     5.97464
+             ju_unica |   1.193362   .6259497     1.91   0.057    -.0334764    2.420201
+              tecnico |   .7834499   1.061978     0.74   0.461     -1.29799    2.864889
+    tecnico_academico |   .2666885   .3614311     0.74   0.461    -.4417034    .9750805
+        cole_femenino |  -.4753802   .3114178    -1.53   0.127    -1.085748    .1349874
+                _cons |   42.58929   17.14374     2.48   0.013     8.988173    76.19041
+---------------------------------------------------------------------------------------
+
+--- Oaxaca, m = 4, especificacion D_sinINSE_posg ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.097844   112.24   0.000     231.3596     239.583
+              group_2 |   236.3955   1.991012   118.73   0.000     232.4932    240.2978
+           difference |  -.9242385   1.149763    -0.80   0.421    -3.177732    1.329255
+            explained |  -.1114031     1.2728    -0.09   0.930    -2.606045    2.383239
+          unexplained |  -.8128355   1.346409    -0.60   0.546    -3.451748    1.826077
+----------------------+----------------------------------------------------------------
+explained             |
+                mujer |   .0032858   .0771514     0.04   0.966    -.1479282    .1544999
+                 edad |  -2.108671   .2051812   -10.28   0.000    -2.510819   -1.706524
+            repitente |   .6637277   .1294076     5.13   0.000     .4100935    .9173618
+        lectura_30min |   .2495406     .06053     4.12   0.000     .1309039    .3681773
+        libros_26omas |    .388764    .061538     6.32   0.000     .2681517    .5093763
+        trabaja_mas20 |   .0408472   .0201778     2.02   0.043     .0012994     .080395
+       internet_hogar |  -1.623557   .3076632    -5.28   0.000    -2.226566   -1.020548
+     computador_hogar |   .0191425    .026959     0.71   0.478    -.0336962    .0719811
+         ln_matricula |   .3289001    .201942     1.63   0.103    -.0668991    .7246992
+ratio_alumnos_docente |   .0259136   .2292655     0.11   0.910    -.4234386    .4752658
+           pct_planta |   .3227216   .2653887     1.22   0.224    -.1974308    .8428739
+           z_posgrado |   1.042978   .4670281     2.23   0.026     .1276196    1.958336
+         dotacion_tic |   .0223517   .0543249     0.41   0.681    -.0841232    .1288266
+                rural |   .0874275   .0854823     1.02   0.306    -.0801147    .2549697
+             ju_unica |   .3570708   .8436118     0.42   0.672    -1.296378     2.01052
+              tecnico |  -.0027538   .0299318    -0.09   0.927    -.0614191    .0559116
+    tecnico_academico |  -.1024545   .0835067    -1.23   0.220    -.2661246    .0612157
+        cole_femenino |   .1733626   .1094962     1.58   0.113     -.041246    .3879711
+----------------------+----------------------------------------------------------------
+unexplained           |
+                mujer |  -.0306261    .648808    -0.05   0.962    -1.302266    1.241014
+                 edad |  -29.29967   7.979641    -3.67   0.000    -44.93948   -13.65986
+            repitente |  -.3275325   .2461178    -1.33   0.183    -.8099146    .1548496
+        lectura_30min |  -1.098127   .4122688    -2.66   0.008    -1.906159   -.2900946
+        libros_26omas |  -.2019426   .2564706    -0.79   0.431    -.7046158    .3007305
+        trabaja_mas20 |  -.1055967   .0877402    -1.20   0.229    -.2775645     .066371
+       internet_hogar |   .1775371   .6317343     0.28   0.779    -1.060639    1.415714
+     computador_hogar |  -1.086693   .5156333    -2.11   0.035    -2.097315     -.07607
+         ln_matricula |   -9.28026    14.5681    -0.64   0.524    -37.83322     19.2727
+ratio_alumnos_docente |   1.620904   9.479208     0.17   0.864      -16.958    20.19981
+           pct_planta |   -2.16709   5.050531    -0.43   0.668    -12.06595     7.73177
+           z_posgrado |   .4959061   .3599005     1.38   0.168    -.2094859    1.201298
+         dotacion_tic |   .0531274   1.534019     0.03   0.972    -2.953495     3.05975
+                rural |   3.384817   1.364206     2.48   0.013     .7110222    6.058612
+             ju_unica |   1.223393   .6255213     1.96   0.050    -.0026061    2.449392
+              tecnico |   .7337223   1.062059     0.69   0.490    -1.347875     2.81532
+    tecnico_academico |   .2727844   .3634048     0.75   0.453    -.4394759    .9850447
+        cole_femenino |  -.4857862   .3162009    -1.54   0.124    -1.105529    .1339562
+                _cons |    35.3083   16.37029     2.16   0.031     3.223125    67.39347
+---------------------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------
+IMPUTACION 5
+------------------------------------------------------------------------------
+(45,928 observations deleted)
+Observaciones de las dos cohortes: 23822
+
+--- Oaxaca, m = 5, especificacion A_principal ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.064906   114.03   0.000     231.4241    239.5184
+              group_2 |   236.3955   2.000824   118.15   0.000      232.474    240.3171
+           difference |  -.9242385    1.03748    -0.89   0.373    -2.957662    1.109185
+            explained |  -.9204945   1.134666    -0.81   0.417      -3.1444    1.303411
+          unexplained |  -.0037441   1.249801    -0.00   0.998    -2.453309     2.44582
+----------------------+----------------------------------------------------------------
+explained             |
+ estu_inse_individual |  -.5604896   .1686317    -3.32   0.001    -.8910016   -.2299776
+                mujer |    .003285   .0771308     0.04   0.966    -.1478887    .1544586
+                 edad |  -2.071946   .2022154   -10.25   0.000    -2.468281   -1.675611
+            repitente |   .6865884   .1334194     5.15   0.000     .4250912    .9480856
+        lectura_30min |   .2160937   .0604098     3.58   0.000     .0976926    .3344948
+        libros_26omas |   .3222086   .0548101     5.88   0.000     .2147827    .4296344
+        trabaja_mas20 |   .0404473   .0195286     2.07   0.038     .0021719    .0787228
+       internet_hogar |   -1.01119   .2832126    -3.57   0.000    -1.566276   -.4561032
+     computador_hogar |   .0033294    .007241     0.46   0.646    -.0108627    .0175214
+         ln_matricula |   .3084665   .2032228     1.52   0.129    -.0898429     .706776
+ratio_alumnos_docente |   .0449343   .2503012     0.18   0.858     -.445647    .5355156
+           pct_planta |   .3378859   .2878438     1.17   0.240    -.2262775    .9020494
+         dotacion_tic |   .0088786   .0413842     0.21   0.830     -.072233    .0899903
+                rural |   .0916012   .0887019     1.03   0.302    -.0822513    .2654537
+             ju_unica |   .6029692   .8891773     0.68   0.498    -1.139786    2.345725
+              tecnico |  -.0094014   .0282253    -0.33   0.739    -.0647221    .0459192
+    tecnico_academico |  -.1026602   .0846685    -1.21   0.225    -.2686075    .0632871
+        cole_femenino |   .1685038   .1065704     1.58   0.114    -.0403704     .377378
+----------------------+----------------------------------------------------------------
+unexplained           |
+ estu_inse_individual |   -3.04897   5.195242    -0.59   0.557    -13.23146    7.133517
+                mujer |  -.1601471   .6467024    -0.25   0.804     -1.42766    1.107366
+                 edad |  -29.56326   8.182805    -3.61   0.000    -45.60126   -13.52526
+            repitente |  -.2259538   .2323792    -0.97   0.331    -.6814088    .2295011
+        lectura_30min |  -.9842757   .3936343    -2.50   0.012    -1.755785   -.2127667
+        libros_26omas |  -.0582097   .2454107    -0.24   0.813    -.5392058    .4227863
+        trabaja_mas20 |  -.1339143   .0901077    -1.49   0.137    -.3105222    .0426936
+       internet_hogar |   .3455587      .6944     0.50   0.619     -1.01544    1.706558
+     computador_hogar |  -1.034856   .5807626    -1.78   0.075     -2.17313     .103418
+         ln_matricula |  -14.99894   14.69739    -1.02   0.307    -43.80529    13.80741
+ratio_alumnos_docente |   6.673373   9.924458     0.67   0.501    -12.77821    26.12495
+           pct_planta |   6.613902   4.796846     1.38   0.168    -2.787743    16.01555
+         dotacion_tic |   -.601732   1.499541    -0.40   0.688    -3.540779    2.337315
+                rural |    2.31175   1.229121     1.88   0.060    -.0972828    4.720782
+             ju_unica |    1.05541   .5906834     1.79   0.074     -.102308    2.213128
+              tecnico |   .1836413   .9443169     0.19   0.846    -1.667186    2.034468
+    tecnico_academico |   .4073205   .3667219     1.11   0.267    -.3114413    1.126082
+        cole_femenino |   -.415352   .3355354    -1.24   0.216    -1.072989    .2422853
+                _cons |   33.63091   16.24703     2.07   0.038     1.787315    65.47451
+---------------------------------------------------------------------------------------
+
+--- Oaxaca, m = 5, especificacion B_sinINSE ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.062513   114.17   0.000     231.4288    239.5137
+              group_2 |   236.3955   2.000271   118.18   0.000     232.4751     240.316
+           difference |  -.9242385   1.040166    -0.89   0.374    -2.962926    1.114449
+            explained |  -1.047334   1.145069    -0.91   0.360    -3.291628     1.19696
+          unexplained |   .1230956   1.259079     0.10   0.922    -2.344655    2.590846
+----------------------+----------------------------------------------------------------
+explained             |
+                mujer |   .0033446   .0785316     0.04   0.966    -.1505744    .1572637
+                 edad |  -2.127685   .2080351   -10.23   0.000    -2.535426   -1.719943
+            repitente |   .7002079   .1339318     5.23   0.000     .4377064    .9627095
+        lectura_30min |     .21732   .0607266     3.58   0.000     .0982981    .3363419
+        libros_26omas |   .3902936   .0608472     6.41   0.000     .2710354    .5095519
+        trabaja_mas20 |   .0410729   .0197745     2.08   0.038     .0023156    .0798302
+       internet_hogar |  -1.753348    .320691    -5.47   0.000    -2.381891   -1.124806
+     computador_hogar |   .0141621   .0261878     0.54   0.589     -.037165    .0654893
+         ln_matricula |   .3263808    .207467     1.57   0.116     -.080247    .7330086
+ratio_alumnos_docente |   .0450213    .250788     0.18   0.858     -.446514    .5365567
+           pct_planta |   .3429574   .2920717     1.17   0.240    -.2294926    .9154074
+         dotacion_tic |    .008912   .0415115     0.21   0.830    -.0724491     .090273
+                rural |   .0962525   .0924423     1.04   0.298     -.084931    .2774361
+             ju_unica |   .5873601    .894243     0.66   0.511    -1.165324    2.340044
+              tecnico |   -.009885   .0293688    -0.34   0.736    -.0674469    .0476768
+    tecnico_academico |  -.1017806   .0840232    -1.21   0.226     -.266463    .0629018
+        cole_femenino |   .1720792   .1088738     1.58   0.114    -.0413096     .385468
+----------------------+----------------------------------------------------------------
+unexplained           |
+                mujer |  -.1365378    .654286    -0.21   0.835    -1.418915    1.145839
+                 edad |  -28.86749   8.310267    -3.47   0.001    -45.15532   -12.57967
+            repitente |  -.2308284   .2322921    -0.99   0.320    -.6861124    .2244557
+        lectura_30min |  -.9626522   .3931059    -2.45   0.014    -1.733126   -.1921788
+        libros_26omas |  -.0637199   .2430168    -0.26   0.793     -.540024    .4125842
+        trabaja_mas20 |   -.148685   .0900928    -1.65   0.099    -.3252637    .0278937
+       internet_hogar |   .1668401   .6473648     0.26   0.797    -1.101972    1.435652
+     computador_hogar |  -1.163406   .5219623    -2.23   0.026    -2.186434   -.1403792
+         ln_matricula |  -13.96757   14.67321    -0.95   0.341    -42.72654     14.7914
+ratio_alumnos_docente |   6.691202   9.983578     0.67   0.503    -12.87625    26.25866
+           pct_planta |   6.695287   4.857731     1.38   0.168    -2.825691    16.21626
+         dotacion_tic |  -.4534352   1.495068    -0.30   0.762    -3.383714    2.476843
+                rural |    2.36906   1.223146     1.94   0.053    -.0282624    4.766382
+             ju_unica |   1.080036   .5903553     1.83   0.067    -.0770389    2.237111
+              tecnico |   .1318486   .9466985     0.14   0.889    -1.723646    1.987344
+    tecnico_academico |   .4174983   .3684522     1.13   0.257    -.3046548    1.139651
+        cole_femenino |  -.4192115   .3372604    -1.24   0.214     -1.08023    .2418068
+                _cons |   28.98486   15.65518     1.85   0.064    -1.698731    59.66846
+---------------------------------------------------------------------------------------
+
+--- Oaxaca, m = 5, especificacion C_conposg ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.097642   112.26   0.000       231.36    239.5826
+              group_2 |   236.3955   1.993117   118.61   0.000     232.4891     240.302
+           difference |  -.9242385   1.150616    -0.80   0.422    -3.179404    1.330926
+            explained |  -.0488368   1.260558    -0.04   0.969    -2.519485    2.421812
+          unexplained |  -.8754018   1.342395    -0.65   0.514    -3.506448    1.755644
+----------------------+----------------------------------------------------------------
+explained             |
+ estu_inse_individual |  -.5440788   .1648078    -3.30   0.001    -.8670962   -.2210614
+                mujer |   .0032398   .0760706     0.04   0.966    -.1458559    .1523355
+                 edad |   -2.05233   .1993467   -10.30   0.000    -2.443042   -1.661617
+            repitente |   .6543219   .1288457     5.08   0.000     .4017889    .9068548
+        lectura_30min |   .2140841   .0598332     3.58   0.000     .0968131    .3313551
+        libros_26omas |   .3145771   .0540333     5.82   0.000     .2086738    .4204804
+        trabaja_mas20 |   .0395094   .0191105     2.07   0.039     .0020535    .0769652
+       internet_hogar |  -.9484618   .2772315    -3.42   0.001    -1.491826   -.4050981
+     computador_hogar |   .0033677   .0072913     0.46   0.644     -.010923    .0176584
+         ln_matricula |    .308132   .1966746     1.57   0.117    -.0773431    .6936072
+ratio_alumnos_docente |   .0404742    .225522     0.18   0.858    -.4015409    .4824893
+           pct_planta |   .3134762   .2668841     1.17   0.240     -.209607    .8365595
+           z_posgrado |   1.033527   .4622296     2.24   0.025     .1275738     1.93948
+         dotacion_tic |   .0131915   .0589106     0.22   0.823    -.1022711    .1286542
+                rural |   .0853586   .0836573     1.02   0.308    -.0786066    .2493239
+             ju_unica |   .4115168   .8406291     0.49   0.624    -1.236086     2.05912
+              tecnico |  -.0105372    .030551    -0.34   0.730    -.0704161    .0493418
+    tecnico_academico |  -.0986235   .0820492    -1.20   0.229     -.259437    .0621899
+        cole_femenino |   .1704177   .1076052     1.58   0.113    -.0404846      .38132
+----------------------+----------------------------------------------------------------
+unexplained           |
+ estu_inse_individual |  -4.910206    5.06447    -0.97   0.332    -14.83638    5.015972
+                mujer |   -.050086   .6407188    -0.08   0.938    -1.305872      1.2057
+                 edad |  -30.95274   7.969552    -3.88   0.000    -46.57277    -15.3327
+            repitente |  -.3172546    .248296    -1.28   0.201    -.8039058    .1693965
+        lectura_30min |  -.9852367   .3999804    -2.46   0.014    -1.769184   -.2012896
+        libros_26omas |  -.1155896   .2458609    -0.47   0.638    -.5974681     .366289
+        trabaja_mas20 |  -.1088347   .0883515    -1.23   0.218    -.2820005    .0643312
+       internet_hogar |    .324736   .6907331     0.47   0.638    -1.029076    1.678548
+     computador_hogar |  -.9491175   .5807465    -1.63   0.102     -2.08736    .1891247
+         ln_matricula |  -11.18145   14.62998    -0.76   0.445    -39.85569    17.49279
+ratio_alumnos_docente |   1.264696   9.308942     0.14   0.892     -16.9805    19.50989
+           pct_planta |  -1.767926   4.971904    -0.36   0.722    -11.51268    7.976827
+           z_posgrado |   .5067464   .3664904     1.38   0.167    -.2115615    1.225054
+         dotacion_tic |   -.723489   1.562499    -0.46   0.643    -3.785931    2.338953
+                rural |   3.148312   1.347586     2.34   0.019     .5070924    5.789532
+             ju_unica |    1.17015   .6242623     1.87   0.061    -.0533815    2.393682
+              tecnico |   .9022979   1.027693     0.88   0.380    -1.111943    2.916539
+    tecnico_academico |   .2830828   .3602796     0.79   0.432    -.4230522    .9892178
+        cole_femenino |   -.479924   .3154154    -1.52   0.128    -1.098127    .1382789
+                _cons |   44.06642    16.9364     2.60   0.009     10.87169    77.26116
+---------------------------------------------------------------------------------------
+
+--- Oaxaca, m = 5, especificacion D_sinINSE_posg ---
+
+Blinder-Oaxaca decomposition                            Number of obs = 23,822
+                                                Model             =     linear
+Group 1: y2023 = 0                              N of obs 1        =     11,456
+Group 2: y2023 = 1                              N of obs 2        =     12,366
+
+    explained: (X1 - X2) * b
+  unexplained: X1 * (b1 - b) + X2 * (b - b2)
+               with b from pooled model (including group dummy)
+
+                                       (Std. err. adjusted for 428 clusters in sede_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+overall               |
+              group_1 |   235.4713   2.095716   112.36   0.000     231.3638    239.5788
+              group_2 |   236.3955   1.992602   118.64   0.000     232.4901    240.3009
+           difference |  -.9242385   1.154017    -0.80   0.423    -3.186069    1.337592
+            explained |  -.1662123   1.269185    -0.13   0.896    -2.653768    2.321344
+          unexplained |  -.7580263   1.351342    -0.56   0.575    -3.406609    1.890556
+----------------------+----------------------------------------------------------------
+explained             |
+                mujer |   .0032974   .0774231     0.04   0.966    -.1484491     .155044
+                 edad |  -2.106297   .2049439   -10.28   0.000     -2.50798   -1.704614
+            repitente |    .667328   .1293725     5.16   0.000     .4137626    .9208934
+        lectura_30min |    .215261   .0601384     3.58   0.000     .0973919    .3331302
+        libros_26omas |   .3806054   .0599137     6.35   0.000     .2631767    .4980342
+        trabaja_mas20 |   .0401103   .0193457     2.07   0.038     .0021936    .0780271
+       internet_hogar |  -1.668336    .309647    -5.39   0.000    -2.275233   -1.061439
+     computador_hogar |   .0138815   .0256729     0.54   0.589    -.0364365    .0641995
+         ln_matricula |   .3255161   .2008052     1.62   0.105    -.0680549    .7190871
+ratio_alumnos_docente |   .0405294   .2258322     0.18   0.858    -.4020937    .4831524
+           pct_planta |   .3182379   .2708439     1.17   0.240    -.2126064    .8490821
+           z_posgrado |   1.040316   .4646332     2.24   0.025      .129652    1.950981
+         dotacion_tic |   .0132522   .0591605     0.22   0.823    -.1027002    .1292047
+                rural |   .0898319   .0872271     1.03   0.303    -.0811302    .2607939
+             ju_unica |   .3951101   .8456441     0.47   0.640    -1.262322    2.052542
+              tecnico |   -.011014   .0317149    -0.35   0.728     -.073174    .0511461
+    tecnico_academico |  -.0977433   .0814071    -1.20   0.230    -.2572983    .0618117
+        cole_femenino |   .1739003   .1098454     1.58   0.113    -.0413926    .3891932
+----------------------+----------------------------------------------------------------
+unexplained           |
+                mujer |  -.0099533   .6464619    -0.02   0.988    -1.276995    1.257089
+                 edad |  -29.74928   8.065001    -3.69   0.000     -45.5564   -13.94217
+            repitente |  -.3268247    .248477    -1.32   0.188    -.8138307    .1601814
+        lectura_30min |  -.9651642   .3994734    -2.42   0.016    -1.748118   -.1822107
+        libros_26omas |  -.1461688   .2446353    -0.60   0.550    -.6256452    .3333076
+        trabaja_mas20 |  -.1230023   .0882765    -1.39   0.164    -.2960211    .0500164
+       internet_hogar |  -.0029548   .6311224    -0.00   0.996    -1.239932    1.234022
+     computador_hogar |  -1.180656   .5238319    -2.25   0.024    -2.207347   -.1539641
+         ln_matricula |  -10.37622   14.67092    -0.71   0.479    -39.13069    18.37825
+ratio_alumnos_docente |   1.253508   9.358532     0.13   0.893    -17.08888    19.59589
+           pct_planta |  -1.759733   5.022947    -0.35   0.726    -11.60453    8.085063
+           z_posgrado |   .5129772   .3652506     1.40   0.160    -.2029007    1.228855
+         dotacion_tic |  -.5798398   1.558005    -0.37   0.710    -3.633473    2.473793
+                rural |   3.229511   1.345523     2.40   0.016     .5923344    5.866688
+             ju_unica |   1.197802   .6236187     1.92   0.055     -.024468    2.420073
+              tecnico |   .8520687   1.029998     0.83   0.408    -1.166691    2.870828
+    tecnico_academico |   .2931804   .3621861     0.81   0.418    -.4166913    1.003052
+        cole_femenino |  -.4869931   .3188975    -1.53   0.127    -1.112021    .1380346
+                _cons |   37.60972   16.26179     2.31   0.021     5.737205    69.48224
+---------------------------------------------------------------------------------------
+. 
+.     postclose `po'
+. 
+.     timer off 4
+.     display _newline "--- Tiempo del bloque [2] ---"
+
+--- Tiempo del bloque [2] ---
+.     timer list 4
+   4:     70.56 /        1 =      70.5610
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [3] COMBINACION DE RUBIN Y RESUMEN
+. ********************************************************************************
+. * Qbar = media de los Q_m
+. * Ubar = media de las varianzas dentro de cada imputacion (se^2)
+. * B    = varianza muestral de los Q_m, con divisor M-1
+. * T    = Ubar + (1 + 1/M) * B
+. * nu   = (M-1) * (1 + Ubar / ((1 + 1/M) * B))^2
+. *
+. * Con M = 5 los grados de libertad pueden salir muy bajos. Se reportan, y el
+. * rango entre imputaciones se reporta junto a ellos, como hizo C1.
+. 
+. if `hacer_rubin' == 1 {
+. 
+.     display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+.     display "[3] COMBINACION DE RUBIN SOBRE LAS CINCO IMPUTACIONES"
+[3] COMBINACION DE RUBIN SOBRE LAS CINCO IMPUTACIONES
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     capture confirm file "C3_oaxaca_`hoy'.dta"
+.     if _rc != 0 {
+.         display as error "No se encuentra C3_oaxaca_`hoy'.dta. Correr el [2]."
+.         exit 601
+.     }
+. 
+.     use "C3_oaxaca_`hoy'.dta", clear
+. 
+.     generate double u = se^2
+. 
+.     display _newline "Espec.             Componente                    Qbar" ///
+>         "     EE(T)       t      gl       p       min       max"
+
+Espec.             Componente                    Qbar     EE(T)       t      gl       p      
+>  min       max
+. 
+.     levelsof espec, local(especs)
+`"A_principal"' `"B_sinINSE"' `"C_conposg"' `"D_sinINSE_posg"'
+.     foreach e of local especs {
+  2.         foreach c in difference explained unexplained ///
+>                      exp_edad exp_repitente exp_estu_inse_individual ///
+>                      exp_z_posgrado {
+  3. 
+.             quietly count if espec == "`e'" & componente == "`c'"
+  4.             local M = r(N)
+  5.             if `M' < 2 continue
+  6. 
+.             quietly summarize b if espec == "`e'" & componente == "`c'"
+  7.             scalar qbar = r(mean)
+  8.             scalar Bv   = r(Var)
+  9.             scalar bmin = r(min)
+ 10.             scalar bmax = r(max)
+ 11. 
+.             quietly summarize u if espec == "`e'" & componente == "`c'"
+ 12.             scalar ubar = r(mean)
+ 13. 
+.             scalar Tv = ubar + (1 + 1/`M')*Bv
+ 14.             scalar sev = sqrt(Tv)
+ 15.             scalar tv  = qbar/sev
+ 16. 
+.             * Cuando la cantidad no depende de la imputacion, la varianza entre
+.             * imputaciones es cero y los grados de libertad de Rubin se
+.             * disparan. Es lo que ocurre con la diferencia bruta, que solo usa
+.             * punt_global, sin un solo valor faltante.
+.             *
+.             * El umbral va sobre los GRADOS DE LIBERTAD, no sobre Bv. En la
+.             * corrida del 23 de octubre, Bv no era cero exacto sino ruido de
+.             * coma flotante: positivo, distinto entre corridas (1,8e+53 el 22,
+.             * 1,5e+53 el 23) y suficiente para que la rama de la t se ejecutara
+.             * y ttail devolviera valor perdido. Por encima de un millon de
+.             * grados de libertad la t y la normal coinciden en toda cifra que
+.             * se vaya a reportar, asi que se usa la normal y se declara el
+.             * valor como asintotico.
+.             scalar nu = .
+ 17.             scalar pv = .
+ 18.             if Bv > 0 {
+ 19.                 scalar nu = (`M'-1) * (1 + ubar/((1 + 1/`M')*Bv))^2
+ 20.             }
+ 21.             if missing(nu) | nu > 1e6 {
+ 22.                 scalar nu = .
+ 23.                 scalar pv = 2*normal(-abs(tv))
+ 24.             }
+ 25.             else {
+ 26.                 scalar pv = 2*ttail(nu, abs(tv))
+ 27.             }
+ 28. 
+.             display %-18s "`e'" %-26s "`c'" ///
+>                 %10.3f qbar %10.3f sev %8.2f tv ///
+>                 %8.1f nu %8.4f pv %10.3f bmin %10.3f bmax
+ 29.         }
+ 30.     }
+A_principal       difference                    -0.924     1.035   -0.89       .  0.3721    -
+> 0.924    -0.924
+A_principal       explained                     -0.873     1.139   -0.77605631.2  0.4433    -
+> 0.929    -0.802
+A_principal       unexplained                   -0.051     1.252   -0.04885722.6  0.9674    -
+> 0.122     0.005
+A_principal       exp_edad                      -2.074     0.202  -10.25       .  0.0000    -
+> 2.077    -2.071
+A_principal       exp_repitente                  0.686     0.133    5.14       .  0.0000     
+> 0.684     0.689
+A_principal       exp_estu_inse_individual      -0.562     0.169   -3.33470130.9  0.0009    -
+> 0.575    -0.552
+B_sinINSE         difference                    -0.924     1.038   -0.89       .  0.3731    -
+> 0.924    -0.924
+B_sinINSE         explained                     -0.993     1.149   -0.86550324.3  0.3874    -
+> 1.049    -0.923
+B_sinINSE         unexplained                    0.069     1.261    0.05798482.8  0.9565    -
+> 0.001     0.125
+B_sinINSE         exp_edad                      -2.130     0.208  -10.23       .  0.0000    -
+> 2.132    -2.126
+B_sinINSE         exp_repitente                  0.700     0.134    5.22       .  0.0000     
+> 0.697     0.703
+C_conposg         difference                    -0.924     1.150   -0.80       .  0.4217    -
+> 0.924    -0.924
+C_conposg         explained                     -0.012     1.265   -0.01476862.4  0.9924    -
+> 0.086     0.079
+C_conposg         unexplained                   -0.912     1.344   -0.68606642.7  0.4971    -
+> 1.004    -0.838
+C_conposg         exp_edad                      -2.054     0.199  -10.30       .  0.0000    -
+> 2.057    -2.051
+C_conposg         exp_repitente                  0.653     0.129    5.07       .  0.0000     
+> 0.651     0.655
+C_conposg         exp_estu_inse_individual      -0.547     0.165   -3.32163330.3  0.0009    -
+> 0.565    -0.536
+C_conposg         exp_z_posgrado                 1.034     0.465    2.22       .  0.0261     
+> 1.023     1.041
+D_sinINSE_posg    difference                    -0.924     1.153   -0.80       .  0.4229    -
+> 0.924    -0.924
+D_sinINSE_posg    explained                     -0.124     1.273   -0.10494336.4  0.9226    -
+> 0.198    -0.036
+D_sinINSE_posg    unexplained                   -0.800     1.352   -0.59628105.4  0.5538    -
+> 0.888    -0.727
+D_sinINSE_posg    exp_edad                      -2.108     0.205  -10.28       .  0.0000    -
+> 2.110    -2.104
+D_sinINSE_posg    exp_repitente                  0.666     0.129    5.15       .  0.0000     
+> 0.664     0.669
+D_sinINSE_posg    exp_z_posgrado                 1.040     0.467    2.23       .  0.0259     
+> 1.029     1.046
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "LECTURA. ATENCION A LA DIRECCION DEL SIGNO. Con by(y2023), el"
+LECTURA. ATENCION A LA DIRECCION DEL SIGNO. Con by(y2023), el
+.     display "grupo 1 es 2018 y el grupo 2 es 2023, de modo que la diferencia"
+grupo 1 es 2018 y el grupo 2 es 2023, de modo que la diferencia
+.     display "y todas las contribuciones estan en la metrica 2018 MENOS 2023."
+y todas las contribuciones estan en la metrica 2018 MENOS 2023.
+.     display "Un gl vacio significa que la cantidad no varia entre imputaciones"
+Un gl vacio significa que la cantidad no varia entre imputaciones
+.     display "y que el valor p es el asintotico, calculado con la normal."
+y que el valor p es el asintotico, calculado con la normal.
+.     display "Un valor NEGATIVO significa que ese componente empuja a 2023 por"
+Un valor NEGATIVO significa que ese componente empuja a 2023 por
+.     display "encima de 2018; uno POSITIVO, que lo empuja por debajo."
+encima de 2018; uno POSITIVO, que lo empuja por debajo.
+.     display ""
+
+.     display "La fila 4 de C3 se decide con el signo de exp_repitente. Repetir"
+La fila 4 de C3 se decide con el signo de exp_repitente. Repetir
+.     display "la prueba SUMA entre 3,9 y 8,5 puntos [Tabla 8], de modo que la"
+la prueba SUMA entre 3,9 y 8,5 puntos [Tabla 8], de modo que la
+.     display "caida de repitentes del 16,2 % al 10,7 % [Tabla 3] RESTA puntos a"
+caida de repitentes del 16,2 % al 10,7 % [Tabla 3] RESTA puntos a
+.     display "2023 y por tanto debe aparecer con signo POSITIVO en esta tabla."
+2023 y por tanto debe aparecer con signo POSITIVO en esta tabla.
+.     display "Si sale negativa, revisar la direccion de by(y2023) antes de"
+Si sale negativa, revisar la direccion de by(y2023) antes de
+.     display "escribir una sola linea del informe."
+escribir una sola linea del informe.
+.     display ""
+
+.     display "Ninguna contribucion individual se promueve a hallazgo. La Oaxaca"
+Ninguna contribucion individual se promueve a hallazgo. La Oaxaca
+.     display "es descriptiva por la regla impresa en el bloque [0.9]."
+es descriptiva por la regla impresa en el bloque [0.9].
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. }
+
+. 
+. 
+. ********************************************************************************
+. * CIERRE
+. ********************************************************************************
+. 
+. timer off 1
+
+. display _newline "--- Tiempo total de ejecucion ---"
+
+--- Tiempo total de ejecucion ---
+
+. timer list 1
+   1:     70.60 /        1 =      70.6000
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "BLOQUE C3 COMPLETADO."
+BLOQUE C3 COMPLETADO.
+
+. display "Siguiente: aplicar Holm del bloque [1.2] a las filas 1 y 2 de C3, y"
+Siguiente: aplicar Holm del bloque [1.2] a las filas 1 y 2 de C3, y
+
+. display "el signo de exp_repitente del bloque [3] a la fila 4."
+el signo de exp_repitente del bloque [3] a la fila 4.
+
+. display "NO rellenar ningun [R-C3] del libro de correcciones sin este log."
+NO rellenar ningun [R-C3] del libro de correcciones sin este log.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase13
+      name:  fase13
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_13_cohortes_20261023b.l
+> og
+  log type:  text
+ closed on:  23 Oct 2026, 17:16:48
+---------------------------------------------------------------------------------------------

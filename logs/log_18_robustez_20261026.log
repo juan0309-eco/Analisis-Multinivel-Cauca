@@ -1,0 +1,463 @@
+---------------------------------------------------------------------------------------------
+      name:  fase18
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_18_robustez_20261026.lo
+> g
+  log type:  text
+ opened on:  26 Oct 2026, 10:16:18
+
+. 
+. * Los .ster nuevos llevan fecha y no se sobrescriben (README, regla 4)
+. foreach f in R1b_indice_anual R3b_parsimonioso {
+  2.     capture confirm file "`f'_`hoy'.ster"
+  3.     if _rc == 0 {
+  4.         display as error "Ya existe `f'_`hoy'.ster. Cambiar el local hoy."
+  5.         exit 602
+  6.     }
+  7. }
+
+. 
+. local hacer_r1 = 1
+
+. local hacer_r3 = 1
+
+. 
+. timer clear
+
+. timer on 1
+
+. 
+. 
+. ********************************************************************************
+. * [0] ESTRUCTURA ALEATORIA Y BLOQUES DE VARIABLES
+. ********************************************************************************
+. * Identicos a los de 11_estructura_aleatoria.do (estructura "cruzada").
+. global RE "|| mcpio_id: || mcpio_id: R.year || sede_id: || sede_anio:"
+
+. 
+. global v_n1 mujer edad repitente lectura_30min libros_26omas ///
+>             trabaja_mas20 internet_hogar computador_hogar
+
+. 
+. global v_n2 ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>             dotacion_tic rural ju_unica tecnico tecnico_academico ///
+>             cole_femenino
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "ESTRUCTURA ALEATORIA: $RE , reml"
+ESTRUCTURA ALEATORIA: || mcpio_id: || mcpio_id: R.year || sede_id: || sede_anio: , reml
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. 
+. ********************************************************************************
+. * [1] BASE E IDENTIFICADORES
+. ********************************************************************************
+. use "Base_Estimacion.dta", clear
+
+. 
+. capture confirm variable indice_vuln_anual
+
+. if _rc != 0 {
+.     display as error "indice_vuln_anual no esta en Base_Estimacion.dta."
+.     display as error "Regenerar la base con 16a_rehacer_base.do."
+.     exit 111
+. }
+
+. 
+. foreach v in mcpio_anio sede_anio {
+  2.     capture mi unregister `v'
+  3.     capture drop `v'
+  4. }
+
+. egen long mcpio_anio = group(cole_cod_mcpio_ubicacion year)
+
+. egen long sede_anio  = group(cole_cod_dane_sede year)
+
+. mi register regular mcpio_anio sede_anio
+
+. mi update
+
+. 
+. quietly count if missing(mcpio_anio) | missing(sede_anio)
+
+. display "Filas sin identificador: " r(N) " (debe ser 0)"
+Filas sin identificador: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. 
+. 
+. ********************************************************************************
+. * [2] R1b: INDICE CON ESTANDARIZACION INTRA-ANUAL
+. ********************************************************************************
+. * Misma especificacion de efectos fijos que R1 del 08; se compara con ML1b.
+. if `hacer_r1' == 1 {
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[2] R1b: indice alternativo, estructura de cuatro componentes"
+[2] R1b: indice alternativo, estructura de cuatro componentes
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     timer on 2
+.     mi estimate, dots post: mixed punt_global c_inse $v_n1 $v_n2      ///
+>         indice_vuln_anual ib2018.year $RE , reml
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0228
+                                                Largest FMI       =     0.1107
+DF adjustment:   Large sample                   DF:     min       =   1,583.60
+                                                        avg       =   1.97e+07
+                                                        max       =   4.59e+08
+Model F test:       Equal FMI                   F(  25,629773.2)  =     285.96
+                                                Prob > F          =     0.0000
+
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+               c_inse |   .2778719    .027165    10.23   0.000     .2246234    .3311204
+                mujer |  -8.215437   .2769356   -29.67   0.000    -8.758221   -7.672653
+                 edad |  -7.480176   .1241171   -60.27   0.000    -7.723441   -7.236911
+            repitente |   5.932956   .4166754    14.24   0.000     5.116287    6.749625
+        lectura_30min |   6.794411   .2922743    23.25   0.000     6.221361    7.367461
+        libros_26omas |     5.4207   .3978445    13.63   0.000     4.640342    6.201057
+        trabaja_mas20 |  -2.957117   .7084926    -4.17   0.000    -4.345964   -1.568271
+       internet_hogar |    .286959   .3784808     0.76   0.448     -.455018    1.028936
+     computador_hogar |    .564567   .3626008     1.56   0.120    -.1462177    1.275352
+         ln_matricula |   5.126393   1.037422     4.94   0.000     3.093067    7.159719
+ratio_alumnos_docente |  -.0880232   .0793727    -1.11   0.267    -.2435915    .0675451
+           pct_planta |   9.664701   1.694243     5.70   0.000     6.344014    12.98539
+           z_posgrado |    .050519   .2024934     0.25   0.803    -.3463616    .4473997
+         dotacion_tic |   1.245075   1.791549     0.69   0.487    -2.268382    4.758531
+                rural |  -10.88717   1.791842    -6.08   0.000    -14.39912   -7.375221
+             ju_unica |   .2708724   .8258944     0.33   0.743    -1.347852    1.889597
+              tecnico |  -.5559994   1.347709    -0.41   0.680    -3.197891    2.085892
+    tecnico_academico |  -5.764095   2.502787    -2.30   0.021    -10.67117   -.8570242
+        cole_femenino |   36.08275     5.5693     6.48   0.000     25.16712    46.99837
+    indice_vuln_anual |  -.7365952   .6388904    -1.15   0.249    -1.988798     .515607
+                      |
+                 year |
+                2019  |  -4.945934    .773209    -6.40   0.000    -6.461396   -3.430472
+                2020  |  -3.453398   .8206825    -4.21   0.000    -5.061906   -1.844889
+                2021  |  -7.780578   .8147502    -9.55   0.000    -9.377459   -6.183696
+                2022  |  -3.594844   .8155913    -4.41   0.000    -5.193374   -1.996314
+                2023  |  -.7609471   .8206216    -0.93   0.354    -2.369337    .8474427
+                      |
+                _cons |   322.3841    7.40248    43.55   0.000     307.8754    336.8928
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   13.44895   1.687615      10.51664    17.19886
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |   1.816623   .3210745      1.284758     2.56867
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                   sd(_cons) |   11.31173   .4788248      10.41112    12.29024
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |   4.646776   .2279865      4.220743    5.115811
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.36284   .0933891      34.18029    34.54637
+------------------------------------------------------------------------------
+.     estimates save "R1b_indice_anual_`hoy'.ster"
+file R1b_indice_anual_20261026.ster saved
+.     timer off 2
+.     display "Observaciones utilizadas: " e(N)
+Observaciones utilizadas: 69750
+.     timer list 2
+   2:   1617.16 /        1 =    1617.1610
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [3] R3b: ESPECIFICACION PARSIMONIOSA
+. ********************************************************************************
+. * Misma especificacion de efectos fijos que R3 del 08; se compara con ML2b,
+. * que es el modelo de la Tabla 13 con la misma descomposicion del indice.
+. if `hacer_r3' == 1 {
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[3] R3b: especificacion parsimoniosa, estructura de cuatro componentes"
+[3] R3b: especificacion parsimoniosa, estructura de cuatro componentes
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     timer on 3
+.     mi estimate, dots post: mixed punt_global c_inse mujer edad repitente ///
+>         ln_matricula pct_planta rural ju_unica vuln_bar vuln_dev ib2018.year ///
+>         $RE , reml
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0028
+                                                Largest FMI       =     0.0327
+DF adjustment:   Large sample                   DF:     min       =  17,891.35
+                                                        avg       =   5.52e+08
+                                                        max       =   3.47e+09
+Model F test:       Equal FMI                   F(  15, 1.9e+07)  =     417.65
+                                                Prob > F          =     0.0000
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      c_inse |   .4041586   .0189222    21.36   0.000     .3670692    .4412479
+       mujer |  -7.562099   .2765506   -27.34   0.000    -8.104129    -7.02007
+        edad |  -7.533436   .1247506   -60.39   0.000    -7.777942   -7.288929
+   repitente |   6.345725   .4187474    15.15   0.000     5.524995    7.166455
+ln_matricula |    4.79608   .9724784     4.93   0.000     2.890044    6.702117
+  pct_planta |   9.504927   1.733032     5.48   0.000     6.108225    12.90163
+       rural |  -11.32194   1.903019    -5.95   0.000    -15.05179   -7.592086
+    ju_unica |   .1965749   .8231125     0.24   0.811    -1.416696    1.809846
+    vuln_bar |  -2.086658   2.523219    -0.83   0.408    -7.032076    2.858759
+    vuln_dev |   -.839418   .6649468    -1.26   0.207     -2.14269    .4638538
+             |
+        year |
+       2019  |  -4.802604   .7883397    -6.09   0.000    -6.347722   -3.257487
+       2020  |  -3.308427   .8444273    -3.92   0.000    -4.963474    -1.65338
+       2021  |  -7.858093   .8561818    -9.18   0.000    -9.536179   -6.180008
+       2022  |  -3.497282   .9040319    -3.87   0.000    -5.269152   -1.725412
+       2023  |  -.3974018   .9663368    -0.41   0.681    -2.291387    1.496583
+             |
+       _cons |   326.7414   7.430075    43.98   0.000     312.1787    341.3042
+------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   13.79666   1.760974      10.74307    17.71819
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |   1.799133   .3248551      1.262899    2.563056
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                   sd(_cons) |   12.28499   .5034865      11.33677    13.31252
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |   4.693336    .227694      4.267624    5.161514
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.57544   .0938551      34.39197    34.75988
+------------------------------------------------------------------------------
+.     estimates save "R3b_parsimonioso_`hoy'.ster"
+file R3b_parsimonioso_20261026.ster saved
+.     timer off 3
+.     display "Observaciones utilizadas: " e(N)
+Observaciones utilizadas: 69750
+.     test vuln_bar = vuln_dev
+
+ ( 1)  [punt_global]vuln_bar - [punt_global]vuln_dev = 0
+
+           chi2(  1) =    0.23
+         Prob > chi2 =    0.6327
+.     timer list 3
+   3:   1137.64 /        1 =    1137.6390
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [4] COMPARACION CON ML1b Y ML2b
+. ********************************************************************************
+. * Coeficientes comunes a las dos especificaciones de cada par. Para el indice,
+. * R1b se compara con indice_vuln de ML1b (variable distinta, mismo papel).
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[4] COMPARACION: coeficiente, error estandar y p"
+[4] COMPARACION: coeficiente, error estandar y p
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. capture program drop _fila
+
+. program define _fila
+  1.     args modelo archivo var
+  2.     capture estimates use "`archivo'"
+  3.     if _rc != 0 {
+  4.         display as error "  No se encontro `archivo'"
+  5.         exit
+  6.     }
+  7.     capture scalar _b0 = _b[`var']
+  8.     if _rc != 0 {
+  9.         display "  " %-10s "`modelo'" %-22s "`var'" "   (no esta en el modelo)"
+ 10.         exit
+ 11.     }
+ 12.     scalar _s0 = _se[`var']
+ 13.     scalar _p0 = 2*normal(-abs(_b0/_s0))
+ 14.     display "  " %-10s "`modelo'" %-22s "`var'" %10.4f _b0 %10.4f _s0 %9.4f _p0
+ 15. end
+
+. 
+. display _newline "  Modelo    Variable                    Coef.   Err.est.        p"
+
+  Modelo    Variable                    Coef.   Err.est.        p
+
+. 
+. display _newline "--- Par R1b frente a ML1b ---"
+
+--- Par R1b frente a ML1b ---
+
+. foreach v in c_inse pct_planta rural ln_matricula ju_unica cole_femenino ///
+>              tecnico_academico {
+  2.     _fila "ML1b" "ML1b.ster" `v'
+  3.     _fila "R1b"  "R1b_indice_anual_`hoy'.ster" `v'
+  4. }
+  ML1b      c_inse                    0.2777    0.0272   0.0000
+  R1b       c_inse                    0.2779    0.0272   0.0000
+  ML1b      pct_planta                9.6873    1.6945   0.0000
+  R1b       pct_planta                9.6647    1.6942   0.0000
+  ML1b      rural                   -10.8770    1.7917   0.0000
+  R1b       rural                   -10.8872    1.7918   0.0000
+  ML1b      ln_matricula              5.1316    1.0373   0.0000
+  R1b       ln_matricula              5.1264    1.0374   0.0000
+  ML1b      ju_unica                  0.2732    0.8257   0.7407
+  R1b       ju_unica                  0.2709    0.8259   0.7429
+  ML1b      cole_femenino            36.0797    5.5685   0.0000
+  R1b       cole_femenino            36.0827    5.5693   0.0000
+  ML1b      tecnico_academico        -5.7649    2.5024   0.0212
+  R1b       tecnico_academico        -5.7641    2.5028   0.0213
+
+. _fila "ML1b" "ML1b.ster" indice_vuln
+  ML1b      indice_vuln              -0.8532    0.6403   0.1827
+
+. _fila "R1b"  "R1b_indice_anual_`hoy'.ster" indice_vuln_anual
+  R1b       indice_vuln_anual        -0.7366    0.6389   0.2489
+
+. 
+. display _newline "--- Par R3b frente a ML2b ---"
+
+--- Par R3b frente a ML2b ---
+
+. foreach v in c_inse pct_planta rural ln_matricula ju_unica vuln_bar vuln_dev {
+  2.     _fila "ML2b" "ML2b.ster" `v'
+  3.     _fila "R3b"  "R3b_parsimonioso_`hoy'.ster" `v'
+  4. }
+  ML2b      c_inse                    0.2778    0.0272   0.0000
+  R3b       c_inse                    0.4042    0.0189   0.0000
+  ML2b      pct_planta                9.6862    1.6945   0.0000
+  R3b       pct_planta                9.5049    1.7330   0.0000
+  ML2b      rural                   -10.8385    1.7931   0.0000
+  R3b       rural                   -11.3219    1.9030   0.0000
+  ML2b      ln_matricula              5.1749    1.0398   0.0000
+  R3b       ln_matricula              4.7961    0.9725   0.0000
+  ML2b      ju_unica                  0.2801    0.8258   0.7345
+  R3b       ju_unica                  0.1966    0.8231   0.8112
+  ML2b      vuln_bar                 -2.0402    2.4719   0.4092
+  R3b       vuln_bar                 -2.0867    2.5232   0.4082
+  ML2b      vuln_dev                 -0.7658    0.6638   0.2487
+  R3b       vuln_dev                 -0.8394    0.6649   0.2068
+
+. 
+. display _newline "--- Componentes de varianza (DE) ---"
+
+--- Componentes de varianza (DE) ---
+
+. foreach m in ML1b ML2b R1b_indice_anual_`hoy' R3b_parsimonioso_`hoy' {
+  2.     capture estimates use "`m'.ster"
+  3.     if _rc == 0 {
+  4.         display "  `m'"
+  5.         display "    municipio " %7.3f exp(_b[lns1_1_1:_cons])          ///
+>                 "  mcpio-ano " %7.3f exp(_b[lns1_2_1:_cons])            ///
+>                 "  sede "      %7.3f exp(_b[lns2_1_1:_cons])            ///
+>                 "  sede-ano "  %7.3f exp(_b[lns3_1_1:_cons])            ///
+>                 "  residual "  %7.3f exp(_b[lnsig_e:_cons])
+  6.     }
+  7. }
+  ML1b
+    municipio  13.447  mcpio-ano   1.805  sede  11.310  sede-ano   4.649  residual  34.363
+  ML2b
+    municipio  13.590  mcpio-ano   1.808  sede  11.306  sede-ano   4.649  residual  34.363
+  R1b_indice_anual_20261026
+    municipio  13.449  mcpio-ano   1.817  sede  11.312  sede-ano   4.647  residual  34.363
+  R3b_parsimonioso_20261026
+    municipio  13.797  mcpio-ano   1.799  sede  12.285  sede-ano   4.693  residual  34.575
+
+. 
+. display _newline "Aplicar la regla de lectura del encabezado: signo y"
+
+Aplicar la regla de lectura del encabezado: signo y
+
+. display "clasificacion al 5 % frente a ML1b (R1b) y ML2b (R3b)."
+clasificacion al 5 % frente a ML1b (R1b) y ML2b (R3b).
+
+. 
+. 
+. ********************************************************************************
+. * [5] CIERRE
+. ********************************************************************************
+. timer off 1
+
+. display _newline "--- Tiempos: 1 total, 2 R1b, 3 R3b ---"
+
+--- Tiempos: 1 total, 2 R1b, 3 R3b ---
+
+. timer list
+   1:   2899.32 /        1 =    2899.3220
+   2:   1617.16 /        1 =    1617.1610
+   3:   1137.64 /        1 =    1137.6390
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "SCRIPT 18 TERMINADO. Subir el log al Project para corregir 4.5."
+SCRIPT 18 TERMINADO. Subir el log al Project para corregir 4.5.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase18
+      name:  fase18
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_18_robustez_20261026.lo
+> g
+  log type:  text
+ closed on:  26 Oct 2026, 11:04:37
+---------------------------------------------------------------------------------------------

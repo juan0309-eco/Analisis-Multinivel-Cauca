@@ -1,0 +1,1544 @@
+---------------------------------------------------------------------------------------------
+      name:  fase15
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_15_gradiente_20261013_1
+> 026.log
+  log type:  text
+ opened on:  13 Oct 2026, 10:26:51
+
+. display "Inicio: " c(current_date) " " c(current_time)
+Inicio: 13 Oct 2026 10:26:51
+
+. 
+. global v_n1 mujer edad repitente lectura_30min libros_26omas trabaja_mas20 internet_hogar c
+> omputador_hogar
+
+. global v_n2 ln_matricula ratio_alumnos_docente pct_planta z_posgrado dotacion_tic rural ju_
+> unica tecnico tecnico_academico cole_femenino
+
+. 
+. * Estructura aleatoria de C1 con la pendiente en sede
+. global RE_M4 "|| mcpio_id: || mcpio_id: R.year || sede_id: cwc_inse, covariance(unstructure
+> d) || sede_anio:"
+
+. 
+. *------------------------------------------------------------------------------
+. * Programas de lectura (usan los resultados posteados por mi estimate)
+. *------------------------------------------------------------------------------
+. capture program drop rep_corr
+
+. program define rep_corr
+  1.     args et
+  2.     local a   = _b[atr2_1_1_2:_cons]
+  3.     local s   = _se[atr2_1_1_2:_cons]
+  4.     local sdb = _b[lns2_1_1:_cons]
+  5.     local sds = _se[lns2_1_1:_cons]
+  6.     local z   = invnormal(0.975)
+  7.     display as text _newline "[`et']"
+  8.     display as text "  DE de la pendiente = " %7.4f exp(`sdb') "   IC95% [" %7.4f exp(`s
+> db'-`z'*`sds') "; " %7.4f exp(`sdb'+`z'*`sds') "]"
+  9.     display as text "  Correlación        = " %7.4f tanh(`a') "   IC95% [" %7.4f tanh(`a
+> '-`z'*`s') "; " %7.4f tanh(`a'+`z'*`s') "]"
+ 10.     if tanh(`a'-`z'*`s') > 0 | tanh(`a'+`z'*`s') < 0 {
+ 11.         display as result "  REGLA M4: el IC de la correlación EXCLUYE el cero."
+ 12.     }
+ 13.     else {
+ 14.         display as result "  REGLA M4: el IC de la correlación INCLUYE el cero."
+ 15.     }
+ 16. end
+
+. 
+. capture program drop rep_m5
+
+. program define rep_m5
+  1.     args et
+  2.     quietly test c.cwc_inse#c.pct_planta c.cwc_inse#c.indice_vuln
+  3.     local pj = r(p)
+  4.     quietly test c.cwc_inse#c.pct_planta
+  5.     local pa = r(p)
+  6.     quietly test c.cwc_inse#c.indice_vuln
+  7.     local pb = r(p)
+  8.     local pmin = min(`pa',`pb')
+  9.     local pmax = max(`pa',`pb')
+ 10.     local h1 = min(1, 2*`pmin')
+ 11.     local h2 = min(1, max(`h1', `pmax'))
+ 12.     if `pa' <= `pb' {
+ 13.         local ha = `h1'
+ 14.         local hb = `h2'
+ 15.     }
+ 16.     else {
+ 17.         local ha = `h2'
+ 18.         local hb = `h1'
+ 19.     }
+ 20.     display as text _newline "[`et']"
+ 21.     display as text "  cwc_inse x pct_planta   : coef " %7.4f _b[c.cwc_inse#c.pct_planta
+> ] " (EE " %6.4f _se[c.cwc_inse#c.pct_planta] ")  p = " %6.4f `pa' "  p Holm = " %6.4f `ha'
+ 22.     display as text "  cwc_inse x indice_vuln  : coef " %7.4f _b[c.cwc_inse#c.indice_vul
+> n] " (EE " %6.4f _se[c.cwc_inse#c.indice_vuln] ")  p = " %6.4f `pb' "  p Holm = " %6.4f `hb
+> '
+ 23.     display as text "  Contraste conjunto      : p = " %6.4f `pj'
+ 24.     if `pj' >= 0.05 {
+ 25.         display as result "  REGLA M5: contraste conjunto >= 0,05 -> sin heterogeneidad 
+> detectable; M5 pasa a anexo como exploratorio."
+ 26.     }
+ 27.     else {
+ 28.         if min(`ha',`hb') < 0.05 {
+ 29.             display as result "  REGLA M5: conjunto < 0,05 y al menos una interacción su
+> pera Holm -> se reporta solo la que la supera."
+ 30.         }
+ 31.         else {
+ 32.             display as result "  REGLA M5: conjunto < 0,05 pero ninguna supera Holm -> e
+> videncia conjunta no atribuible a una interacción; exploratoria."
+ 33.         }
+ 34.     }
+ 35. end
+
+. 
+. *------------------------------------------------------------------------------
+. * [0] DATOS Y VARIABLES DERIVADAS (una sola vez, en memoria; no se guarda)
+. *------------------------------------------------------------------------------
+. display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+
+. display "[0] DATOS Y VARIABLES DERIVADAS"
+[0] DATOS Y VARIABLES DERIVADAS
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "Base_Estimacion.dta", clear
+
+. 
+. * sede_anio igual que en 11_estructura_aleatoria.do
+. foreach v in sede_anio {
+  2.     capture mi unregister `v'
+  3.     capture drop `v'
+  4. }
+
+. egen long sede_anio = group(cole_cod_dane_sede year)
+
+. mi register regular sede_anio
+
+. mi update
+
+. 
+. * DE del INSE dentro de la cohorte de sede, recalculada en cada imputación
+. foreach v in sd_inse_sede c_sd_inse n_sa {
+  2.     capture mi unregister `v'
+  3.     capture drop `v'
+  4. }
+
+. bysort _mi_m cole_cod_dane_sede year: egen double sd_inse_sede = sd(estu_inse_individual) i
+> f _mi_m > 0
+(70,010 missing values generated)
+
+. bysort _mi_m cole_cod_dane_sede year: generate int n_sa = _N
+
+. replace sd_inse_sede = 0 if n_sa == 1 & _mi_m > 0
+(260 real changes made)
+
+. bysort _mi_m year: egen double _msd = mean(sd_inse_sede) if _mi_m > 0
+(69,750 missing values generated)
+
+. generate double c_sd_inse = sd_inse_sede - _msd if _mi_m > 0
+(69,750 missing values generated)
+
+. drop _msd
+
+. label variable sd_inse_sede "DE del INSE dentro de la cohorte de sede"
+
+. label variable c_sd_inse    "DE del INSE dentro de la cohorte de sede, centrada por año"
+
+. label variable n_sa         "Estudiantes en la cohorte de sede (sede-año)"
+
+. mi register imputed sd_inse_sede c_sd_inse
+
+. mi register regular n_sa
+
+. mi update
+
+. 
+. display _newline "--- Verificaciones ---"
+
+--- Verificaciones ---
+
+. quietly count if _mi_m > 0 & missing(c_sd_inse)
+
+. display "Faltantes de c_sd_inse en las imputaciones: " r(N) " (debe ser 0)"
+Faltantes de c_sd_inse en las imputaciones: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. quietly count if missing(sede_anio)
+
+. display "Filas sin sede_anio: " r(N) " (debe ser 0)"
+Filas sin sede_anio: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. quietly count if _mi_m == 1 & n_sa < 10
+
+. display "Observaciones en cohortes de sede con menos de 10 estudiantes (m=1): " r(N)
+Observaciones en cohortes de sede con menos de 10 estudiantes (m=1): 3045
+
+. tabstat sd_inse_sede c_sd_inse n_sa if _mi_m == 1, stat(n mean sd min max) format(%9.4f)
+
+   Stats |  sd_ins~e  c_sd_i~e      n_sa
+---------+------------------------------
+       N |  6.98e+04  6.98e+04  6.98e+04
+    Mean |    7.0689   -0.0000   54.5408
+      SD |    1.2737    1.2689   39.6611
+     Min |    0.0000   -7.2121    1.0000
+     Max |   17.7180   10.6049  202.0000
+----------------------------------------
+
+. 
+. timer clear
+
+. 
+. *------------------------------------------------------------------------------
+. * [B] M4r y M5r: estructura C1 + año fijo + pendiente aleatoria, REML
+. *------------------------------------------------------------------------------
+. if `hacer_r' == 1 {
+.     display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+.     display "[B] M4r y M5r: estructura C1, REML, 20 imputaciones"
+[B] M4r y M5r: estructura C1, REML, 20 imputaciones
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     timer on 1
+.     mi estimate, dots post: mixed punt_global cwc_inse c_inse_prom_sede          ///
+>         $v_n1 $v_n2 indice_vuln ib2018.year $RE_M4 , reml
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0239
+                                                Largest FMI       =     0.1101
+DF adjustment:   Large sample                   DF:     min       =   1,600.50
+                                                        avg       = 5536533.16
+                                                        max       =   9.06e+07
+Model F test:       Equal FMI                   F(  26,675259.7)  =     239.90
+                                                Prob > F          =     0.0000
+
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+             cwc_inse |   .1949758   .0343117     5.68   0.000     .1277231    .2622285
+     c_inse_prom_sede |   .2514213   .0988256     2.54   0.011     .0577083    .4451342
+                mujer |  -8.226514   .2766448   -29.74   0.000    -8.768728   -7.684299
+                 edad |  -7.500163   .1240831   -60.44   0.000    -7.743361   -7.256965
+            repitente |   5.758207   .4169825    13.81   0.000     4.940936    6.575478
+        lectura_30min |   6.808057   .2914415    23.36   0.000     6.236654    7.379459
+        libros_26omas |   5.290156   .3976809    13.30   0.000     4.510126    6.070187
+        trabaja_mas20 |  -2.961196   .7078976    -4.18   0.000    -4.348887   -1.573505
+       internet_hogar |   .4081786   .3789187     1.08   0.281    -.3346569    1.151014
+     computador_hogar |   .5655094   .3626066     1.56   0.119    -.1452882    1.276307
+         ln_matricula |    5.20288   1.034994     5.03   0.000      3.17431    7.231449
+ratio_alumnos_docente |  -.0811637   .0791919    -1.02   0.305    -.2363775    .0740501
+           pct_planta |    9.24675   1.687672     5.48   0.000     5.938947    12.55455
+           z_posgrado |   .0553554   .2025452     0.27   0.785    -.3416269    .4523376
+         dotacion_tic |   1.210782   1.789758     0.68   0.499    -2.299122    4.720686
+                rural |  -8.594975    1.78563    -4.81   0.000    -12.09477   -5.095176
+             ju_unica |   .2818576   .8242331     0.34   0.732     -1.33361    1.897326
+              tecnico |  -.3191243   1.332789    -0.24   0.811    -2.931761    2.293512
+    tecnico_academico |  -5.198239   2.454346    -2.12   0.034    -10.01027   -.3862109
+        cole_femenino |   38.42142   5.420872     7.09   0.000     27.79671    49.04614
+          indice_vuln |  -.8356847   .6380248    -1.31   0.190     -2.08619    .4148209
+                      |
+                 year |
+                2019  |  -4.772813   .7850586    -6.08   0.000      -6.3115   -3.234127
+                2020  |  -3.206802   .8445251    -3.80   0.000    -4.862041   -1.551563
+                2021  |     -7.501   .8571742    -8.75   0.000    -9.181031   -5.820969
+                2022  |  -3.143301   .9023496    -3.48   0.000    -4.911874   -1.374728
+                2023  |  -.1616985   .9613255    -0.17   0.866    -2.045863    1.722465
+                      |
+                _cons |   320.7014    7.36965    43.52   0.000      306.257    335.1458
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   12.74321   1.622322      9.929181    16.35476
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |   1.806536    .322026       1.27384    2.561996
+-----------------------------+------------------------------------------------
+sede_id: Unstructured        |
+                sd(cwc_inse) |   .3438291   .0279548      .2931738    .4032368
+                   sd(_cons) |   11.48653   .5015325      10.54443    12.51281
+        corr(cwc_inse,_cons) |   .3805219   .0885665      .1951428    .5396499
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |   4.661452   .2273582      4.236475    5.129061
+-----------------------------+------------------------------------------------
+                sd(Residual) |    34.2725   .0933738      34.08998      34.456
+------------------------------------------------------------------------------
+.     timer off 1
+.     estimates save "M4r_`f'.ster"
+file M4r_20261013.ster saved
+.     matrix list e(b)
+
+e(b)[1,35]
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+        cwc_inse  c_inse_pro~e         mujer          edad     repitente  lectura_30~n
+y1      .1949758     .25142128    -8.2265135     -7.500163     5.7582071     6.8080566
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+    libros_26~as  trabaja_m~20  internet_h~r  computador~r  ln_matricula  ratio_alum~e
+y1     5.2901564    -2.9611956     .40817865     .56550937     5.2028795    -.08116366
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+      pct_planta    z_posgrado  dotacion_tic         rural      ju_unica       tecnico
+y1     9.2467502     .05535536     1.2107821    -8.5949752     .28185763    -.31912433
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                     2018b.         2019.         2020.
+    tecnico_ac~o  cole_femen~o   indice_vuln          year          year          year
+y1    -5.1982389     38.421424     -.8356847             0    -4.7728135    -3.2068018
+
+     punt_global:  punt_global:  punt_global:  punt_global:     lns1_1_1:     lns1_2_1:
+            2021.         2022.         2023.                                          
+            year          year          year         _cons         _cons         _cons
+y1    -7.5010003    -3.1433012    -.16169854     320.70139     2.5449985      .5914112
+
+        lns2_1_1:     lns2_1_2:   atr2_1_1_2:     lns3_1_1:      lnsig_e:
+                                                                         
+           _cons         _cons         _cons         _cons         _cons
+y1    -1.0676105     2.4411753     .40066979      1.539327     3.5343432
+.     rep_corr "M4r: estructura C1 + año fijo, REML"
+
+[M4r: estructura C1 + año fijo, REML]
+  DE de la pendiente =  0.3438   IC95% [ 0.2932;  0.4032]
+  Correlación        =  0.3805   IC95% [ 0.1952;  0.5396]
+  REGLA M4: el IC de la correlación EXCLUYE el cero.
+. 
+.     timer on 2
+.     mi estimate, dots post: mixed punt_global cwc_inse                           ///
+>         c.cwc_inse#c.pct_planta c.cwc_inse#c.indice_vuln                         ///
+>         c_inse_prom_sede $v_n1 $v_n2 indice_vuln ib2018.year $RE_M4 , reml
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0243
+                                                Largest FMI       =     0.1097
+DF adjustment:   Large sample                   DF:     min       =   1,611.27
+                                                        avg       = 5887214.25
+                                                        max       =   1.11e+08
+Model F test:       Equal FMI                   F(  28,714701.9)  =     223.85
+                                                Prob > F          =     0.0000
+
+------------------------------------------------------------------------------------------
+             punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------------------+----------------------------------------------------------------
+                cwc_inse |   .0155509   .0934611     0.17   0.868     -.167639    .1987409
+                         |
+ c.cwc_inse#c.pct_planta |   .2229157   .1011956     2.20   0.028     .0245672    .4212642
+                         |
+c.cwc_inse#c.indice_vuln |  -.0525309   .0270207    -1.94   0.052     -.105494    .0004321
+                         |
+        c_inse_prom_sede |   .2511669   .0988677     2.54   0.011     .0573714    .4449625
+                   mujer |  -8.227738   .2766475   -29.74   0.000    -8.769957   -7.685519
+                    edad |  -7.496962   .1240833   -60.42   0.000    -7.740161   -7.253763
+               repitente |   5.741324   .4170197    13.77   0.000     4.923981    6.558668
+           lectura_30min |   6.802832   .2915021    23.34   0.000     6.231309    7.374356
+           libros_26omas |   5.286008   .3976424    13.29   0.000     4.506058    6.065959
+           trabaja_mas20 |   -2.95447   .7079386    -4.17   0.000    -4.342242   -1.566697
+          internet_hogar |   .4229443   .3790481     1.12   0.265    -.3201449    1.166034
+        computador_hogar |   .5692562   .3625321     1.57   0.116     -.141394    1.279906
+            ln_matricula |   5.219461   1.036077     5.04   0.000     3.188767    7.250156
+   ratio_alumnos_docente |   -.083486   .0792237    -1.05   0.292    -.2387621    .0717901
+              pct_planta |   9.550406    1.69309     5.64   0.000     6.231982    12.86883
+              z_posgrado |   .0573464   .2026049     0.28   0.777    -.3397529    .4544456
+            dotacion_tic |   1.200195   1.790658     0.67   0.503     -2.31149    4.711879
+                   rural |  -8.867545   1.788991    -4.96   0.000    -12.37393   -5.361164
+                ju_unica |   .2894752   .8246114     0.35   0.726    -1.326734    1.905685
+                 tecnico |  -.3754779   1.334872    -0.28   0.779    -2.992205    2.241249
+       tecnico_academico |  -5.233189   2.461131    -2.13   0.034    -10.05855   -.4078236
+           cole_femenino |   38.29363   5.444138     7.03   0.000     27.62331    48.96394
+             indice_vuln |  -.8549114    .638422    -1.34   0.181    -2.106196    .3963727
+                         |
+                    year |
+                   2019  |  -4.770758   .7851407    -6.08   0.000    -6.309606    -3.23191
+                   2020  |  -3.212495   .8446436    -3.80   0.000    -4.867967   -1.557024
+                   2021  |  -7.501579    .857298    -8.75   0.000    -9.181852   -5.821305
+                   2022  |  -3.140044   .9025066    -3.48   0.001    -4.908925   -1.371164
+                   2023  |  -.1544042   .9615387    -0.16   0.872    -2.038986    1.730178
+                         |
+                   _cons |   320.5801   7.381329    43.43   0.000     306.1128    335.0474
+------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |    12.8332   1.631573      10.00267    16.46471
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |   1.805878    .322213      1.272955    2.561909
+-----------------------------+------------------------------------------------
+sede_id: Unstructured        |
+                sd(cwc_inse) |   .3307859   .0280588      .2801118    .3906274
+                   sd(_cons) |   11.44724   .4977206      10.51214    12.46553
+        corr(cwc_inse,_cons) |   .3556027   .0915021      .1650053    .5205969
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |   4.664988    .227431      4.239865    5.132736
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.27331   .0933763      34.09079    34.45682
+------------------------------------------------------------------------------
+.     timer off 2
+.     estimates save "M5r_`f'.ster"
+file M5r_20261013.ster saved
+.     matrix list e(b)
+
+e(b)[1,37]
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                    c.cwc_inse#   c.cwc_inse#                                          
+        cwc_inse  c.pct_planta  c.indice_v~n  c_inse_pro~e         mujer          edad
+y1     .01555092     .22291571    -.05253094     .25116693     -8.227738    -7.4969619
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+       repitente  lectura_30~n  libros_26~as  trabaja_m~20  internet_h~r  computador~r
+y1     5.7413244     6.8028324     5.2860085    -2.9544697     .42294434     .56925622
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+    ln_matricula  ratio_alum~e    pct_planta    z_posgrado  dotacion_tic         rural
+y1     5.2194615    -.08348598     9.5504061     .05734636     1.2001948    -8.8675454
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                 2018b.
+        ju_unica       tecnico  tecnico_ac~o  cole_femen~o   indice_vuln          year
+y1     .28947519    -.37547786    -5.2331889     38.293625    -.85491142             0
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+            2019.         2020.         2021.         2022.         2023.              
+            year          year          year          year          year         _cons
+y1    -4.7707579    -3.2124953    -7.5015786    -3.1400443    -.15440417     320.58014
+
+        lns1_1_1:     lns1_2_1:     lns2_1_1:     lns2_1_2:   atr2_1_1_2:     lns3_1_1:
+                                                                                       
+           _cons         _cons         _cons         _cons         _cons         _cons
+y1     2.5520356     .59104663    -1.1062838     2.4377487     .37184299     1.5400852
+
+         lnsig_e:
+                 
+           _cons
+y1      3.534367
+.     rep_m5 "M5r: estructura C1 + año fijo, REML"
+
+[M5r: estructura C1 + año fijo, REML]
+  cwc_inse x pct_planta   : coef  0.2229 (EE 0.1012)  p = 0.0276  p Holm = 0.0552
+  cwc_inse x indice_vuln  : coef -0.0525 (EE 0.0270)  p = 0.0519  p Holm = 0.0552
+  Contraste conjunto      : p = 0.0160
+  REGLA M5: conjunto < 0,05 pero ninguna supera Holm -> evidencia conjunta no atribuible a un
+> a interacción; exploratoria.
+.     rep_corr "M5r: componentes de la pendiente"
+
+[M5r: componentes de la pendiente]
+  DE de la pendiente =  0.3308   IC95% [ 0.2801;  0.3906]
+  Correlación        =  0.3556   IC95% [ 0.1650;  0.5206]
+  REGLA M4: el IC de la correlación EXCLUYE el cero.
+. 
+.     * Efecto del INSE dentro de la sede evaluado en las medias de pct_planta e
+.     * indice_vuln (en M5 el coeficiente de cwc_inse está en pct_planta = 0 e
+.     * indice_vuln = 0, que no es un punto interpretable). Cálculo derivado.
+.     quietly summarize pct_planta if _mi_m == 1
+.     local mpl = r(mean)
+.     quietly summarize indice_vuln if _mi_m == 1
+.     local miv = r(mean)
+.     display _newline "Medias usadas: pct_planta = " %9.4f `mpl' "  indice_vuln = " %9.4f `m
+> iv'
+
+Medias usadas: pct_planta =    0.8775  indice_vuln =    0.2171
+.     lincom cwc_inse + (`mpl')*c.cwc_inse#c.pct_planta + (`miv')*c.cwc_inse#c.indice_vuln
+
+ ( 1)  [punt_global]cwc_inse + .8775181*[punt_global]c.cwc_inse#c.pct_planta +
+       .217089*[punt_global]c.cwc_inse#c.indice_vuln = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .1997596   .0339759     5.88   0.000     .1331681    .2663511
+------------------------------------------------------------------------------
+. }
+
+. 
+. *------------------------------------------------------------------------------
+. * [C] M4c y M5c: controles de error de medida
+. *------------------------------------------------------------------------------
+. if `hacer_c' == 1 {
+.     display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+.     display "[C] M4c y M5c: + DE del INSE en la cohorte e INSE x rural"
+[C] M4c y M5c: + DE del INSE en la cohorte e INSE x rural
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     timer on 3
+.     mi estimate, dots post: mixed punt_global cwc_inse                           ///
+>         c.cwc_inse#c.c_sd_inse c.cwc_inse#c.rural c_sd_inse                      ///
+>         c_inse_prom_sede $v_n1 $v_n2 indice_vuln ib2018.year $RE_M4 , reml
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0258
+                                                Largest FMI       =     0.1114
+DF adjustment:   Large sample                   DF:     min       =   1,562.74
+                                                        avg       = 5878909.34
+                                                        max       =   1.13e+08
+Model F test:       Equal FMI                   F(  29,696053.8)  =     219.96
+                                                Prob > F          =     0.0000
+
+----------------------------------------------------------------------------------------
+           punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-----------------------+----------------------------------------------------------------
+              cwc_inse |   .3527995   .0440972     8.00   0.000     .2663698    .4392291
+                       |
+c.cwc_inse#c.c_sd_inse |   .0672975   .0168835     3.99   0.000     .0341968    .1003981
+                       |
+    c.cwc_inse#c.rural |  -.3140997    .052355    -6.00   0.000     -.416715   -.2114843
+                       |
+             c_sd_inse |   .2736837   .1609068     1.70   0.089    -.0417051    .5890725
+      c_inse_prom_sede |   .2195614   .1005545     2.18   0.029     .0224596    .4166632
+                 mujer |  -8.215766   .2765725   -29.71   0.000    -8.757839   -7.673694
+                  edad |  -7.498731   .1240256   -60.46   0.000    -7.741816   -7.255645
+             repitente |   5.723006   .4169159    13.73   0.000     4.905865    6.540146
+         lectura_30min |   6.815088   .2914041    23.39   0.000     6.243758    7.386419
+         libros_26omas |   5.241439   .3979168    13.17   0.000     4.460932    6.021946
+         trabaja_mas20 |  -2.932595   .7076723    -4.14   0.000    -4.319843   -1.545348
+        internet_hogar |   .4015022   .3789237     1.06   0.289    -.3413486    1.144353
+      computador_hogar |   .5776128   .3625901     1.59   0.111    -.1331508    1.288376
+          ln_matricula |   4.999238   1.036106     4.83   0.000     2.968488    7.029987
+ ratio_alumnos_docente |  -.0760568   .0791634    -0.96   0.337    -.2312147    .0791012
+            pct_planta |   9.092257   1.688242     5.39   0.000     5.783338    12.40118
+            z_posgrado |   .0495487   .2023902     0.24   0.807    -.3471297     .446227
+          dotacion_tic |   1.218452   1.787947     0.68   0.496     -2.28785    4.724753
+                 rural |  -10.73976   1.811349    -5.93   0.000    -14.28994   -7.189579
+              ju_unica |   .2022179   .8244633     0.25   0.806    -1.413701    1.818137
+               tecnico |  -.3495152    1.33572    -0.26   0.794    -2.967927    2.268897
+     tecnico_academico |  -5.180849   2.462601    -2.10   0.035    -10.00918   -.3525146
+         cole_femenino |   39.06463   5.436969     7.19   0.000     28.40836     49.7209
+           indice_vuln |  -.8337505   .6355074    -1.31   0.190    -2.079322    .4118212
+                       |
+                  year |
+                 2019  |   -4.75556   .7814104    -6.09   0.000    -6.287096   -3.224024
+                 2020  |   -3.23321    .840895    -3.84   0.000    -4.881334   -1.585086
+                 2021  |  -7.530388   .8534887    -8.82   0.000    -9.203195   -5.857581
+                 2022  |  -3.165973   .8984655    -3.52   0.000    -4.926933   -1.405012
+                 2023  |  -.1841538   .9572093    -0.19   0.847     -2.06025    1.691942
+                       |
+                 _cons |   323.4853   7.381162    43.83   0.000     309.0183    337.9522
+----------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   12.75812   1.623047       9.94259    16.37095
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |   1.780863    .322295      1.249058    2.539092
+-----------------------------+------------------------------------------------
+sede_id: Unstructured        |
+                sd(cwc_inse) |   .2916746   .0277955      .2419659    .3515952
+                   sd(_cons) |    11.4489    .497224      10.51468    12.46612
+        corr(cwc_inse,_cons) |   .3791935   .0924396      .1853304    .5446461
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |   4.659525   .2272233      4.234797    5.126852
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.27035   .0933531      34.08787    34.45381
+------------------------------------------------------------------------------
+.     timer off 3
+.     estimates save "M4c_`f'.ster"
+file M4c_20261013.ster saved
+.     matrix list e(b)
+
+e(b)[1,38]
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                    c.cwc_inse#   c.cwc_inse#                                          
+        cwc_inse   c.c_sd_inse       c.rural     c_sd_inse  c_inse_pro~e         mujer
+y1     .35279946     .06729748    -.31409965     .27368368     .21956141    -8.2157663
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+            edad     repitente  lectura_30~n  libros_26~as  trabaja_m~20  internet_h~r
+y1    -7.4987305     5.7230058     6.8150885      5.241439    -2.9325953     .40150219
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+    computador~r  ln_matricula  ratio_alum~e    pct_planta    z_posgrado  dotacion_tic
+y1     .57761285     4.9992378    -.07605677     9.0922567     .04954865     1.2184516
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+           rural      ju_unica       tecnico  tecnico_ac~o  cole_femen~o   indice_vuln
+y1    -10.739762     .20221788    -.34951521    -5.1808487     39.064629    -.83375046
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+           2018b.         2019.         2020.         2021.         2022.         2023.
+            year          year          year          year          year          year
+y1             0    -4.7555601    -3.2332102    -7.5303881    -3.1659727    -.18415376
+
+     punt_global:     lns1_1_1:     lns1_2_1:     lns2_1_1:     lns2_1_2:   atr2_1_1_2:
+                                                                                       
+           _cons         _cons         _cons         _cons         _cons         _cons
+y1     323.48526     2.5461679     .57709822    -1.2321165     2.4378938     .39911732
+
+        lns3_1_1:      lnsig_e:
+                               
+           _cons         _cons
+y1     1.5389136     3.5342805
+.     rep_corr "M4c"
+
+[M4c]
+  DE de la pendiente =  0.2917   IC95% [ 0.2420;  0.3516]
+  Correlación        =  0.3792   IC95% [ 0.1853;  0.5446]
+  REGLA M4: el IC de la correlación EXCLUYE el cero.
+. 
+.     timer on 4
+.     mi estimate, dots post: mixed punt_global cwc_inse                           ///
+>         c.cwc_inse#c.pct_planta c.cwc_inse#c.indice_vuln                         ///
+>         c.cwc_inse#c.c_sd_inse c.cwc_inse#c.rural c_sd_inse                      ///
+>         c_inse_prom_sede $v_n1 $v_n2 indice_vuln ib2018.year $RE_M4 , reml
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0263
+                                                Largest FMI       =     0.1109
+DF adjustment:   Large sample                   DF:     min       =   1,577.74
+                                                        avg       = 5591253.09
+                                                        max       =   1.12e+08
+Model F test:       Equal FMI                   F(  31,728558.8)  =     206.23
+                                                Prob > F          =     0.0000
+
+------------------------------------------------------------------------------------------
+             punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------------------+----------------------------------------------------------------
+                cwc_inse |   .3012975   .1048616     2.87   0.004     .0957619    .5068331
+                         |
+ c.cwc_inse#c.pct_planta |   .0625559   .1012755     0.62   0.537    -.1359515    .2610633
+                         |
+c.cwc_inse#c.indice_vuln |  -.0452033   .0260707    -1.73   0.083    -.0963041    .0058974
+                         |
+  c.cwc_inse#c.c_sd_inse |   .0663364   .0168695     3.93   0.000     .0332635    .0994093
+                         |
+      c.cwc_inse#c.rural |  -.3024248   .0539621    -5.60   0.000    -.4081904   -.1966591
+                         |
+               c_sd_inse |   .2746706   .1609146     1.71   0.088    -.0407334    .5900746
+        c_inse_prom_sede |   .2186721   .1005688     2.17   0.030     .0215424    .4158019
+                   mujer |  -8.217894   .2765752   -29.71   0.000    -8.759972   -7.675817
+                    edad |  -7.497141    .124031   -60.45   0.000    -7.740237   -7.254045
+               repitente |   5.710131   .4169732    13.69   0.000     4.892878    6.527384
+           lectura_30min |   6.810446   .2914698    23.37   0.000     6.238985    7.381907
+           libros_26omas |   5.233661    .397863    13.15   0.000     4.453265    6.014056
+           trabaja_mas20 |  -2.927605   .7077663    -4.14   0.000    -4.315038   -1.540171
+          internet_hogar |   .4182076   .3790333     1.10   0.270    -.3248569    1.161272
+        computador_hogar |   .5783804   .3625884     1.60   0.111    -.1323795     1.28914
+            ln_matricula |   5.001921   1.036792     4.82   0.000     2.969826    7.034016
+   ratio_alumnos_docente |  -.0770623   .0791774    -0.97   0.330    -.2322478    .0781231
+              pct_planta |   9.186414   1.693009     5.43   0.000     5.868153    12.50468
+              z_posgrado |   .0504479   .2024105     0.25   0.803    -.3462702     .447166
+            dotacion_tic |   1.209693   1.788292     0.68   0.499    -2.297292    4.716678
+                   rural |  -10.70686   1.811545    -5.91   0.000    -14.25743   -7.156298
+                ju_unica |   .2059449   .8246241     0.25   0.803     -1.41029    1.822179
+                 tecnico |  -.3743799   1.336944    -0.28   0.779    -2.995201    2.246441
+       tecnico_academico |  -5.165196    2.46663    -2.09   0.036    -10.00149   -.3289063
+           cole_femenino |   39.04446   5.446808     7.17   0.000      28.3689    49.72001
+             indice_vuln |  -.8486518   .6356302    -1.34   0.182    -2.094464    .3971605
+                         |
+                    year |
+                   2019  |  -4.754007   .7814081    -6.08   0.000    -6.285539   -3.222475
+                   2020  |  -3.235923   .8409123    -3.85   0.000    -4.884081   -1.587765
+                   2021  |  -7.531283   .8534998    -8.82   0.000    -9.204112   -5.858454
+                   2022  |  -3.164063   .8984829    -3.52   0.000    -4.925058   -1.403069
+                   2023  |  -.1795331   .9572446    -0.19   0.851    -2.055699    1.696632
+                         |
+                   _cons |   323.3841   7.388565    43.77   0.000     308.9027    337.8656
+------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   12.78498   1.626619       9.96329    16.40581
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |   1.780431   .3224067      1.248494    2.539006
+-----------------------------+------------------------------------------------
+sede_id: Unstructured        |
+                sd(cwc_inse) |   .2859617    .027988      .2360306    .3464554
+                   sd(_cons) |   11.43736   .4963513      10.50476    12.45277
+        corr(cwc_inse,_cons) |   .3706437   .0944378      .1728288    .5397177
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |   4.660591   .2272583      4.235796    5.127988
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.27105   .0933573      34.08857    34.45452
+------------------------------------------------------------------------------
+.     timer off 4
+.     estimates save "M5c_`f'.ster"
+file M5c_20261013.ster saved
+.     matrix list e(b)
+
+e(b)[1,40]
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                    c.cwc_inse#   c.cwc_inse#   c.cwc_inse#   c.cwc_inse#              
+        cwc_inse  c.pct_planta  c.indice_v~n   c.c_sd_inse       c.rural     c_sd_inse
+y1     .30129752     .06255586    -.04520333     .06633638    -.30242475      .2746706
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+    c_inse_pro~e         mujer          edad     repitente  lectura_30~n  libros_26~as
+y1     .21867215    -8.2178944    -7.4971409      5.710131     6.8104463     5.2336606
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+    trabaja_m~20  internet_h~r  computador~r  ln_matricula  ratio_alum~e    pct_planta
+y1    -2.9276046     .41820762     .57838039     5.0019213    -.07706234     9.1864145
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+      z_posgrado  dotacion_tic         rural      ju_unica       tecnico  tecnico_ac~o
+y1      .0504479     1.2096931    -10.706865     .20594487    -.37437994     -5.165196
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                       2018b.         2019.         2020.         2021.
+    cole_femen~o   indice_vuln          year          year          year          year
+y1     39.044455     -.8486518             0    -4.7540069    -3.2359234    -7.5312832
+
+     punt_global:  punt_global:  punt_global:     lns1_1_1:     lns1_2_1:     lns2_1_1:
+            2022.         2023.                                                        
+            year          year         _cons         _cons         _cons         _cons
+y1    -3.1640633    -.17953306     323.38411     2.5482713      .5768556    -1.2518975
+
+        lns2_1_2:   atr2_1_1_2:     lns3_1_1:      lnsig_e:
+                                                           
+           _cons         _cons         _cons         _cons
+y1     2.4368856     .38916915     1.5391423     3.5343011
+.     rep_m5 "M5c"
+
+[M5c]
+  cwc_inse x pct_planta   : coef  0.0626 (EE 0.1013)  p = 0.5368  p Holm = 0.5368
+  cwc_inse x indice_vuln  : coef -0.0452 (EE 0.0261)  p = 0.0829  p Holm = 0.1659
+  Contraste conjunto      : p = 0.1942
+  REGLA M5: contraste conjunto >= 0,05 -> sin heterogeneidad detectable; M5 pasa a anexo como
+>  exploratorio.
+.     rep_corr "M5c: componentes de la pendiente"
+
+[M5c: componentes de la pendiente]
+  DE de la pendiente =  0.2860   IC95% [ 0.2360;  0.3464]
+  Correlación        =  0.3706   IC95% [ 0.1728;  0.5397]
+  REGLA M4: el IC de la correlación EXCLUYE el cero.
+. }
+
+. 
+. *------------------------------------------------------------------------------
+. * [D] M4d y M5d: solo cohortes de sede con al menos 10 estudiantes
+. *------------------------------------------------------------------------------
+. if `hacer_d' == 1 {
+.     display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+.     display "[D] M4d y M5d: n_sa >= 10"
+[D] M4d y M5d: n_sa >= 10
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     timer on 5
+.     mi estimate, dots post: mixed punt_global cwc_inse                           ///
+>         c.cwc_inse#c.c_sd_inse c.cwc_inse#c.rural c_sd_inse                      ///
+>         c_inse_prom_sede $v_n1 $v_n2 indice_vuln ib2018.year if n_sa >= 10       ///
+>         $RE_M4 , reml
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects REML regression                   Number of obs     =     66,705
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        176    1,588.2     13,855
+                sede_id |        386         10      172.8      1,109
+              sede_anio |      1,955         10       34.1        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0242
+                                                Largest FMI       =     0.1071
+DF adjustment:   Large sample                   DF:     min       =   1,688.45
+                                                        avg       = 6056982.84
+                                                        max       =   6.53e+07
+Model F test:       Equal FMI                   F(  29,810729.3)  =     211.57
+                                                Prob > F          =     0.0000
+
+----------------------------------------------------------------------------------------
+           punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-----------------------+----------------------------------------------------------------
+              cwc_inse |   .3455614   .0448441     7.71   0.000     .2576679     .433455
+                       |
+c.cwc_inse#c.c_sd_inse |   .0685568   .0182147     3.76   0.000     .0328465    .1042671
+                       |
+    c.cwc_inse#c.rural |  -.3074146    .054198    -5.67   0.000    -.4136428   -.2011864
+                       |
+             c_sd_inse |   .1952369   .1861733     1.05   0.294    -.1696764    .5601503
+      c_inse_prom_sede |   .3458494   .1128923     3.06   0.002     .1245616    .5671372
+                 mujer |  -8.371885   .2845163   -29.42   0.000    -8.929527   -7.814243
+                  edad |  -7.573239   .1282876   -59.03   0.000    -7.824678     -7.3218
+             repitente |   5.526377   .4235818    13.05   0.000     4.696172    6.356583
+         lectura_30min |   6.971109   .2991589    23.30   0.000     6.384577    7.557642
+         libros_26omas |   5.252221    .406299    12.93   0.000     4.455319    6.049124
+         trabaja_mas20 |  -2.731709   .7292843    -3.75   0.000    -4.161285   -1.302133
+        internet_hogar |   .5307569   .3888743     1.36   0.172    -.2315913    1.293105
+      computador_hogar |    .537354   .3719882     1.44   0.149    -.1918302    1.266538
+          ln_matricula |   5.141957   1.143622     4.50   0.000     2.900486    7.383428
+ ratio_alumnos_docente |  -.0413768   .0842144    -0.49   0.623    -.2064348    .1236811
+            pct_planta |    8.94952   1.840433     4.86   0.000     5.342318    12.55672
+            z_posgrado |  -.0288608   .2127407    -0.14   0.892    -.4458257    .3881041
+          dotacion_tic |   .6322234     1.9672     0.32   0.748    -3.224235    4.488682
+                 rural |  -10.07125   1.836324    -5.48   0.000    -13.67038   -6.472114
+              ju_unica |    .374656   .8549461     0.44   0.661    -1.301008     2.05032
+               tecnico |  -.1224913   1.401693    -0.09   0.930    -2.869931    2.624948
+     tecnico_academico |  -5.378242   2.512875    -2.14   0.032    -10.30508   -.4514083
+         cole_femenino |   38.51693   5.401126     7.13   0.000     27.93091    49.10294
+           indice_vuln |  -.7336528   .6539924    -1.12   0.262    -2.015454    .5481489
+                       |
+                  year |
+                 2019  |  -4.719128   .8042052    -5.87   0.000    -6.295342   -3.142915
+                 2020  |  -3.560163   .8703067    -4.09   0.000    -5.265932   -1.854393
+                 2021  |  -8.025275   .8844401    -9.07   0.000    -9.758746   -6.291805
+                 2022  |  -3.420622   .9293454    -3.68   0.000    -5.242105   -1.599138
+                 2023  |  -.4281614   .9922741    -0.43   0.666    -2.372983     1.51666
+                       |
+                 _cons |   323.4771   8.040769    40.23   0.000     307.7174    339.2369
+----------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   12.79781   1.664913      9.917443    16.51473
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |   1.735987    .334502      1.189957    2.532573
+-----------------------------+------------------------------------------------
+sede_id: Unstructured        |
+                sd(cwc_inse) |   .2956683   .0287652       .244321    .3578069
+                   sd(_cons) |   11.36114   .5328605      10.36332    12.45504
+        corr(cwc_inse,_cons) |   .3955318   .0935514      .1983002    .5619777
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |    4.72127   .2344558        4.2834    5.203901
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.46421   .0959004      34.27676    34.65269
+------------------------------------------------------------------------------
+.     timer off 5
+.     estimates save "M4d_`f'.ster"
+file M4d_20261013.ster saved
+.     matrix list e(b)
+
+e(b)[1,38]
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                    c.cwc_inse#   c.cwc_inse#                                          
+        cwc_inse   c.c_sd_inse       c.rural     c_sd_inse  c_inse_pro~e         mujer
+y1     .34556144     .06855677    -.30741458     .19523693     .34584937    -8.3718851
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+            edad     repitente  lectura_30~n  libros_26~as  trabaja_m~20  internet_h~r
+y1    -7.5732388     5.5263775     6.9711093     5.2522212    -2.7317094     .53075693
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+    computador~r  ln_matricula  ratio_alum~e    pct_planta    z_posgrado  dotacion_tic
+y1     .53735397     5.1419568    -.04137685     8.9495195    -.02886081     .63222343
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+           rural      ju_unica       tecnico  tecnico_ac~o  cole_femen~o   indice_vuln
+y1    -10.071245       .374656    -.12249127    -5.3782417     38.516925    -.73365277
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+           2018b.         2019.         2020.         2021.         2022.         2023.
+            year          year          year          year          year          year
+y1             0    -4.7191283    -3.5601625    -8.0252754    -3.4206215     -.4281614
+
+     punt_global:     lns1_1_1:     lns1_2_1:     lns2_1_1:     lns2_1_2:   atr2_1_1_2:
+                                                                                       
+           _cons         _cons         _cons         _cons         _cons         _cons
+y1     323.47714     2.5492739     .55157641    -1.2185171     2.4301991     .41834089
+
+        lns3_1_1:      lnsig_e:
+                               
+           _cons         _cons
+y1     1.5520778     3.5399215
+.     rep_corr "M4d (n_sa >= 10)"
+
+[M4d (n_sa >= 10)]
+  DE de la pendiente =  0.2957   IC95% [ 0.2443;  0.3578]
+  Correlación        =  0.3955   IC95% [ 0.1983;  0.5620]
+  REGLA M4: el IC de la correlación EXCLUYE el cero.
+. 
+.     timer on 6
+.     mi estimate, dots post: mixed punt_global cwc_inse                           ///
+>         c.cwc_inse#c.pct_planta c.cwc_inse#c.indice_vuln                         ///
+>         c.cwc_inse#c.c_sd_inse c.cwc_inse#c.rural c_sd_inse                      ///
+>         c_inse_prom_sede $v_n1 $v_n2 indice_vuln ib2018.year if n_sa >= 10       ///
+>         $RE_M4 , reml
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects REML regression                   Number of obs     =     66,705
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        176    1,588.2     13,855
+                sede_id |        386         10      172.8      1,109
+              sede_anio |      1,955         10       34.1        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0247
+                                                Largest FMI       =     0.1067
+DF adjustment:   Large sample                   DF:     min       =   1,703.31
+                                                        avg       = 5830386.48
+                                                        max       =   6.56e+07
+Model F test:       Equal FMI                   F(  31,843398.6)  =     198.19
+                                                Prob > F          =     0.0000
+
+------------------------------------------------------------------------------------------
+             punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------------------+----------------------------------------------------------------
+                cwc_inse |   .3137592    .110261     2.85   0.004     .0976431    .5298753
+                         |
+ c.cwc_inse#c.pct_planta |   .0403521   .1071928     0.38   0.707    -.1697495    .2504536
+                         |
+c.cwc_inse#c.indice_vuln |  -.0365139   .0271361    -1.35   0.178    -.0897041    .0166762
+                         |
+  c.cwc_inse#c.c_sd_inse |   .0674187   .0182125     3.70   0.000     .0317133    .1031241
+                         |
+      c.cwc_inse#c.rural |  -.2998238   .0558251    -5.37   0.000    -.4092415   -.1904062
+                         |
+               c_sd_inse |   .1959701   .1861782     1.05   0.293    -.1689528     .560893
+        c_inse_prom_sede |    .345148   .1129053     3.06   0.002     .1238349    .5664611
+                   mujer |  -8.373429   .2845202   -29.43   0.000    -8.931079    -7.81578
+                    edad |  -7.571978   .1282956   -59.02   0.000    -7.823433   -7.320524
+               repitente |   5.516388   .4236508    13.02   0.000     4.686047    6.346728
+           lectura_30min |   6.967321   .2991953    23.29   0.000     6.380717    7.553925
+           libros_26omas |   5.245532   .4062626    12.91   0.000     4.448705    6.042358
+           trabaja_mas20 |  -2.728912   .7293952    -3.74   0.000    -4.158707   -1.299116
+          internet_hogar |   .5436119   .3889655     1.40   0.162    -.2189138    1.306138
+        computador_hogar |   .5376167    .371983     1.45   0.148     -.191557     1.26679
+            ln_matricula |   5.141143   1.144152     4.49   0.000     2.898635    7.383652
+   ratio_alumnos_docente |  -.0421858    .084226    -0.50   0.616    -.2072664    .1228948
+              pct_planta |   9.013873   1.846395     4.88   0.000     5.394985    12.63276
+              z_posgrado |  -.0281762   .2127583    -0.13   0.895    -.4451755    .3888232
+            dotacion_tic |   .6302269   1.967367     0.32   0.749    -3.226559    4.487012
+                   rural |  -10.04549   1.836553    -5.47   0.000    -13.64507   -6.445915
+                ju_unica |   .3770566   .8550339     0.44   0.659     -1.29878    2.052893
+                 tecnico |  -.1375264   1.402331    -0.10   0.922    -2.886217    2.611164
+       tecnico_academico |  -5.354768   2.515697    -2.13   0.033    -10.28718   -.4223532
+           cole_femenino |    38.5239   5.406173     7.13   0.000     27.92799    49.11981
+             indice_vuln |  -.7478694   .6541205    -1.14   0.253    -2.029922    .5341834
+                         |
+                    year |
+                   2019  |  -4.716815   .8042144    -5.87   0.000    -6.293046   -3.140584
+                   2020  |  -3.560924   .8703239    -4.09   0.000    -5.266728   -1.855121
+                   2021  |  -8.024421   .8844586    -9.07   0.000    -9.757928   -6.290914
+                   2022  |  -3.417218   .9293694    -3.68   0.000    -5.238748   -1.595687
+                   2023  |  -.4226767   .9923152    -0.43   0.670    -2.367579    1.522226
+                         |
+                   _cons |   323.4217   8.047941    40.19   0.000     307.6479    339.1955
+------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   12.82061   1.668083      9.934805    16.54467
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |   1.735737   .3346334      1.189544    2.532722
+-----------------------------+------------------------------------------------
+sede_id: Unstructured        |
+                sd(cwc_inse) |   .2914652   .0290068      .2397957    .3542682
+                   sd(_cons) |   11.35241   .5322424      10.35572    12.44501
+        corr(cwc_inse,_cons) |   .3914143   .0950208      .1911411    .5604005
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |   4.721917   .2344891      4.283985    5.204617
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.46501   .0959055      34.27755     34.6535
+------------------------------------------------------------------------------
+.     timer off 6
+.     estimates save "M5d_`f'.ster"
+file M5d_20261013.ster saved
+.     matrix list e(b)
+
+e(b)[1,40]
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                    c.cwc_inse#   c.cwc_inse#   c.cwc_inse#   c.cwc_inse#              
+        cwc_inse  c.pct_planta  c.indice_v~n   c.c_sd_inse       c.rural     c_sd_inse
+y1     .31375922     .04035205    -.03651394     .06741871    -.29982383     .19597009
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+    c_inse_pro~e         mujer          edad     repitente  lectura_30~n  libros_26~as
+y1     .34514795    -8.3734294    -7.5719784     5.5163877     6.9673211     5.2455317
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+    trabaja_m~20  internet_h~r  computador~r  ln_matricula  ratio_alum~e    pct_planta
+y1    -2.7289118     .54361191     .53761668     5.1411432    -.04218579     9.0138731
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+      z_posgrado  dotacion_tic         rural      ju_unica       tecnico  tecnico_ac~o
+y1    -.02817615     .63022693    -10.045494     .37705659    -.13752636    -5.3547682
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                       2018b.         2019.         2020.         2021.
+    cole_femen~o   indice_vuln          year          year          year          year
+y1     38.523897    -.74786939             0    -4.7168149    -3.5609244     -8.024421
+
+     punt_global:  punt_global:  punt_global:     lns1_1_1:     lns1_2_1:     lns2_1_1:
+            2022.         2023.                                                        
+            year          year         _cons         _cons         _cons         _cons
+y1    -3.4172177    -.42267666     323.42168     2.5510542     .55143223    -1.2328346
+
+        lns2_1_2:   atr2_1_1_2:     lns3_1_1:      lnsig_e:
+                                                           
+           _cons         _cons         _cons         _cons
+y1     2.4294297     .41346907     1.5522149     3.5399447
+.     rep_m5 "M5d (n_sa >= 10)"
+
+[M5d (n_sa >= 10)]
+  cwc_inse x pct_planta   : coef  0.0404 (EE 0.1072)  p = 0.7066  p Holm = 0.7066
+  cwc_inse x indice_vuln  : coef -0.0365 (EE 0.0271)  p = 0.1784  p Holm = 0.3569
+  Contraste conjunto      : p = 0.3858
+  REGLA M5: contraste conjunto >= 0,05 -> sin heterogeneidad detectable; M5 pasa a anexo como
+>  exploratorio.
+.     rep_corr "M5d: componentes de la pendiente"
+
+[M5d: componentes de la pendiente]
+  DE de la pendiente =  0.2915   IC95% [ 0.2398;  0.3542]
+  Correlación        =  0.3914   IC95% [ 0.1912;  0.5604]
+  REGLA M4: el IC de la correlación EXCLUYE el cero.
+. }
+
+. 
+. *------------------------------------------------------------------------------
+. * [A] M4b y M5b: estructura ANTIGUA de 08 + año fijo (mle)
+. *     Aísla el efecto de añadir ib2018.year; no es un modelo de referencia final.
+. *------------------------------------------------------------------------------
+. if `hacer_b' == 1 {
+.     display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+.     display "[A] M4b y M5b: estructura antigua de 08 + ib2018.year (mle)"
+[A] M4b y M5b: estructura antigua de 08 + ib2018.year (mle)
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     timer on 7
+.     mi estimate, dots post: mixed punt_global cwc_inse c_inse_prom_sede          ///
+>         $v_n1 $v_n2 indice_vuln ib2018.year                                      ///
+>         || mcpio_id: || sede_id: cwc_inse , mle covariance(unstructured)
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects ML regression                     Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0333
+                                                Largest FMI       =     0.1650
+DF adjustment:   Large sample                   DF:     min       =     718.20
+                                                        avg       = 3672130.84
+                                                        max       =   8.30e+07
+Model F test:       Equal FMI                   F(  26,374581.4)  =     254.04
+                                                Prob > F          =     0.0000
+
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+             cwc_inse |   .1900059   .0343437     5.53   0.000     .1226903    .2573216
+     c_inse_prom_sede |   .1962343    .081651     2.40   0.016     .0361764    .3562923
+                mujer |  -8.157631   .2773375   -29.41   0.000    -8.701203   -7.614059
+                 edad |  -7.518736   .1243808   -60.45   0.000    -7.762518   -7.274955
+            repitente |   5.727397   .4179174    13.70   0.000     4.908294    6.546501
+        lectura_30min |   6.853186   .2920304    23.47   0.000      6.28064    7.425733
+        libros_26omas |   5.394017   .4007345    13.46   0.000     4.607923    6.180111
+        trabaja_mas20 |   -3.00195   .7103122    -4.23   0.000    -4.394377   -1.609523
+       internet_hogar |    .467539   .3801979     1.23   0.219    -.2778226      1.2129
+     computador_hogar |   .5756614    .364088     1.58   0.114    -.1380494    1.289372
+         ln_matricula |   4.196353   .9299704     4.51   0.000     2.373624    6.019082
+ratio_alumnos_docente |  -.0448848   .0620794    -0.72   0.470    -.1665585     .076789
+           pct_planta |   6.611997   1.424738     4.64   0.000      3.81954    9.404455
+           z_posgrado |   .0687237   .1489191     0.46   0.644    -.2231533    .3606006
+         dotacion_tic |  -.0266677   1.490995    -0.02   0.986     -2.95242    2.899084
+                rural |  -9.820267   1.745258    -5.63   0.000    -13.24094   -6.399592
+             ju_unica |   .1638352   .6235565     0.26   0.793    -1.058315    1.385985
+              tecnico |  -.4214224   1.330221    -0.32   0.751    -3.029646    2.186801
+    tecnico_academico |  -5.270403    2.55811    -2.06   0.040    -10.29267   -.2481371
+        cole_femenino |   39.07941   5.436383     7.19   0.000     28.42429    49.73453
+          indice_vuln |  -.8668988   .3998438    -2.17   0.030    -1.650578   -.0832193
+                      |
+                 year |
+                2019  |  -4.550664   .4696423    -9.69   0.000    -5.471147   -3.630182
+                2020  |  -3.709606   .5146566    -7.21   0.000    -4.718315   -2.700897
+                2021  |  -8.626895   .5257238   -16.41   0.000    -9.657296   -7.596495
+                2022  |  -3.079153   .5533863    -5.56   0.000    -4.163771   -1.994534
+                2023  |   .2770464   .5866274     0.47   0.637    -.8727243    1.426817
+                      |
+                _cons |   329.4216   6.820311    48.30   0.000     316.0539    342.7893
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   12.54149   1.576006      9.803572    16.04405
+-----------------------------+------------------------------------------------
+sede_id: Unstructured        |
+                sd(cwc_inse) |   .3403336   .0280157      .2896172    .3999312
+                   sd(_cons) |   11.75738   .4959246      10.82448    12.77068
+        corr(cwc_inse,_cons) |   .3877339   .0874104      .2045535    .5446759
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.57015   .0931945      34.38797    34.75329
+------------------------------------------------------------------------------
+.     timer off 7
+.     estimates save "M4b_`f'.ster"
+file M4b_20261013.ster saved
+.     matrix list e(b)
+
+e(b)[1,33]
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+        cwc_inse  c_inse_pro~e         mujer          edad     repitente  lectura_30~n
+y1     .19000593     .19623434    -8.1576312    -7.5187364     5.7273975     6.8531864
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+    libros_26~as  trabaja_m~20  internet_h~r  computador~r  ln_matricula  ratio_alum~e
+y1     5.3940172    -3.0019501     .46753895     .57566142      4.196353    -.04488475
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+      pct_planta    z_posgrado  dotacion_tic         rural      ju_unica       tecnico
+y1     6.6119971     .06872367    -.02666773    -9.8202671     .16383519    -.42142239
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                     2018b.         2019.         2020.
+    tecnico_ac~o  cole_femen~o   indice_vuln          year          year          year
+y1    -5.2704034      39.07941     -.8668988             0    -4.5506644    -3.7096057
+
+     punt_global:  punt_global:  punt_global:  punt_global:     lns1_1_1:     lns2_1_1:
+            2021.         2022.         2023.                                          
+            year          year          year         _cons         _cons         _cons
+y1    -8.6268955    -3.0791527     .27704637     329.42163     2.5290425     -1.077829
+
+        lns2_1_2:   atr2_1_1_2:      lnsig_e:
+                                             
+           _cons         _cons         _cons
+y1     2.4644811     .40913015     3.5429906
+.     rep_corr "M4b: estructura antigua + año fijo, mle"
+
+[M4b: estructura antigua + año fijo, mle]
+  DE de la pendiente =  0.3403   IC95% [ 0.2896;  0.3999]
+  Correlación        =  0.3877   IC95% [ 0.2046;  0.5447]
+  REGLA M4: el IC de la correlación EXCLUYE el cero.
+. 
+.     timer on 8
+.     mi estimate, dots post: mixed punt_global cwc_inse                           ///
+>         c.cwc_inse#c.pct_planta c.cwc_inse#c.indice_vuln                         ///
+>         c_inse_prom_sede $v_n1 $v_n2 indice_vuln ib2018.year                     ///
+>         || mcpio_id: || sede_id: cwc_inse , mle covariance(unstructured)
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects ML regression                     Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0333
+                                                Largest FMI       =     0.1665
+DF adjustment:   Large sample                   DF:     min       =     705.57
+                                                        avg       = 4109479.22
+                                                        max       =   1.04e+08
+Model F test:       Equal FMI                   F(  28,411553.0)  =     237.19
+                                                Prob > F          =     0.0000
+
+------------------------------------------------------------------------------------------
+             punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------------------+----------------------------------------------------------------
+                cwc_inse |   .0208202   .0936008     0.22   0.824    -.1626438    .2042843
+                         |
+ c.cwc_inse#c.pct_planta |   .2116607   .1013161     2.09   0.037     .0130755    .4102459
+                         |
+c.cwc_inse#c.indice_vuln |   -.053252    .027074    -1.97   0.049    -.1063194   -.0001845
+                         |
+        c_inse_prom_sede |   .1957502   .0816715     2.40   0.017     .0356518    .3558485
+                   mujer |   -8.15882   .2773375   -29.42   0.000    -8.702392   -7.615248
+                    edad |  -7.515607   .1243796   -60.42   0.000    -7.759386   -7.271827
+               repitente |   5.711214   .4179487    13.66   0.000      4.89205    6.530379
+           lectura_30min |   6.847813   .2920854    23.44   0.000     6.275157    7.420469
+           libros_26omas |    5.38985   .4006875    13.45   0.000     4.603852    6.175848
+           trabaja_mas20 |  -2.995335   .7103453    -4.22   0.000    -4.387828   -1.602842
+          internet_hogar |   .4822518   .3803309     1.27   0.205    -.2633707    1.227874
+        computador_hogar |   .5791463   .3640108     1.59   0.112    -.1344117    1.292704
+            ln_matricula |   4.209249   .9310558     4.52   0.000     2.384392    6.034106
+   ratio_alumnos_docente |  -.0463584   .0620926    -0.75   0.455     -.168058    .0753413
+              pct_planta |   6.818573   1.428465     4.77   0.000     4.018808    9.618337
+              z_posgrado |   .0700893   .1489248     0.47   0.638    -.2217989    .3619774
+            dotacion_tic |  -.0350541   1.491568    -0.02   0.981    -2.961952    2.891844
+                   rural |  -10.12359   1.749506    -5.79   0.000    -13.55258   -6.694595
+                ju_unica |   .1684605   .6236814     0.27   0.787    -1.053934    1.390855
+                 tecnico |  -.4777332   1.333054    -0.36   0.720     -3.09153    2.136064
+       tecnico_academico |   -5.30855   2.567843    -2.07   0.039    -10.35008   -.2670228
+           cole_femenino |   38.94013   5.465514     7.12   0.000     28.22791    49.65234
+             indice_vuln |  -.8760638   .3999409    -2.19   0.028    -1.659934   -.0921939
+                         |
+                    year |
+                   2019  |   -4.54999   .4696605    -9.69   0.000    -5.470508   -3.629472
+                   2020  |  -3.714932   .5146845    -7.22   0.000    -4.723695   -2.706168
+                   2021  |  -8.629161   .5257496   -16.41   0.000    -9.659612    -7.59871
+                   2022  |  -3.079977   .5534234    -5.57   0.000    -4.164667   -1.995286
+                   2023  |   .2784902   .5866792     0.47   0.635    -.8713819    1.428362
+                         |
+                   _cons |   329.4121   6.831983    48.22   0.000     316.0215    342.8027
+------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   12.63576   1.585828       9.88036    16.15957
+-----------------------------+------------------------------------------------
+sede_id: Unstructured        |
+                sd(cwc_inse) |   .3259683   .0280991       .275288    .3859788
+                   sd(_cons) |   11.71777   .4921474      10.79182    12.72318
+        corr(cwc_inse,_cons) |   .3604271   .0910909      .1704904    .5245393
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.57095   .0931965      34.38877    34.75409
+------------------------------------------------------------------------------
+.     timer off 8
+.     estimates save "M5b_`f'.ster"
+file M5b_20261013.ster saved
+.     matrix list e(b)
+
+e(b)[1,35]
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                    c.cwc_inse#   c.cwc_inse#                                          
+        cwc_inse  c.pct_planta  c.indice_v~n  c_inse_pro~e         mujer          edad
+y1     .02082023     .21166067    -.05325197     .19575017    -8.1588199    -7.5156065
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+       repitente  lectura_30~n  libros_26~as  trabaja_m~20  internet_h~r  computador~r
+y1     5.7112142     6.8478129     5.3898502    -2.9953351     .48225181     .57914634
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+    ln_matricula  ratio_alum~e    pct_planta    z_posgrado  dotacion_tic         rural
+y1     4.2092488     -.0463584     6.8185727     .07008927    -.03505413    -10.123589
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                 2018b.
+        ju_unica       tecnico  tecnico_ac~o  cole_femen~o   indice_vuln          year
+y1     .16846054    -.47773319    -5.3085502     38.940127    -.87606381             0
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+            2019.         2020.         2021.         2022.         2023.              
+            year          year          year          year          year         _cons
+y1      -4.54999    -3.7149316     -8.629161    -3.0799767     .27849021     329.41212
+
+        lns1_1_1:     lns2_1_1:     lns2_1_2:   atr2_1_1_2:      lnsig_e:
+                                                                         
+           _cons         _cons         _cons         _cons         _cons
+y1     2.5365306    -1.1209551     2.4611067     .37737667     3.5430136
+.     rep_m5 "M5b: estructura antigua + año fijo, mle"
+
+[M5b: estructura antigua + año fijo, mle]
+  cwc_inse x pct_planta   : coef  0.2117 (EE 0.1013)  p = 0.0367  p Holm = 0.0734
+  cwc_inse x indice_vuln  : coef -0.0533 (EE 0.0271)  p = 0.0492  p Holm = 0.0734
+  Contraste conjunto      : p = 0.0194
+  REGLA M5: conjunto < 0,05 pero ninguna supera Holm -> evidencia conjunta no atribuible a un
+> a interacción; exploratoria.
+. }
+
+. 
+. *------------------------------------------------------------------------------
+. * [E] Efectos aleatorios por sede de M4r (Figuras 6 y 7), imputación 1
+. *     Va al final porque reemplaza el conjunto de datos en memoria.
+. *     Los BLUP están encogidos hacia cero: sirven para el gráfico, NO para
+. *     estimar la correlación, que sale del modelo (rep_corr).
+. *------------------------------------------------------------------------------
+. if `hacer_efec' == 1 {
+.     display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+.     display "[E] EFECTOS ALEATORIOS POR SEDE (M4r, imputación 1)"
+[E] EFECTOS ALEATORIOS POR SEDE (M4r, imputación 1)
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     mi extract 1, clear
+.     timer on 9
+.     mixed punt_global cwc_inse c_inse_prom_sede $v_n1 $v_n2 indice_vuln          ///
+>         ib2018.year $RE_M4 , reml
+
+Performing EM optimization ...
+
+Performing gradient-based optimization: 
+Iteration 0:   log restricted-likelihood = -346603.43  
+Iteration 1:   log restricted-likelihood = -346602.18  
+Iteration 2:   log restricted-likelihood = -346602.18  
+
+Computing standard errors ...
+
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Wald chi2(26)     =    6431.49
+Log restricted-likelihood = -346602.18          Prob > chi2       =     0.0000
+
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+             cwc_inse |   .2030247   .0337179     6.02   0.000     .1369387    .2691107
+     c_inse_prom_sede |   .2728441   .0971264     2.81   0.005     .0824798    .4632084
+                mujer |  -8.243403   .2762071   -29.85   0.000    -8.784759   -7.702047
+                 edad |  -7.495068   .1239785   -60.45   0.000    -7.738061   -7.252074
+            repitente |   5.752524   .4164322    13.81   0.000     4.936332    6.568716
+        lectura_30min |   6.831769   .2805736    24.35   0.000     6.281855    7.381683
+        libros_26omas |   5.263443   .3749981    14.04   0.000      4.52846    5.998426
+        trabaja_mas20 |  -3.227761   .6879579    -4.69   0.000    -4.576133   -1.879388
+       internet_hogar |   .3646317   .3677657     0.99   0.321    -.3561759    1.085439
+     computador_hogar |   .5151308   .3542707     1.45   0.146     -.179227    1.209489
+         ln_matricula |   5.297777   1.026909     5.16   0.000     3.285073    7.310482
+ratio_alumnos_docente |  -.0856985    .078896    -1.09   0.277    -.2403318    .0689348
+           pct_planta |   8.999443   1.657675     5.43   0.000     5.750461    12.24843
+           z_posgrado |   .0493484   .2015604     0.24   0.807    -.3457026    .4443995
+         dotacion_tic |   1.426237   1.660781     0.86   0.390    -1.828834    4.681308
+                rural |  -8.549523   1.774814    -4.82   0.000    -12.02809   -5.070952
+             ju_unica |   .3229033   .8223273     0.39   0.695    -1.288829    1.934635
+              tecnico |  -.5538879   1.295126    -0.43   0.669    -3.092287    1.984512
+    tecnico_academico |  -5.112782   2.332639    -2.19   0.028     -9.68467   -.5408947
+        cole_femenino |   38.00388   5.414998     7.02   0.000     27.39068    48.61708
+          indice_vuln |  -.8281976   .6370674    -1.30   0.194    -2.076827    .4204315
+                      |
+                 year |
+                2019  |  -4.818215   .7837375    -6.15   0.000    -6.354313   -3.282118
+                2020  |  -3.216777   .8422868    -3.82   0.000    -4.867629   -1.565925
+                2021  |  -7.542296   .8550711    -8.82   0.000    -9.218205   -5.866388
+                2022  |  -3.163627   .9002327    -3.51   0.000     -4.92805   -1.399203
+                2023  |  -.1937044   .9586307    -0.20   0.840    -2.072586    1.685177
+                      |
+                _cons |   320.4758   7.321491    43.77   0.000     306.1259    334.8256
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  var(_cons) |   162.9842   41.48164      98.96994    268.4031
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                 var(R.year) |   3.244354   1.151794      1.617853    6.506049
+-----------------------------+------------------------------------------------
+sede_id: Unstructured        |
+               var(cwc_inse) |   .1149493   .0184626      .0839055    .1574788
+                  var(_cons) |   131.1406   11.44683      110.5194    155.6094
+         cov(cwc_inse,_cons) |   1.437875   .3791768      .6947022    2.181048
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                  var(_cons) |   21.64671   2.112031      17.87893    26.20849
+-----------------------------+------------------------------------------------
+               var(Residual) |   1174.669   6.390668       1162.21    1187.261
+------------------------------------------------------------------------------
+LR test vs. linear model: chi2(6) = 13801.42              Prob > chi2 = 0.0000
+
+Note: LR test is conservative and provided only for reference.
+.     timer off 9
+.     display "converged (M4r, m=1) = " e(converged)
+converged (M4r, m=1) = 1
+. 
+.     * Orden esperado de los efectos de sede: pendiente (cwc_inse), luego intercepto.
+.     * VERIFICAR con describe y con los signos antes de graficar.
+.     capture noisily predict double b_pend b_int, reffects relevel(sede_id)
+.     capture noisily predict double se_pend se_int, reses relevel(sede_id)
+.     describe b_pend b_int se_pend se_int
+
+Variable      Storage   Display    Value
+    name         type    format    label      Variable label
+---------------------------------------------------------------------------------------------
+b_pend          double  %10.0g                BLUP r.e. for sede_id: cwc_inse
+b_int           float   %9.0g                 BLUP r.e. for sede_id: _cons
+se_pend         double  %10.0g                BLUP r.e. std. errors for sede_id: cwc_inse
+se_int          float   %9.0g                 BLUP r.e. std. errors for sede_id: _cons
+.     summarize b_pend b_int se_pend se_int
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+      b_pend |     69,750     .053546    .2572345  -.6013417   .7462805
+       b_int |     69,750    1.849017    11.30981  -34.90036   48.52331
+     se_pend |     69,750    .2211101    .0469524   .1319761   .3367711
+      se_int |     69,750    5.466519    .7484826   4.295169   10.88007
+.     correlate b_pend b_int
+(obs=69,750)
+
+             |   b_pend    b_int
+-------------+------------------
+      b_pend |   1.0000
+       b_int |   0.4786   1.0000
+
+. 
+.     keep cole_cod_dane_sede sede_id b_pend b_int se_pend se_int
+.     duplicates drop
+
+Duplicates in terms of all variables
+
+(69,313 observations deleted)
+.     isid sede_id
+.     display "Sedes con efectos predichos: " _N
+Sedes con efectos predichos: 437
+.     save "Efectos_sede_M4r_`f'.dta"
+file Efectos_sede_M4r_20261013.dta saved
+. }
+
+. 
+. *------------------------------------------------------------------------------
+. display _newline(2) "--- Tiempos (s): 1=M4r 2=M5r 3=M4c 4=M5c 5=M4d 6=M5d 7=M4b 8=M5b 9=efe
+> ctos ---"
+
+
+--- Tiempos (s): 1=M4r 2=M5r 3=M4c 4=M5c 5=M4d 6=M5d 7=M4b 8=M5b 9=efectos ---
+
+. timer list
+   1:   4012.29 /        1 =    4012.2890
+   2:   4020.18 /        1 =    4020.1830
+   3:   4467.56 /        1 =    4467.5600
+   4:   8748.66 /        1 =    8748.6600
+   5:   3190.07 /        1 =    3190.0740
+   6:   2693.18 /        1 =    2693.1790
+   7:   1346.60 /        1 =    1346.5980
+   8:   1987.83 /        1 =    1987.8280
+   9:    161.66 /        1 =     161.6590
+
+. display "Fin: " c(current_date) " " c(current_time)
+Fin: 13 Oct 2026 19:01:56
+
+. log close fase15
+      name:  fase15
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_15_gradiente_20261013_1
+> 026.log
+  log type:  text
+ closed on:  13 Oct 2026, 19:01:56
+---------------------------------------------------------------------------------------------

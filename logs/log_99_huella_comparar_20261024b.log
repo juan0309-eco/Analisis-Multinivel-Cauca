@@ -1,0 +1,262 @@
+---------------------------------------------------------------------------------------------
+      name:  huella
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_99_huella_comparar_2026
+> 1024b.log
+  log type:  text
+ opened on:  24 Oct 2026, 10:00:05
+
+. display "Tarea: `tarea'   " c(current_date) " " c(current_time)
+Tarea: 99_huella_comparar   24 Oct 2026 10:00:05
+
+. 
+. timer clear
+
+. timer on 1
+
+. 
+. 
+. ********************************************************************************
+. * [A] TOMAR LA HUELLA
+. ********************************************************************************
+. 
+. if "`modo'" == "tomar" {
+. 
+.     display _newline "{hline 78}"
+.     display "[A] HUELLA DE LOS .ster, ETIQUETA: `etiqueta'"
+.     display "{hline 78}"
+. 
+.     capture confirm file "huella_`etiqueta'.dta"
+.     if _rc == 0 {
+.         display as error "Ya existe huella_`etiqueta'.dta. No se sobrescribe."
+.         display as error "Si hay que repetirla, usar otra etiqueta (antes_b...)."
+.         exit 602
+.     }
+. 
+.     local lista : dir . files "*.ster", respectcase
+.     local lista : list sort lista
+.     local nster : word count `lista'
+.     display "Archivos .ster en la carpeta: `nster'"
+. 
+.     tempname ph bb VV
+.     postfile `ph' str120 archivo str10 tipo str244 parametro double valor ///
+>         using "huella_`etiqueta'.dta"
+. 
+.     local nerr = 0
+.     foreach f of local lista {
+  2. 
+.         capture estimates use "`f'"
+  3.         if _rc != 0 {
+  4.             local cod = _rc
+  5.             post `ph' ("`f'") ("error") ("estimates use, codigo `cod'") (.)
+  6.             display as error "  No se pudo leer `f' (codigo `cod')."
+  7.             local ++nerr
+  8.             continue
+  9.         }
+ 10. 
+.         * --- Comando que produjo el archivo ---
+.         post `ph' ("`f'") ("cmd") ("cmd: `e(cmd)'") (.)
+ 11.         post `ph' ("`f'") ("cmd") ("cmd_mi: `e(cmd_mi)'") (.)
+ 12. 
+.         * --- Escalares (quedan en faltante si el archivo no los tiene) ---
+.         foreach s in N ll M_mi converged {
+ 13.             post `ph' ("`f'") ("escalar") ("`s'") (e(`s'))
+ 14.         }
+ 15. 
+.         * --- Coeficientes, errores estandar y varianzas ---
+.         matrix `bb' = e(b)
+ 16.         capture matrix `VV' = e(V)
+ 17.         local tieneV = (_rc == 0)
+ 18. 
+.         local nombres : colfullnames `bb'
+ 19.         local k = colsof(`bb')
+ 20.         forvalues j = 1/`k' {
+ 21.             local p : word `j' of `nombres'
+ 22.             post `ph' ("`f'") ("b") ("`p'") (`bb'[1,`j'])
+ 23.             if `tieneV' == 1 {
+ 24.                 post `ph' ("`f'") ("se") ("`p'") (sqrt(`VV'[`j',`j']))
+ 25.             }
+ 26.             * lns1_1_1, lns1_2_1, lns2_1_1, ... y lnsig_e empiezan por "lns"
+.             if substr("`p'", 1, 3) == "lns" {
+ 27.                 post `ph' ("`f'") ("varianza") ("`p'") (exp(2*`bb'[1,`j']))
+ 28.             }
+ 29.         }
+ 30. 
+.         display "  `f': `k' parametros"
+ 31.     }
+. 
+.     postclose `ph'
+. 
+.     * --- Resumen y copia legible ---
+.     use "huella_`etiqueta'.dta", clear
+. 
+.     display _newline "--- Filas por tipo ---"
+.     tabulate tipo
+. 
+.     display _newline "Archivos leidos: " `nster' - `nerr' " de `nster'"
+.     if `nerr' > 0 {
+.         display as error "Archivos que no se pudieron leer:"
+.         list archivo parametro if tipo == "error", clean noobs
+.     }
+. 
+.     format valor %15.6f
+.     export delimited using "huella_`etiqueta'.csv", datafmt replace
+. 
+.     display _newline "Guardado: huella_`etiqueta'.dta y huella_`etiqueta'.csv"
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [B] COMPARAR DOS HUELLAS
+. ********************************************************************************
+. 
+. if "`modo'" == "comparar" {
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[B] COMPARACION: `ref' frente a `nueva'"
+[B] COMPARACION: antes frente a despues
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     foreach h in `ref' `nueva' {
+  2.         capture confirm file "huella_`h'.dta"
+  3.         if _rc != 0 {
+  4.             display as error "No se encuentra huella_`h'.dta. Tomarla primero."
+  5.             log close huella
+  6.             exit 601
+  7.         }
+  8.     }
+. 
+.     * Un mismo nombre de parametro puede repetirse dentro de un .ster: Stata
+.     * nombra igual varios terminos omitidos. Le paso a punt_global:o.cwc_inse,
+.     * tres veces en b y en se, en C5_CC_M5_ctrl_20261013b, ctrl_alin_20261013d,
+.     * ctrl10_20261013b y ctrl10_alin_20261013d (log_99_huella_comparar_20261024,
+.     * r(459)). Cada repeticion se numera (rep) en el orden en que se guardo,
+.     * que es el orden de e(b), y la comparacion usa tambien ese numero.
+.     use "huella_`nueva'.dta", clear
+.     rename valor valor_nueva
+.     generate long fila = _n
+.     bysort archivo tipo parametro (fila): generate int rep = _n
+.     drop fila
+.     tempfile hn
+.     save `hn'
+file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_4bf0_000001.tmp saved as .dta format
+. 
+.     use "huella_`ref'.dta", clear
+.     rename valor valor_ref
+.     generate long fila = _n
+.     bysort archivo tipo parametro (fila): generate int rep = _n
+.     drop fila
+. 
+.     quietly count if rep > 1
+.     display "Repeticiones de un mismo nombre dentro de un .ster (rep > 1): " r(N)
+Repeticiones de un mismo nombre dentro de un .ster (rep > 1): 16
+. 
+.     capture isid archivo tipo parametro rep
+.     if _rc != 0 {
+.         display as error "Sigue habiendo filas repetidas en huella_`ref'.dta."
+.         log close huella
+.         exit 459
+.     }
+. 
+.     merge 1:1 archivo tipo parametro rep using `hn'
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                             7,159  (_merge==3)
+    -----------------------------------------
+. 
+.     * --- 1. Archivos o parametros que estan en una sola huella ---
+.     display _newline "--- Filas presentes en una sola huella ---"
+
+--- Filas presentes en una sola huella ---
+.     display "_merge = 1: estaban ANTES y ya no estan  <- NO deberia haber ninguna"
+_merge = 1: estaban ANTES y ya no estan  <- NO deberia haber ninguna
+.     display "_merge = 2: son NUEVOS (una corrida posterior); no es un fallo"
+_merge = 2: son NUEVOS (una corrida posterior); no es un fallo
+.     tabulate _merge
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+            Matched (3) |      7,159      100.00      100.00
+------------------------+-----------------------------------
+                  Total |      7,159      100.00
+. 
+.     quietly count if _merge == 1
+.     local faltan = r(N)
+.     if `faltan' > 0 {
+.         display as error _newline "Archivos que desaparecieron o cambiaron de contenido:"
+.         preserve
+.             keep if _merge == 1
+.             contract archivo
+.             list archivo, clean noobs
+.         restore
+.     }
+. 
+.     * --- 2. Diferencias en los valores comunes ---
+.     generate double dif = abs(valor_nueva - valor_ref) if _merge == 3
+(351 missing values generated)
+.     generate byte cambia = (_merge == 3) & ///
+>         ( (dif > 0 & !missing(dif)) | (missing(valor_ref) != missing(valor_nueva)) )
+. 
+.     quietly count if _merge == 3
+.     local comunes = r(N)
+.     quietly count if cambia == 1
+.     local ncambia = r(N)
+. 
+.     display _newline "Valores comunes comparados: `comunes'"
+
+Valores comunes comparados: 7159
+.     display "Valores que cambiaron:      `ncambia'"
+Valores que cambiaron:      0
+. 
+.     if `ncambia' > 0 {
+.         display as error _newline "--- Valores distintos ---"
+.         format valor_ref valor_nueva dif %15.6f
+.         list archivo tipo parametro valor_ref valor_nueva dif if cambia == 1, ///
+>             clean noobs
+.     }
+. 
+.     * --- 3. Veredicto ---
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     if `faltan' == 0 & `ncambia' == 0 {
+.         display "VEREDICTO: IDENTICAS. Ningun .ster existente cambio."
+VEREDICTO: IDENTICAS. Ningun .ster existente cambio.
+.     }
+.     else {
+.         display as error "VEREDICTO: HAY DIFERENCIAS. Revisar las listas de arriba"
+.         display as error "antes de seguir con la reorganizacion."
+.     }
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. }
+
+. 
+. 
+. ********************************************************************************
+. * CIERRE
+. ********************************************************************************
+. 
+. timer off 1
+
+. display _newline "--- Tiempo total ---"
+
+--- Tiempo total ---
+
+. timer list 1
+   1:      0.49 /        1 =       0.4920
+
+. 
+. log close huella
+      name:  huella
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_99_huella_comparar_2026
+> 1024b.log
+  log type:  text
+ closed on:  24 Oct 2026, 10:00:05
+---------------------------------------------------------------------------------------------

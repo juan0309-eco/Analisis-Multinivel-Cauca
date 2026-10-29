@@ -1,0 +1,1292 @@
+---------------------------------------------------------------------------------------------
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ opened on:  24 Oct 2026, 22:57:18
+
+. display "Master   modo: $MODO   perfil: `perfil'   datos: $RAIZ   do-files: $RAIZ_DO"
+Master   modo: verif   perfil: verifA   datos: C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Obje
+> tivo 2\verificacion   do-files: C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Definitivo
+
+. display "Inicio: " c(current_date) " " c(current_time)
+Inicio: 24 Oct 2026 22:57:18
+
+. 
+. 
+. * ----------------------------------------------------------------------
+. * [1] INTERRUPTORES (todos en 0). Una fila por script, en orden.
+. *     tipo: R = rapido (minutos), L = lento (horas), E = ensayo
+. *     reescribe: 1 = sobrescribe bases o .ster sin fecha
+. * ----------------------------------------------------------------------
+. *                                                         tipo  reescribe
+. local s01  = 0    // 01  depuracion del Nivel 1            R     1
+
+. local s02  = 0    // 02  panel de sedes                    R     1
+
+. local s03  = 0    // 03  TIC de sedes                      R     1
+
+. local s04  = 0    // 04  panel municipal (v5)              R     1
+
+. local s05  = 0    // 05  ensamblaje                        R     1
+
+. local s06  = 0    // 06  PCA de vulnerabilidad (v3)        R     1
+
+. local s07  = 0    // 07  imputacion multiple, M = 20       L     1
+
+. local s07b = 0    // 07b union de los niveles imputados    R     1
+
+. local s07c = 0    // 07c Nivel 3 actualizado (C7)          R     1
+
+. local s08  = 0    // 08  estimacion principal              L     1
+
+. local s09  = 0    // 09  tablas y graficos                 R     1
+
+. local s10  = 0    // 10  blindaje (bloques [2] y [3] L)    L     1
+
+. local s10b = 0    // 10b planta docente con efectos fijos  R     0
+
+. local s11a = 0    // 11a ensayo de estructura aleatoria    E     1
+
+. local s11  = 0    // 11  estructura aleatoria de C1        L     1
+
+. local s11b = 0    // 11b efecto minimo detectable          R     1
+
+. local s11c = 0    // 11c Tabla 14                          R     1
+
+. local s12  = 0    // 12  efecto composicional (C2)         L     1
+
+. local s13  = 0    // 13  cohortes y Oaxaca (C3)            L     0
+
+. local s14  = 0    // 14  sensibilidad y diagnosticos (C5)  L     0
+
+. local s14b = 0    // 14b cierre del bloque [1] del 14      R     0
+
+. local s14c = 0    // 14c Popayan                           L     0
+
+. local s15a = 0    // 15a ensayo del gradiente              E     0
+
+. local s15  = 0    // 15  gradiente y medicion (C6)         L     0
+
+. local s15b = 0    // 15b lecturas del 15                   R     0
+
+. local s15c = 0    // 15c Figuras 6 y 7                     R     0
+
+. local s16a = 0    // 16a rehace Base_Estimacion (C7)       R     1
+
+. local s16  = 0    // 16  canales territoriales (C7)        L     0
+
+. local s17  = 0    // 17  diagnosticos de C7                R     0
+
+. 
+. * Archivo y marca de reescritura de cada clave
+. local orden "01 02 03 04 05 06 07 07b 07c 08 09 10 10b 11a 11 11b 11c 12 13 14 14b 14c 15a 
+> 15 15b 15c 16a 16 17"
+
+. 
+. local a01  "01_depuracion_N1_ICFES_v2.do"
+
+. local a02  "02_panel_sedes_N2_v2.do"
+
+. local a03  "03_panel_tic_N2_v2.do"
+
+. local a04  "04_panel_municipal_N3_v5.do"
+
+. local a05  "05_ensamblaje_v2.do"
+
+. local a06  "06_pca_vulnerabilidad_v3.do"
+
+. local a07  "07_imputacion_v3.do"
+
+. local a07b "07b_reparar_y_unir_v2.do"
+
+. local a07c "07c_actualizar_nivel3.do"
+
+. local a08  "08_estimacion_v5.do"
+
+. local a09  "09_tablas_graficos_v5.do"
+
+. local a10  "10_blindaje.do"
+
+. local a10b "10b_planta_fe_v2.do"
+
+. local a11a "11a_ensayo_estructura.do"
+
+. local a11  "11_estructura_aleatoria.do"
+
+. local a11b "11b_emd.do"
+
+. local a11c "11c_tabla14.do"
+
+. local a12  "12_composicional.do"
+
+. local a13  "13_cohortes_oaxaca.do"
+
+. local a14  "14_sensibilidad_diagnosticos.do"
+
+. local a14b "14b_cierre_bloque1.do"
+
+. local a14c "14c_popayan.do"
+
+. local a15a "15a_ensayo_gradiente.do"
+
+. local a15  "15_gradiente_medicion.do"
+
+. local a15b "15b_lecturas.do"
+
+. local a15c "15c_figuras.do"
+
+. local a16a "16a_rehacer_base.do"
+
+. local a16  "16_territorial.do"
+
+. local a17  "17_diagnosticos_C7.do"
+
+. 
+. local reescriben "01 02 03 04 05 06 07 07b 07c 08 09 10 11a 11 11b 11c 12 16a"
+
+. 
+. if "`perfil'" == "verifA" {
+.     foreach k in 01 02 03 04 05 06 07b 07c 09 10b 11b 11c 15b 15c 16a {
+  2.         local s`k' = 1
+  3.     }
+.     display _newline "Perfil verifA: 15 scripts encendidos."
+
+Perfil verifA: 15 scripts encendidos.
+. }
+
+. 
+. 
+. * ----------------------------------------------------------------------
+. * [2] COMPROBACIONES ANTES DE CORRER NADA
+. * ----------------------------------------------------------------------
+. local encendidos ""
+
+. foreach k of local orden {
+  2.     if `s`k'' == 1 local encendidos "`encendidos' `k'"
+  3.     capture confirm file "$RAIZ_DO/`a`k''"
+  4.     if _rc != 0 {
+  5.         display as error "No existe `a`k'' en la carpeta Definitivo."
+  6.         log close master
+  7.         macro drop TESIS_CONFIG MODO
+  8.         exit 601
+  9.     }
+ 10. }
+
+. local nenc : word count `encendidos'
+
+. display _newline "Scripts encendidos: `nenc'  (`encendidos' )"
+
+Scripts encendidos: 15  ( 01 02 03 04 05 06 07b 07c 09 10b 11b 11c 15b 15c 16a )
+
+. 
+. if `nenc' == 0 {
+.     display _newline "Ningun interruptor esta en 1: no se corre nada."
+.     display "Los 29 do-files de la cadena existen en Definitivo."
+. }
+
+. 
+. local peligro : list encendidos & reescriben
+
+. if "$MODO" == "normal" & "`peligro'" != "" & `permitir_reescribir' != 1 {
+.     display as error _newline "En modo normal, estos scripts sobrescriben bases o"
+.     display as error ".ster que usa el informe: `peligro'"
+.     display as error "Para correrlos, poner permitir_reescribir = 1. Antes,"
+.     display as error "considerar el modo verif."
+.     log close master
+.     macro drop TESIS_CONFIG MODO
+.     exit 9
+. }
+
+. 
+. 
+. * ----------------------------------------------------------------------
+. * [3] CORRIDA
+. * ----------------------------------------------------------------------
+. local resumen ""
+
+. foreach k of local encendidos {
+  2.     display _newline "{hline 78}"
+  3.     display "MASTER: inicia `a`k''   " c(current_date) " " c(current_time)
+  4.     display "{hline 78}"
+  5.     local t0 = clock(c(current_date) + " " + c(current_time), "DMYhms")
+  6. 
+.     capture noisily do "$RAIZ_DO/`a`k''"
+  7.     local rc = _rc
+  8. 
+.     * El script cerro el log del master al empezar: se reabre
+.     capture log close _all
+  9.     cd "$RAIZ"
+ 10.     log using "log_00_master_`hoy'.log", append text name(master)   // VALIDADOR: intenc
+> ional V2b
+ 11.     local seg = round((clock(c(current_date) + " " + c(current_time), "DMYhms") - `t0') 
+> / 1000)
+ 12.     display "MASTER: termina `a`k''   codigo `rc'   `seg' s"
+ 13.     local resumen "`resumen' `k':`rc':`seg'"
+ 14. 
+.     if `rc' != 0 {
+ 15.         display as error _newline "El master se detiene: `a`k'' termino con r(`rc')."
+ 16.         if `rc' == 602 {
+ 17.             display as error "r(602): su log ya existe. Cambiar el local hoy de ese scri
+> pt."
+ 18.         }
+ 19.         display as error "Su propio log dice en que linea fallo."
+ 20.         log close master
+ 21.         macro drop TESIS_CONFIG MODO
+ 22.         exit `rc'
+ 23.     }
+ 24. }
+
+------------------------------------------------------------------------------
+MASTER: inicia 01_depuracion_N1_ICFES_v2.do   24 Oct 2026 22:57:18
+------------------------------------------------------------------------------
+
+. ********************************************************************************
+. * PROYECTO : Desempeño Saber 11 en sedes oficiales del Cauca, 2018-2023
+. *            Modelo multinivel de 3 niveles (estudiante / sede / municipio)
+. * SCRIPT   : 01 - FASE 1. DEPURACIÓN DE MICRODATOS ICFES (NIVEL 1)
+. * SALIDA   : N1_Saber11_2018_2023.dta  (pool de cortes transversales repetidos)
+. * STATA    : 17
+. * VERSIÓN  : 2 - el INSE se conserva CRUDO en toda la depuración
+. ********************************************************************************
+. * NOTA DE DISEÑO
+. * Esta NO es una base panel de individuos. Son cortes transversales repetidos:
+. * cada año contiene una cohorte distinta de estudiantes. Por eso no se declara
+. * xtset a nivel de estudiante ni se usan operadores de rezago sobre las filas
+. * individuales. Las únicas llaves que deben sobrevivir a esta fase son:
+. *   - cole_cod_dane_sede          (string, %20.0f)  -> encadena con Nivel 2
+. *   - cole_cod_mcpio_ubicacion    (numérica)        -> encadena con Nivel 3
+. *   - year                        (numérica)        -> encadena con ambos
+. *
+. * TRATAMIENTO DEL INSE
+. * estu_inse_individual queda en sus unidades originales. Ni el centrado en la
+. * gran media ni el centrado al clúster se aplican aquí: son transformaciones
+. * de estimación, no de depuración, y hacerlas ahora impediría reportar los
+. * descriptivos del Objetivo 1 en la escala real del índice. Ambas quedan para
+. * el do-file de estimación, después de la imputación múltiple.
+. ********************************************************************************
+. 
+. clear all
+
+. set more off
+
+. set varabbrev off
+
+. version 17
+
+. 
+. if "$TESIS_CONFIG" == "" do "C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Definitivo\00_config
+> .do"
+
+. cd "$RAIZ"
+C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion
+
+. 
+. capture log close _all
+---------------------------------------------------------------------------------------------
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ opened on:  24 Oct 2026, 22:57:55
+MASTER: termina 01_depuracion_N1_ICFES_v2.do   codigo 0   37 s
+
+------------------------------------------------------------------------------
+MASTER: inicia 02_panel_sedes_N2_v2.do   24 Oct 2026 22:57:55
+------------------------------------------------------------------------------
+
+. ********************************************************************************
+. * PROYECTO : Desempeño Saber 11 en sedes oficiales del Cauca, 2018-2023
+. * SCRIPT   : 02 - FASE 2. PANEL DE SEDES EDUCATIVAS (NIVEL 2)
+. * ENTRADA  : N1_Saber11_2018_2023.dta
+. *            Panel_matricula.xlsx, Panel_doc.xlsx, Panel_estabilidad.xlsx
+. * SALIDA   : N2_Sedes_sinTIC.dta
+. * STATA    : 17
+. * VERSIÓN  : 2 - el esqueleto de sede-año se construye desde la base ICFES
+. ********************************************************************************
+. * LÓGICA DEL SCRIPT
+. * El punto de partida NO son los Excel del DANE sino la base de estudiantes
+. * depurada. De ella salen dos cosas: la lista exacta de sede-año con la que
+. * estamos trabajando (2.447 según la corrida del 01) y los atributos de sede
+. * de origen ICFES. Los paneles del DANE se pegan encima de ese esqueleto, de
+. * modo que ninguna sede de la muestra analítica puede desaparecer por un
+. * problema de cobertura de una fuente externa.
+. *
+. * ALCANCE
+. * El panel TIC no entra todavía: viene en hojas anuales sin consolidar y
+. * requiere reconstruir la variable desde la fuente.
+. *
+. * REGLA INQUEBRANTABLE
+. * Un dato ausente no se convierte en cero. Los vacíos se conservan como
+. * missing verdadero y los resuelve la imputación múltiple.
+. ********************************************************************************
+. 
+. clear all
+
+. set more off
+
+. set varabbrev off
+
+. version 17
+
+. 
+. if "$TESIS_CONFIG" == "" do "C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Definitivo\00_config
+> .do"
+
+. cd "$RAIZ"
+C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion
+
+. 
+. capture log close _all
+---------------------------------------------------------------------------------------------
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ opened on:  24 Oct 2026, 23:07:06
+MASTER: termina 02_panel_sedes_N2_v2.do   codigo 0   551 s
+
+------------------------------------------------------------------------------
+MASTER: inicia 03_panel_tic_N2_v2.do   24 Oct 2026 23:07:06
+------------------------------------------------------------------------------
+
+. ********************************************************************************
+. * PROYECTO : Desempeño Saber 11 en sedes oficiales del Cauca, 2018-2023
+. * SCRIPT   : 03 - FASE 3. PANEL TIC Y CIERRE DEL NIVEL 2
+. * ENTRADA  : Panel_tic.xlsx (hojas 2018_tic ... 2023_tic)
+. *            N2_Sedes_sinTIC.dta
+. * SALIDA   : N2_Sedes_2018_2023.dta
+. *            TIC_largo_2018_2023.dta (archivo fuente en formato largo)
+. * STATA    : 17
+. * VERSIÓN  : 2 - incorpora z_posgrado y el diagnóstico de ceros explícitos
+. ********************************************************************************
+. * EL ERROR ESTRUCTURAL QUE ESTE SCRIPT CORRIGE
+. *
+. * La versión anterior calculaba
+. *     bienes_tic = SEDECOM_CANTIDAD - SEDECOM_CANT_SINUSO
+. * y obtenía valores negativos, hasta -1.451 en la fila más extrema. Esa resta
+. * afectaba a 56.719 filas, el 11,7% de la base.
+. *
+. * SEDECOM_CANTIDAD no es el inventario total: son los equipos desplegados. En
+. * las hojas de 2021 en adelante, SEDECOM_CANT_PRESTA + SEDECOM_CANT_SEDE suma
+. * exactamente SEDECOM_CANTIDAD en la totalidad de las filas (verificado: cero
+. * discrepancias). Esa descomposición reparte por ubicación los equipos en
+. * servicio; los inservibles no están prestados ni operando, así que quedan
+. * fuera de CANTIDAD y restarlos los descontaba dos veces.
+. *
+. * Reconstrucción correcta:
+. *     equipos_funcionales = suma de SEDECOM_CANTIDAD sobre los tres tipos
+. *     equipos_total       = equipos_funcionales + suma de SEDECOM_CANT_SINUSO
+. *
+. * SOBRE LA AUSENCIA DE FILAS
+. * Las 25.619 filas con CANTIDAD = 0 coinciden exactamente con las filas que
+. * tienen CANTIDAD = 0 y SIN USO > 0: no existe ninguna fila con ambos en cero.
+. * La fuente crea registro solo cuando la sede posee al menos un equipo de ese
+. * tipo, en servicio o inservible. Por tanto la ausencia de fila SÍ significa
+. * cero equipos, la suma sobre los tipos presentes es correcta, y n_tipos_tic
+. * NO debe entrar como control: la variedad de equipos es parte de la dotación,
+. * no un confusor de ella.
+. ********************************************************************************
+. 
+. clear all
+
+. set more off
+
+. set varabbrev off
+
+. version 17
+
+. 
+. if "$TESIS_CONFIG" == "" do "C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Definitivo\00_config
+> .do"
+
+. cd "$RAIZ"
+C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion
+
+. 
+. capture log close _all
+---------------------------------------------------------------------------------------------
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ opened on:  24 Oct 2026, 23:10:37
+MASTER: termina 03_panel_tic_N2_v2.do   codigo 0   211 s
+
+------------------------------------------------------------------------------
+MASTER: inicia 04_panel_municipal_N3_v5.do   24 Oct 2026 23:10:37
+------------------------------------------------------------------------------
+
+. ********************************************************************************
+. * PROYECTO : Desempeño Saber 11 en sedes oficiales del Cauca, 2018-2023
+. * SCRIPT   : 04 - FASE 4. PANEL MUNICIPAL (NIVEL 3)
+. * ENTRADA  : IPC anual desde el año 1955 a 2025.xlsx
+. *            Panel_homicidios.xlsx, Hectareas Coca.xlsx
+. *            Panel_inversion.xlsx  (hojas Panel_inversion y Panel_caracterizacion)
+. * SALIDA   : N3_Municipios_2018_2023.dta
+. * STATA    : 17
+. * VERSIÓN  : 5 - añade la tasa de homicidios suavizada por Bayes empírico (C7)
+. *                y el log deja de llevar `replace`
+. ********************************************************************************
+. * QUÉ CAMBIA RESPECTO DE LA VERSIÓN 4
+. *
+. * 1. El bloque [2] construye `tasa_hom_eb`, la tasa de homicidios suavizada por
+. *    el estimador global de Bayes empírico (Marshall, 1991). Motivo: 85
+. *    municipio-año registran entre uno y cinco homicidios y otros 29 registran
+. *    cero, de modo que 114 de 252 tienen cinco o menos. En esos casos un solo
+. *    caso mueve la tasa varios puntos y buena parte de su variación temporal es
+. *    ruido de muestreo, que atenúa el coeficiente hacia cero. La corrección C7
+. *    pone esa explicación a prueba.
+. *
+. * 2. El log lleva fecha y NO lleva `replace`. El log de la versión 4,
+. *    `log_04_panel_municipal_N3.log`, respalda la Tabla 6, la Tabla 21 y el
+. *    Anexo F.5 del informe y debe conservarse intacto.
+. *
+. * QUÉ CAMBIABA LA VERSIÓN 4 RESPECTO DE LA 1
+. *
+. * La variable de inversión no era «la inversión pública municipal». El indicador
+. * extraído de TerriData es «Libre Inversión», que corresponde a la asignación
+. * del Sistema General de Participaciones al componente de propósito general en
+. * su rubro de libre inversión. No es la asignación educativa del SGP, y la
+. * mayoría de municipios del Cauca no están certificados en educación, de modo
+. * que el canal hacia los establecimientos es indirecto.
+. *
+. * Esta versión conserva esa variable como medida principal —mide precisamente
+. * los recursos discrecionales de que dispone el municipio para bienes públicos
+. * locales— pero incorpora cuatro medidas fiscales alternativas para probar si
+. * el resultado depende del componente específico elegido:
+. *
+. *   inv_fut       inversión efectivamente ejecutada, fuente FUT en vez de SICODIS
+. *   sgp_total     total asignado por el SGP, todos los componentes
+. *   sgp_pae       asignación especial de alimentación escolar
+. *   ing_trib_pc   ingresos tributarios per cápita, esfuerzo fiscal propio
+. *
+. * La última es la prueba más exigente: correlaciona 0,06 con la principal, de
+. * modo que mide capacidad fiscal por una vía completamente distinta.
+. *
+. * Se añade además una hoja de caracterización territorial que NO entra a los
+. * modelos. Cobertura, deserción, repitencia, tránsito a la superior, incidencia
+. * del conflicto y penetración de internet son resultados codeterminados con el
+. * desempeño; incluirlos como predictores contaminaría la estimación. Sirven
+. * para describir el contexto municipal en el capítulo de resultados.
+. *
+. * MATIZ QUE INTRODUCE C7: `iica` y `minas` NO son resultados educativos, de modo
+. * que sí pueden entrar a los modelos como indicadores adicionales de conflicto.
+. * `desercion_of` y `cob_neta_media` siguen fuera como predictores, pero la
+. * primera se emplea como variable DEPENDIENTE en la prueba del canal de
+. * deserción que sustituye al Anexo F.4.
+. *
+. * POR QUÉ LA COCA CAMBIA DE FUENTE
+. * El archivo propio `Hectareas Coca.xlsx` traía la columna como texto con
+. * formatos mezclados, y la conversión producía magnitudes inconsistentes: el
+. * mismo municipio-año aparecía dividido por mil en unas filas y multiplicado
+. * por diez en otras. La comprobación contra la serie de TerriData arrojó una
+. * correlación de 0,026 cuando debía ser cercana a uno, con los mismos dígitos
+. * en distinta posición decimal.
+. *
+. * Se adopta la serie de TerriData, que además cubre las 252 combinaciones de
+. * municipio y año en lugar de 186 y trae ceros explícitos donde no hay cultivo,
+. * en vez de ceros inferidos por ausencia de fila.
+. *
+. * ESTRUCTURA TEMPORAL
+. * Los paneles cubren 2017-2022 y se desplazan en +1 al final: una fila con
+. * year = 2018 contiene condiciones municipales de 2017. La deflactación se
+. * aplica ANTES del desplazamiento, sobre el año real del dato.
+. ********************************************************************************
+. 
+. clear all
+
+. set more off
+
+. set varabbrev off
+
+. version 17
+
+. 
+. if "$TESIS_CONFIG" == "" do "C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Definitivo\00_config
+> .do"
+
+. cd "$RAIZ"
+C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion
+
+. 
+. * ----------------------------------------------------------------------
+. * FECHA DE LAS SALIDAS. Cambiar en cada corrida nueva.
+. * El guard impide sobrescribir un log existente: es la lección del incidente
+. * del 13 de octubre, cuando un `log using ..., replace` destruyó la salida
+. * del bloque [7] del 10_blindaje.do.
+. * ----------------------------------------------------------------------
+. local hoy "20261019"
+
+. 
+. capture log close _all
+---------------------------------------------------------------------------------------------
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ opened on:  24 Oct 2026, 23:10:59
+MASTER: termina 04_panel_municipal_N3_v5.do   codigo 0   22 s
+
+------------------------------------------------------------------------------
+MASTER: inicia 05_ensamblaje_v2.do   24 Oct 2026 23:10:59
+------------------------------------------------------------------------------
+
+. ********************************************************************************
+. * PROYECTO : Desempeño Saber 11 en sedes oficiales del Cauca, 2018-2023
+. * SCRIPT   : 05 - FASE 5. ENSAMBLAJE DE LOS TRES NIVELES
+. * ENTRADA  : N1_Saber11_2018_2023.dta   (69.750 estudiantes)
+. *            N2_Sedes_2018_2023.dta     (2.447 sede-año)
+. *            N3_Municipios_2018_2023.dta (252 municipio-año)
+. * SALIDA   : Base_Multinivel_2018_2023.dta
+. * STATA    : 17
+. * VERSIÓN  : 2 - corrige colisiones de nombres y verifica los prerrequisitos
+. ********************************************************************************
+. * REQUISITO PREVIO
+. * N2_Sedes_2018_2023.dta debe venir de 03_panel_tic_N2_v2.do, que es el que
+. * construye z_posgrado. Si se corrió la primera versión del 03, esa variable no
+. * existe y el script se detiene con un mensaje explícito en el bloque [2].
+. *
+. * POR QUÉ ESTE CRUCE DEBE SER PERFECTO
+. * El panel de sedes se construyó a partir de la propia base de estudiantes, y
+. * el panel municipal cubre los 42 municipios del molde. Por construcción, cada
+. * estudiante tiene que encontrar su sede-año y su municipio-año. Por eso el
+. * script no se conforma con reportar porcentajes de cruce: los exige con
+. * `assert`.
+. *
+. * DOS SOLAPAMIENTOS DE NOMBRES QUE HAY QUE RESOLVER ANTES DEL MERGE
+. * Primero: la base de estudiantes trae versiones a NIVEL DE ESTUDIANTE de los
+. * atributos de sede (rural, jornada, carácter, género de la sede). El panel de
+. * sedes trae las consolidadas a sede-año, que son las autoritativas. Stata, ante
+. * un nombre repetido, conserva silenciosamente el del master, así que esas
+. * columnas se eliminan explícitamente. Sin ese paso, `ju_unica` entraría con el
+. * valor del estudiante y no con la regla de mayoría de la sede.
+. * Segundo: la base de estudiantes ya contiene `tag_sede` y `tag_mcpio`,
+. * generados en el script 01. Se eliminan para poder recrearlos aquí.
+. *
+. * ALCANCE
+. * Este es el punto final del proceso de depuración y consolidación. El PCA del
+. * índice de vulnerabilidad, la imputación múltiple y la estimación van en
+. * scripts posteriores.
+. ********************************************************************************
+. 
+. clear all
+
+. set more off
+
+. set varabbrev off
+
+. version 17
+
+. 
+. if "$TESIS_CONFIG" == "" do "C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Definitivo\00_config
+> .do"
+
+. cd "$RAIZ"
+C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion
+
+. 
+. capture log close _all
+---------------------------------------------------------------------------------------------
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ opened on:  24 Oct 2026, 23:11:15
+MASTER: termina 05_ensamblaje_v2.do   codigo 0   16 s
+
+------------------------------------------------------------------------------
+MASTER: inicia 06_pca_vulnerabilidad_v3.do   24 Oct 2026 23:11:15
+------------------------------------------------------------------------------
+
+. ********************************************************************************
+. * PROYECTO : Desempeño Saber 11 en sedes oficiales del Cauca, 2018-2023
+. * SCRIPT   : 06 - ÍNDICE DE VULNERABILIDAD MACRO-TERRITORIAL Y MUNDLAK
+. * ENTRADA  : N3_Municipios_2018_2023.dta   (252 municipio-año, salida del 04 v5)
+. *            Base_Multinivel_2018_2023.dta (69.750 estudiantes)
+. * SALIDA   : N3_Municipios_PCA.dta
+. *            Base_Multinivel_PCA.dta
+. * STATA    : 17
+. * VERSIÓN  : 3 - descompone tasa_hom_eb e iica (C7) y amplía el keep del
+. *                bloque [7]; el log deja de llevar `replace`
+. ********************************************************************************
+. * QUÉ CAMBIA RESPECTO DE LA VERSIÓN 2
+. *
+. * 1. El bloque [5] descompone en componente entre y componente dentro las dos
+. *    variables territoriales nuevas de C7: `tasa_hom_eb`, la tasa de homicidios
+. *    suavizada por Bayes empírico, e `iica`, el Índice de Incidencia del
+. *    Conflicto Armado. El `xtsum` de ese bloque es el que decide si `iica_dev`
+. *    es estimable: la precondición P2 de C7 exige una razón DE_dentro/DE_total
+. *    de al menos 0,20, que es la de la asignación SGP en la Tabla 21 y el caso
+. *    límite que el trabajo ya aceptó estimar.
+. *
+. * 2. El `keep` del bloque [7] se amplía para que las variables nuevas lleguen a
+. *    la base de estudiantes. SIN ESO se quedan en N3_Municipios_PCA.dta y el
+. *    script 16 no las encuentra. Se llevan los NIVELES además de _bar y _dev,
+. *    porque el bloque [5] del 16 los necesita en nivel dentro de `areg`.
+. *
+. * 3. El log lleva fecha y NO lleva `replace`. El log de la versión 2,
+. *    `log_06_pca_vulnerabilidad.log`, respalda las Tablas 18 a 21 del Anexo B:
+. *    el KMO de 0,531, el 45,75 % de varianza explicada, las cargas 0,670 /
+. *    0,575 / −0,471 y la prueba de Bartlett. Debe conservarse intacto.
+. *
+. * EL ÍNDICE NO CAMBIA. El PCA se sigue estimando sobre las mismas tres
+. * variables (tasa_homicidios, ln_coca, ln_inversion_pc) y las mismas 252
+. * observaciones. Si alguna de las cifras del Anexo B se mueve, hay un error:
+. * PARAR y revisar antes de seguir.
+. *
+. * POR QUÉ ESTE SCRIPT VA ANTES DE LA IMPUTACIÓN
+. * El panel municipal no tiene valores perdidos, así que el índice se construye
+. * completo. Eso permite además que entre al modelo de imputación como variable
+. * auxiliar sin necesidad de imputarlo a él.
+. *
+. * SOBRE QUÉ SE ESTIMA EL PCA
+. * Sobre las 252 observaciones municipio-año, NO sobre las 69.750 filas de
+. * estudiante. Estimarlo sobre las filas de estudiante ponderaría cada municipio
+. * por su número de evaluados, de modo que Popayán pesaría decenas de veces más
+. * que un municipio pequeño en la definición de los pesos del componente.
+. *
+. * Tampoco se estima sobre 42 medias municipales, como hacía la versión
+. * anterior. Eso producía un índice constante en el tiempo e impedía cualquier
+. * análisis de variación temporal, que es justamente lo que pide el Objetivo 4.
+. ********************************************************************************
+. 
+. clear all
+
+. set more off
+
+. set varabbrev off
+
+. version 17
+
+. 
+. if "$TESIS_CONFIG" == "" do "C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Definitivo\00_config
+> .do"
+
+. cd "$RAIZ"
+C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion
+
+. 
+. * ----------------------------------------------------------------------
+. * FECHA DE LAS SALIDAS. Cambiar en cada corrida nueva.
+. * ----------------------------------------------------------------------
+. local hoy "20261019"
+
+. 
+. capture log close _all
+---------------------------------------------------------------------------------------------
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ opened on:  24 Oct 2026, 23:11:17
+MASTER: termina 06_pca_vulnerabilidad_v3.do   codigo 0   2 s
+
+------------------------------------------------------------------------------
+MASTER: inicia 07b_reparar_y_unir_v2.do   24 Oct 2026 23:11:17
+------------------------------------------------------------------------------
+
+. ********************************************************************************
+. * PROYECTO : Desempeño Saber 11 en sedes oficiales del Cauca, 2018-2023
+. * SCRIPT   : 07B - REPARACIÓN DE MI_Sedes.dta Y UNIÓN DE LOS DOS NIVELES
+. * ENTRADA  : MI_Sedes.dta, MI_Estudiantes.dta   (generados por el 07)
+. * SALIDA   : Base_Multinivel_MI.dta
+. * STATA    : 17
+. * VERSIÓN  : 2 - reconstrucción de _mi_miss reescrita con un bucle
+. ********************************************************************************
+. * QUÉ ARREGLA ESTE SCRIPT
+. * La Parte A de la primera versión del script 07 terminaba con un `keep` que
+. * conservaba `_mi_m` e `_mi_id` pero omitía `_mi_miss`. Esa es la tercera
+. * variable de sistema que Stata necesita para reconocer un archivo como
+. * conjunto de imputación, y sin ella `mi merge` se detiene.
+. *
+. * No hay que reimputar nada. Las 20 imputaciones de ambos niveles están
+. * guardadas y son válidas; solo falta reponer una columna que se deduce de los
+. * datos que ya existen.
+. *
+. * CÓMO SE RECONSTRUYE
+. * `_mi_miss` vale 1 cuando la observación original tenía algún valor faltante
+. * en las variables registradas como imputadas. Esa información sigue en las
+. * filas de m = 0, que conservan los datos sin imputar. Se revisa cada variable
+. * en la fila de m = 0 de cada observación y el resultado se propaga a sus 20
+. * copias.
+. ********************************************************************************
+. 
+. clear all
+
+. set more off
+
+. set varabbrev off
+
+. version 17
+
+. 
+. if "$TESIS_CONFIG" == "" do "C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Definitivo\00_config
+> .do"
+
+. cd "$RAIZ"
+C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion
+
+. 
+. capture log close _all
+---------------------------------------------------------------------------------------------
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ opened on:  24 Oct 2026, 23:11:44
+MASTER: termina 07b_reparar_y_unir_v2.do   codigo 0   27 s
+
+------------------------------------------------------------------------------
+MASTER: inicia 07c_actualizar_nivel3.do   24 Oct 2026 23:11:44
+------------------------------------------------------------------------------
+
+. ********************************************************************************
+. * PROYECTO : Desempeño Saber 11 en sedes oficiales del Cauca, 2018-2023
+. * SCRIPT   : 07C - ACTUALIZACIÓN DE LAS VARIABLES DE NIVEL 3 EN LA BASE IMPUTADA
+. * ENTRADA  : Base_Multinivel_MI.dta, N3_Municipios_PCA.dta
+. * SALIDA   : Base_Multinivel_MI.dta (reemplazada)
+. * STATA    : 17
+. * REVISIÓN : 19 de octubre de 2026 - incorpora las variables de C7 y el log
+. *            deja de llevar `replace`
+. ********************************************************************************
+. * PARA QUÉ SIRVE
+. * Incorpora las variables municipales (índice de vulnerabilidad, su
+. * descomposición de Mundlak y las medidas fiscales) a la base imputada.
+. *
+. * Desde la versión 3 del script 07 este paso es OBLIGATORIO, no opcional: el
+. * modelo de imputación ya no usa el índice como predictor auxiliar, de modo que
+. * el 07 lo retira de la base antes de imputar y es aquí donde entra.
+. *
+. * NO hace falta volver a imputar cuando el índice cambia. Las variables
+. * municipales son completas y entran al conjunto como REGULARES, no como
+. * imputadas: son idénticas en las veinte imputaciones y basta con sustituirlas.
+. * Las cuatro horas del script 07 no se repiten.
+. *
+. * LO MISMO VALE PARA LAS VARIABLES DE C7. `tasa_hom_eb` e `iica` son registros
+. * administrativos agregados, completos e idénticos en las veinte imputaciones.
+. * El modelo de imputación usa `tasa_homicidios`, `ln_coca` y `ln_inversion_pc`,
+. * que no cambian, de modo que los valores imputados permanecen intactos.
+. *
+. * ESTE SCRIPT SOBRESCRIBE Base_Multinivel_MI.dta
+. * Antes de correrlo, hacer copia de seguridad:
+. *     copy "Base_Multinivel_MI.dta" "Base_Multinivel_MI_pre_C7.dta"
+. *     copy "Base_Estimacion.dta"    "Base_Estimacion_pre_C7.dta"
+. * Son las cuatro horas del script 07 y las del bloque [2] del 08.
+. *
+. * LA SALVEDAD DE LA VERSIÓN ANTERIOR YA NO APLICA
+. * Hasta la versión 2 del script 07, el modelo de imputación usaba el índice
+. * antiguo entre sus predictores, lo que obligaba a declarar en la metodología
+. * que los valores imputados correspondían a una versión previa del índice. La
+. * versión 3 sustituyó el índice por sus tres dimensiones crudas, de modo que
+. * los valores imputados ya no dependen de cómo se construya el índice y esa
+. * limitación desaparece.
+. *
+. * IMPORTANTE: esto solo es cierto si la base imputada se generó con el 07 v3.
+. * Si se está trabajando sobre una base imputada producida por el 07 v2, la
+. * limitación sigue vigente y hay que declararla.
+. ********************************************************************************
+. 
+. clear all
+
+. set more off
+
+. set varabbrev off
+
+. version 17
+
+. 
+. if "$TESIS_CONFIG" == "" do "C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Definitivo\00_config
+> .do"
+
+. cd "$RAIZ"
+C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion
+
+. 
+. * ----------------------------------------------------------------------
+. * FECHA DE LAS SALIDAS. Cambiar en cada corrida nueva.
+. * ----------------------------------------------------------------------
+. local hoy "20261019b"
+
+. 
+. capture log close _all
+---------------------------------------------------------------------------------------------
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ opened on:  24 Oct 2026, 23:12:13
+MASTER: termina 07c_actualizar_nivel3.do   codigo 0   29 s
+
+------------------------------------------------------------------------------
+MASTER: inicia 09_tablas_graficos_v5.do   24 Oct 2026 23:12:13
+------------------------------------------------------------------------------
+
+. ********************************************************************************
+. * PROYECTO : Desempeño Saber 11 en sedes oficiales del Cauca, 2018-2023
+. * SCRIPT   : 09 - TABLAS Y GRÁFICOS
+. * ENTRADA  : archivos .ster del script 08, ICC_por_year.dta, Base_Estimacion.dta
+. * SALIDA   : archivos .rtf para Word y gráficos .png
+. * STATA    : 17
+. * VERSIÓN  : 5 - el Objetivo 3 se reporta AÑO POR AÑO; el modelo contextual
+. *                M3ctx es la especificación de referencia
+. *
+. * CORRECCIÓN DEL 19-08-2026 (misma versión 3, no reestima nada)
+. * [7] La tabla de robustez no incluía R5 (inversión ejecutada del FUT) ni
+. * R6 (recaudo tributario), añadidas en el 08 v3. Ya se agregaron.
+. * [2] La columna de M5 mostraba dos filas fantasma (`pct_planta` y `c_inse`
+. * repetidos con coeficiente 0 y ee "(.)"), artefacto de que M5 especifica
+. * `c.c_inse##c.pct_planta` y `c.c_inse##c.indice_vuln` a la vez que
+. * `pct_planta` sigue en $v_n2. Se agregó `noomitted` a los esttab de [2] y
+. * [7] para suprimir esas filas sin tocar los coeficientes reales.
+. ********************************************************************************
+. * ESTE SCRIPT NO ESTIMA NADA
+. * Lee los modelos guardados por el 08 y arma las tablas. Cambiar el formato de
+. * una tabla no obliga a repetir horas de estimación. La única excepción es el
+. * gráfico de efectos aleatorios, que necesita predecirlos sobre una imputación.
+. *
+. * CORRECCIÓN DE LA VERSIÓN 1
+. * El filtro `drop(*:lns*)` fallaba porque `mixed` guarda los parámetros
+. * aleatorios como ECUACIONES propias (lns1_1_1, lns2_1_1, lnsig_e, atr1_1_1_2)
+. * y no como coeficientes dentro de la ecuación principal. Se reemplaza por
+. * `keep(punt_global:*)`, que conserva los efectos fijos sin importar cuántos
+. * parámetros aleatorios tenga cada modelo.
+. *
+. * REQUISITOS
+. * Los comandos `esttab` y `estout` no vienen con Stata:
+. *     ssc install estout, replace
+. *
+. * POR QUÉ RTF Y NO COPIAR A MANO
+. * Exportar a RTF permite abrir la tabla directamente en Word con los números ya
+. * puestos. Transcribir coeficientes a mano es la fuente más común de
+. * discrepancias entre lo que dice el texto y lo que dice la tabla.
+. ********************************************************************************
+. 
+. clear all
+
+. set more off
+
+. set varabbrev off
+
+. version 17
+
+. 
+. if "$TESIS_CONFIG" == "" do "C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Definitivo\00_config
+> .do"
+
+. cd "$RAIZ"
+C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion
+
+. 
+. capture log close _all
+---------------------------------------------------------------------------------------------
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ opened on:  24 Oct 2026, 23:15:15
+MASTER: termina 09_tablas_graficos_v5.do   codigo 0   182 s
+
+------------------------------------------------------------------------------
+MASTER: inicia 10b_planta_fe_v2.do   24 Oct 2026 23:15:15
+------------------------------------------------------------------------------
+
+. ********************************************************************************
+. * PROYECTO : Desempeño Saber 11 en sedes oficiales del Cauca, 2018-2023
+. * SCRIPT   : 10b - CORRECCIÓN DEL BLOQUE [7] DEL BLINDAJE  (versión 2)
+. * ENTRADA  : Base_Multinivel_PCA.dta
+. * SALIDA   : log_10b_planta_fe.log
+. * STATA    : 17
+. ********************************************************************************
+. * LOS DOS ERRORES CORREGIDOS
+. *
+. * (1) r(451), "repeated time values within panel".
+. *     `Base_Multinivel_PCA.dta` está a nivel de ESTUDIANTE, así que la
+. *     combinación sede-año no identifica las filas. Para `xtreg, fe` basta con
+. *     declarar la unidad de los efectos fijos: `xtset sede_id`, sin variable de
+. *     tiempo. Los efectos de año entran igual como indicadoras.
+. *
+. * (2) r(111), "c_inse not found".
+. *     `c_inse` no existe en esta base. Se construye en el script 08, sobre el
+. *     conjunto YA IMPUTADO, porque allí depende de los valores imputados del
+. *     índice socioeconómico. Aquí, que se trabaja sobre casos completos, hay
+. *     que construirlo desde `estu_inse_individual` con la misma definición:
+. *     el índice menos la media general de su año.
+. *
+. * POR QUÉ ESTE EJERCICIO NO REEMPLAZA AL MODELO PRINCIPAL
+. * Corre sobre casos completos, no sobre las veinte imputaciones, y con efectos
+. * fijos de sede en lugar de la estructura multinivel de tres niveles. Es una
+. * prueba de robustez deliberadamente exigente, no una especificación rival: su
+. * único propósito es averiguar si el coeficiente de la planta docente sobrevive
+. * cuando se descarta toda diferencia permanente entre establecimientos.
+. ********************************************************************************
+. 
+. clear all
+
+. set more off
+
+. set varabbrev off
+
+. version 17
+
+. 
+. if "$TESIS_CONFIG" == "" do "C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Definitivo\00_config
+> .do"
+
+. cd "$RAIZ"
+C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion
+
+. 
+. capture log close _all
+---------------------------------------------------------------------------------------------
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ opened on:  24 Oct 2026, 23:15:30
+MASTER: termina 10b_planta_fe_v2.do   codigo 0   15 s
+
+------------------------------------------------------------------------------
+MASTER: inicia 11b_emd.do   24 Oct 2026 23:15:30
+------------------------------------------------------------------------------
+
+. ********************************************************************************
+. * PROYECTO : Desempeno Saber 11 en sedes oficiales del Cauca, 2018-2023
+. * SCRIPT   : 11B - EFECTO MINIMO DETECTABLE CON LA ESTRUCTURA NUEVA (C1)
+. * ENTRADA  : N3_Municipios_PCA.dta y los .ster de ML3 generados por el 08,
+. *            el 10 y el 11
+. * SALIDA   : log_11b_emd.log y EMD_C1.dta
+. * STATA    : 17
+. ********************************************************************************
+. * POR QUE UN SCRIPT APARTE Y NO UNA EDICION DEL 10
+. * C1 pedia modificar el bloque [1] de 10_blindaje.do para que leyera ML3b.ster.
+. * Se hace aqui en vez de alli por tres razones:
+. *
+. *   1. Los otros bloques del 10 tardan horas y sus resultados ya existen en
+. *      log_10_blindaje.log. No hay por que repetirlos.
+. *   2. El bloque [6] del 10 carga M3_cwc.ster, que ningun script genera. Es el
+. *      hallazgo H1 y se resuelve en C2.
+. *   3. El bloque [7] del 10 termina en r(451) y ya quedo corregido aparte en
+. *      10b_planta_fe_v2.do.
+. *
+. * Asi 10_blindaje.do queda intacto como registro de lo que se corrio el 23 de
+. * agosto, y este script documenta el recalculo con su propio log.
+. *
+. * QUE HACE
+. * Reescala los coeficientes del entorno municipal a puntos de examen por
+. * desviacion estandar DENTRO del municipio y calcula el efecto minimo
+. * detectable con 80% de potencia al 5%: EMD = (1,96 + 0,84) por el error
+. * estandar. Es la misma convencion del bloque [1] del 10, de modo que las
+. * cifras son comparables con las de la Tabla 28.
+. *
+. * LO QUE ANADE RESPECTO DEL 10
+. * El 10 calculaba el EMD de una sola especificacion. Aqui se calculan cuatro,
+. * para separar de donde viene el cambio:
+. *
+. *   ML3          maxima verosimilitud, dos niveles  (la de la Tabla 28)
+. *   ML3_reml     REML, dos niveles                  (aisla el efecto de REML)
+. *   ML3_robust   MV con errores agrupados por mcpio (aisla el sandwich)
+. *   ML3b         REML, estructura nueva             (la que entra al documento)
+. *
+. * Si el EMD apenas se mueve entre ML3 y ML3_reml pero salta en ML3b, el cambio
+. * viene de la estructura aleatoria y no del metodo de estimacion. Eso es
+. * exactamente lo que hay que poder afirmar en el Anexo F.1.
+. *
+. * ADVERTENCIA DE LECTURA
+. * El p que se imprime usa la aproximacion normal sobre el cociente entre el
+. * coeficiente y su error. Los p oficiales de cada modelo son los de su propio
+. * log; aqui se muestran solo para orientar la lectura de la tabla.
+. *
+. * TIEMPO: minutos. No reestima nada, solo lee archivos .ster.
+. ********************************************************************************
+. 
+. clear all
+
+. set more off
+
+. set varabbrev off
+
+. version 17
+
+. 
+. if "$TESIS_CONFIG" == "" do "C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Definitivo\00_config
+> .do"
+
+. cd "$RAIZ"
+C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion
+
+. 
+. capture log close _all
+---------------------------------------------------------------------------------------------
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ opened on:  24 Oct 2026, 23:15:39
+MASTER: termina 11b_emd.do   codigo 0   9 s
+
+------------------------------------------------------------------------------
+MASTER: inicia 11c_tabla14.do   24 Oct 2026 23:15:39
+------------------------------------------------------------------------------
+
+. ********************************************************************************
+. * PROYECTO : Desempeno Saber 11 en sedes oficiales del Cauca, 2018-2023
+. * SCRIPT   : 11C - PENDIENTES ANUALES DE LA VULNERABILIDAD (TABLA 14) (C1)
+. * ENTRADA  : ML4b.ster, generado por el bloque [2] de 11_estructura_aleatoria.do
+. * SALIDA   : log_11c_tabla14.log y Tabla14_C1.dta
+. * STATA    : 17
+. ********************************************************************************
+. * QUE RESUELVE
+. * La Tabla 14 del informe reporta, para cada cohorte, la pendiente de la
+. * vulnerabilidad dentro del municipio: la suma del termino principal y su
+. * interaccion con el ano, con el error estandar de esa combinacion lineal.
+. *
+. * Esas cifras provienen de ML4, la especificacion de dos componentes aleatorios.
+. * ML4b ya esta estimado con la estructura nueva, pero el bloque [2] del 11 solo
+. * guardo el .ster y el contraste conjunto; las combinaciones lineales por ano no
+. * se calcularon. Este script las extrae sin reestimar nada.
+. *
+. * TIEMPO: segundos.
+. ********************************************************************************
+. 
+. clear all
+
+. set more off
+
+. set varabbrev off
+
+. version 17
+
+. 
+. if "$TESIS_CONFIG" == "" do "C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Definitivo\00_config
+> .do"
+
+. cd "$RAIZ"
+C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion
+
+. 
+. capture log close _all
+---------------------------------------------------------------------------------------------
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ opened on:  24 Oct 2026, 23:15:45
+MASTER: termina 11c_tabla14.do   codigo 0   6 s
+
+------------------------------------------------------------------------------
+MASTER: inicia 15b_lecturas.do   24 Oct 2026 23:15:45
+------------------------------------------------------------------------------
+
+. *==============================================================================
+. * 15b_lecturas.do
+. * C6: lecturas derivadas sobre los .ster ya estimados por 15_gradiente_medicion.do
+. *     NO reestima ningún modelo. Corre en minutos, no en horas.
+. *
+. * ENTRADA : M4r_20261013.ster  M5r_20261013.ster  M4c_20261013.ster
+. *           M5c_20261013.ster  M4d_20261013.ster  M5d_20261013.ster
+. *           Efectos_sede_M4r_20261013.dta   Base_Estimacion.dta
+. * SALIDAS : log_15b_lecturas_AAAAMMDD_HHMM.log
+. *           Fig6_gradiente_AAAAMMDD.png   Fig7_int_pend_AAAAMMDD.png
+. *
+. * QUÉ AÑADE
+. *   [1] Descriptivos de c_sd_inse y rural (imputación 1), para interpretar los
+. *       coeficientes de M4c/M4d y para verificar la identidad del promedio.
+. *   [2] lincom: pendiente del INSE en urbano y en rural, y a mas/menos una DE de
+. *       dispersión. En M4c/M4d el coeficiente de cwc_inse está evaluado en
+. *       rural = 0 y c_sd_inse = 0, de modo que por sí solo no es el gradiente medio.
+. *   [3] Figuras 6 y 7 con los efectos aleatorios de M4r, coloreadas por zona.
+. *==============================================================================
+. version 17
+
+. clear all
+
+. set more off
+
+. set varabbrev off
+
+. if "$TESIS_CONFIG" == "" do "C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Definitivo\00_config
+> .do"
+
+. cd "$RAIZ"
+C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion
+
+. 
+. * Fecha de los archivos que dejó 15_gradiente_medicion.do
+. local fin = "20261013"
+
+. 
+. capture log close _all
+---------------------------------------------------------------------------------------------
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ opened on:  24 Oct 2026, 23:16:03
+MASTER: termina 15b_lecturas.do   codigo 0   18 s
+
+------------------------------------------------------------------------------
+MASTER: inicia 15c_figuras.do   24 Oct 2026 23:16:03
+------------------------------------------------------------------------------
+
+. *==============================================================================
+. * 15c_figuras.do
+. * C6: Figuras 6 y 7 reestimadas con M4r, en el formato del informe.
+. *
+. * CAMBIOS RESPECTO DE 15b_lecturas.do (bloque [3])
+. *   - Sin title() ni note() dentro de la imagen. En el informe el número y el
+. *     título van en el párrafo de estilo "Rotulo" encima de la figura, y el pie
+. *     en el párrafo de estilo "Nota" debajo (APA 7). Nada de eso va en el PNG.
+. *   - La Figura 6 vuelve a ser el INTERCEPTO de la sede, como en el informe
+. *     actual ("Efectos aleatorios de sede ordenados por magnitud"), no el
+. *     gradiente. El 15b graficó el gradiente por error.
+. *   - La Figura 7 recupera la orientación del informe: intercepto en el eje Y,
+. *     pendiente en el eje X.
+. *   - Mismas opciones de ejes y de esquema que el bloque [6] del
+. *     09_tablas_graficos_v5.do, para que no desentonen con las demás.
+. *   - xsize/ysize fijados para que al insertarlas a 5,9 pulgadas de ancho
+. *     queden con la misma altura que las Figuras 3 a 7 actuales.
+. *
+. * ENTRADA : Efectos_sede_M4r_20261013.dta   Base_Estimacion.dta
+. * SALIDAS : log_15c_figuras_AAAAMMDD_HHMM.log
+. *           Fig6_efectos_sede_C6_AAAAMMDD.png
+. *           Fig7_int_pend_C6_AAAAMMDD.png
+. *           Fig7_int_pend_C6_sincolor_AAAAMMDD.png   (versión sin leyenda)
+. *==============================================================================
+. version 17
+
+. clear all
+
+. set more off
+
+. set varabbrev off
+
+. if "$TESIS_CONFIG" == "" do "C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Definitivo\00_config
+> .do"
+
+. cd "$RAIZ"
+C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion
+
+. 
+. local fin = "20261013"          // fecha de los archivos de 15 y 15b
+
+. 
+. capture log close _all
+---------------------------------------------------------------------------------------------
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ opened on:  24 Oct 2026, 23:16:13
+MASTER: termina 15c_figuras.do   codigo 0   10 s
+
+------------------------------------------------------------------------------
+MASTER: inicia 16a_rehacer_base.do   24 Oct 2026 23:16:13
+------------------------------------------------------------------------------
+
+. ********************************************************************************
+. * PROYECTO : Desempeno Saber 11 en sedes oficiales del Cauca, 2018-2023
+. * SCRIPT   : 16A - REGENERACION DE Base_Estimacion.dta (C7)
+. * ENTRADA  : Base_Multinivel_MI.dta  (ya actualizada por el 07c con PARCHE 3)
+. * SALIDA   : Base_Estimacion.dta, log_16a_rehacer_base_<hoy>.log
+. * STATA    : 17
+. ********************************************************************************
+. * PARA QUE SIRVE
+. * Base_Estimacion.dta NO la produce el 07c: la produce el bloque [2] del
+. * 08_estimacion_v5.do. Cuando cambian las variables de Nivel 3 hay que volver
+. * a generarla, pero correr el 08 completo re-estimaria toda la progresion
+. * transversal del Objetivo 3, que son horas de computo ya hechas.
+. *
+. * Este script reproduce EXACTAMENTE el bloque [2] del 08 y nada mas. El codigo
+. * esta copiado literal, sin "mejoras", para que la base resultante sea
+. * identica a la que produjo las Tablas 8 a 13 salvo por las variables
+. * municipales nuevas.
+. *
+. * VERIFICACION OBLIGATORIA AL FINAL
+. * El tabstat de c_inse, cwc_inse, inse_prom_sede y c_inse_prom_sede debe
+. * coincidir con el del bloque [2.2] de log_08_estimacion.log. Si no coincide,
+. * PARAR: algo cambio en la base imputada y todo el Capitulo 4 estaria en
+. * cuestion, no solo C7.
+. ********************************************************************************
+. 
+. clear all
+
+. set more off
+
+. set varabbrev off
+
+. version 17
+
+. 
+. if "$TESIS_CONFIG" == "" do "C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Definitivo\00_config
+> .do"
+
+. cd "$RAIZ"
+C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion
+
+. 
+. * ----------------------------------------------------------------------
+. * FECHA DE LAS SALIDAS. Cambiar en cada corrida nueva.
+. * ----------------------------------------------------------------------
+. local hoy "20261019c"
+
+. 
+. * Guard: ningun log se sobrescribe nunca. Es la leccion del incidente del
+. * 13 de octubre, cuando un `log using ..., replace` destruyo la salida del
+. * bloque [7] del 10_blindaje.do.
+. capture log close _all
+---------------------------------------------------------------------------------------------
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ opened on:  24 Oct 2026, 23:16:38
+MASTER: termina 16a_rehacer_base.do   codigo 0   25 s
+
+. 
+. 
+. * ----------------------------------------------------------------------
+. * [4] RESUMEN Y CIERRE
+. * ----------------------------------------------------------------------
+. if `nenc' > 0 {
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "RESUMEN (clave : codigo : segundos)"
+RESUMEN (clave : codigo : segundos)
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+.     foreach r of local resumen {
+  2.         display "  `r'"
+  3.     }
+  01:0:37
+  02:0:551
+  03:0:211
+  04:0:22
+  05:0:16
+  06:0:2
+  07b:0:27
+  07c:0:29
+  09:0:182
+  10b:0:15
+  11b:0:9
+  11c:0:6
+  15b:0:18
+  15c:0:10
+  16a:0:25
+. }
+
+. display _newline "Fin: " c(current_date) " " c(current_time)
+
+Fin: 24 Oct 2026 23:16:38
+
+. 
+. * Se borran MODO y TESIS_CONFIG para que un script corrido suelto despues
+. * vuelva a cargar el config en modo normal.
+. log close master
+      name:  master
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\verificacion\log_00_master_
+> 20261024v.log
+  log type:  text
+ closed on:  24 Oct 2026, 23:16:38
+---------------------------------------------------------------------------------------------

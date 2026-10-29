@@ -1,0 +1,392 @@
+---------------------------------------------------------------------------------------------
+      name:  fase16a
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_16a_rehacer_base_202610
+> 19c.log
+  log type:  text
+ opened on:  19 Oct 2026, 10:52:27
+
+. 
+. timer clear 1
+
+. timer on 1
+
+. 
+. 
+. ********************************************************************************
+. * [0] VERIFICACION PREVIA: las variables nuevas tienen que estar
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[0] VERIFICACION DE LA ENTRADA"
+[0] VERIFICACION DE LA ENTRADA
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "Base_Multinivel_MI.dta", clear
+
+. 
+. foreach v in tasa_hom_eb tasa_hom_eb_bar tasa_hom_eb_dev ///
+>              iica iica_bar iica_dev {
+  2.     capture confirm variable `v'
+  3.     if _rc != 0 {
+  4.         display as error "`v' no esta en Base_Multinivel_MI.dta."
+  5.         display as error "Correr 04 v5, 06 v3 y 07c con los parches de C7"
+  6.         display as error "antes de este script."
+  7.         exit 111
+  8.     }
+  9. }
+
+. display "Las seis variables nuevas de C7 estan presentes."
+Las seis variables nuevas de C7 estan presentes.
+
+. 
+. quietly count
+
+. display "Filas del conjunto imputado: " r(N) " (esperadas: 1.464.750)"
+Filas del conjunto imputado: 1464750 (esperadas: 1.464.750)
+
+. 
+. mi describe
+
+Style: flong
+       last mi update 19oct2026 10:51:12, approximately 1 minute ago
+
+Observations:
+   Complete       58,948
+   Incomplete     10,802  (M = 20 imputations)
+   ---------------------
+   Total          69,750
+
+Variables:
+   Imputed: 14; estu_inse_individual(3249) mujer(2) lectura_30min(5432) libros_26omas(7196)
+            trabaja_mas20(3368) internet_hogar(5322) computador_hogar(3435)
+            ln_matricula(179) ratio_alumnos_docente(179) pct_planta(179) pct_posgrado(179)
+            dotacion_tic(1614) tecnico(532) tecnico_academico(532)
+
+   Passive: 5; z_posgrado(179) inse_prom_sede(0) c_inse(3249) cwc_inse(3249)
+            c_inse_prom_sede(0)
+
+   Regular: 43; punt_global edad repitente estrato year rural ju_unica evaluados_sede
+            indice_vuln indice_vuln_anual vuln_bar vuln_dev tasa_homicidios
+            tasa_homicidios_bar tasa_homicidios_dev coca ln_coca ln_coca_bar ln_coca_dev
+            ln_inversion_pc ln_inversion_pc_bar ln_inversion_pc_dev ln_inv_fut_pc
+            ln_inv_fut_pc_bar ln_inv_fut_pc_dev ln_ing_trib_pc ln_ing_trib_pc_bar
+            ln_ing_trib_pc_dev ln_sgp_pae_pc ln_sgp_total_pc ln_inv_fut_pc_x
+            ln_inv_fut_pc_x_bar ln_inv_fut_pc_x_dev tasa_hom_eb tasa_hom_eb_bar
+            tasa_hom_eb_dev iica iica_bar iica_dev minas tasa_hom_td desercion_of
+            cob_neta_media
+
+   System:  3; _mi_m _mi_id _mi_miss
+
+   (there are 115 unregistered variables)
+
+. 
+. 
+. ********************************************************************************
+. * [1] BLOQUE [2] DEL 08_estimacion_v5.do, LITERAL
+. ********************************************************************************
+. * Copiado sin cambios. Los comentarios originales se conservan porque explican
+. * por que las derivadas se registran como IMPUTADAS y no como pasivas.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[1] RECONSTRUCCION DE LAS VARIABLES DERIVADAS"
+[1] RECONSTRUCCION DE LAS VARIABLES DERIVADAS
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. * `mi register passive` obliga a que las observaciones completas tengan el
+. * mismo valor en todas las imputaciones. Eso es correcto para una variable que
+. * depende solo de los datos del propio estudiante, pero no para una media de
+. * conglomerado, que depende de los valores imputados de sus companeros y
+. * cambia legitimamente entre imputaciones.
+. *
+. * La solucion: dejar las derivadas vacias en m = 0 y registrarlas como
+. * imputadas. Asi Stata no las sincroniza. La estimacion nunca usa m = 0.
+. 
+. capture drop inse_prom_sede c_inse cwc_inse c_inse_prom_sede
+
+. 
+. bysort _mi_m cole_cod_dane_sede year: egen double _prom = ///
+>     mean(estu_inse_individual)
+
+. generate double inse_prom_sede = _prom if _mi_m > 0
+(69,750 missing values generated)
+
+. drop _prom
+
+. label variable inse_prom_sede "INSE medio de la cohorte de la sede"
+
+. 
+. bysort _mi_m year: egen double _gm = mean(estu_inse_individual)
+
+. generate double c_inse = estu_inse_individual - _gm if _mi_m > 0
+(69,750 missing values generated)
+
+. drop _gm
+
+. label variable c_inse "INSE centrado en la gran media del ano"
+
+. 
+. generate double cwc_inse = estu_inse_individual - inse_prom_sede if _mi_m > 0
+(69,750 missing values generated)
+
+. label variable cwc_inse "INSE centrado en la media de la sede"
+
+. 
+. bysort _mi_m year: egen double _gms = mean(inse_prom_sede)
+(69,750 missing values generated)
+
+. generate double c_inse_prom_sede = inse_prom_sede - _gms if _mi_m > 0
+(69,750 missing values generated)
+
+. drop _gms
+
+. label variable c_inse_prom_sede "INSE medio de la sede, centrado"
+
+. 
+. mi register imputed inse_prom_sede c_inse cwc_inse c_inse_prom_sede
+(variables inse_prom_sede c_inse cwc_inse c_inse_prom_sede were registered as passive, now
+ registered as imputed)
+(58948 m=0 obs now marked as incomplete)
+
+. 
+. 
+. ********************************************************************************
+. * [2] VERIFICACION
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[2] VERIFICACION"
+[2] VERIFICACION
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. display _newline "--- El promedio de sede debe ser constante dentro de la sede-ano ---"
+
+--- El promedio de sede debe ser constante dentro de la sede-ano ---
+
+. bysort _mi_m cole_cod_dane_sede year: egen double _sd_prom = sd(inse_prom_sede)
+(70,010 missing values generated)
+
+. quietly count if _sd_prom > 1e-8 & !missing(_sd_prom)
+
+. display "Observaciones con promedio de sede inconsistente: " r(N) " (debe ser 0)"
+Observaciones con promedio de sede inconsistente: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. drop _sd_prom
+
+. 
+. quietly count if _mi_m > 0 & missing(c_inse)
+
+. display "Valores faltantes de c_inse en las imputaciones: " r(N) " (debe ser 0)"
+Valores faltantes de c_inse en las imputaciones: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "COMPARAR ESTE TABSTAT CON log_08_estimacion.log, BLOQUE [2.2]."
+COMPARAR ESTE TABSTAT CON log_08_estimacion.log, BLOQUE [2.2].
+
+. display "Si no coincide, PARAR: la base imputada cambio."
+Si no coincide, PARAR: la base imputada cambio.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. tabstat c_inse cwc_inse inse_prom_sede c_inse_prom_sede if _mi_m == 1, ///
+>     stat(n mean sd min max) format(%9.4f)
+
+   Stats |    c_inse  cwc_inse  inse_p~e  c_inse~e
+---------+----------------------------------------
+       N |  6.98e+04  6.98e+04  6.98e+04  6.98e+04
+    Mean |    0.0000   -0.0000   44.1145    0.0000
+      SD |    8.5798    7.0650    4.9165    4.8681
+     Min |  -30.2128  -33.6513   28.6799  -14.8761
+     Max |   39.4396   37.8332   61.7539   18.8240
+--------------------------------------------------
+
+. 
+. 
+. ********************************************************************************
+. * [3] IDENTIFICADORES DE NIVEL
+. ********************************************************************************
+. 
+. capture drop sede_id mcpio_id
+
+. egen long sede_id  = group(cole_cod_dane_sede)
+
+. egen long mcpio_id = group(cole_cod_mcpio_ubicacion)
+
+. mi register regular sede_id mcpio_id
+
+. 
+. display _newline "--- Identificadores ---"
+
+--- Identificadores ---
+
+. quietly levelsof mcpio_id if _mi_m == 1, local(mm)
+
+. display "Municipios: " wordcount("`mm'") " (esperados: 42)"
+Municipios: 42 (esperados: 42)
+
+. quietly levelsof sede_id if _mi_m == 1, local(ss)
+
+. display "Sedes: " wordcount("`ss'") " (esperadas: 437)"
+Sedes: 437 (esperadas: 437)
+
+. 
+. 
+. ********************************************************************************
+. * [4] CONTROL DE LAS VARIABLES NUEVAS DE C7
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[4] VARIABLES NUEVAS DE C7 EN LA BASE DE ESTIMACION"
+[4] VARIABLES NUEVAS DE C7 EN LA BASE DE ESTIMACION
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. tabstat tasa_homicidios tasa_hom_eb iica if _mi_m == 1, ///
+>     by(year) stat(n mean sd) format(%9.4f)
+
+Summary statistics: N, Mean, SD
+Group variable: year (Año de presentación de la prueba)
+
+    year |  tasa_h~s  tasa_h~b      iica
+---------+------------------------------
+    2018 |  1.15e+04  1.15e+04  1.15e+04
+         |   20.9380   21.0501    0.1076
+         |   19.5737   15.7729    0.1064
+---------+------------------------------
+    2019 |  1.15e+04  1.15e+04  1.15e+04
+         |   36.8503   36.7823    0.1475
+         |   35.3715   32.2032    0.1559
+---------+------------------------------
+    2020 |  1.10e+04  1.10e+04  1.10e+04
+         |   42.3756   42.3990    0.1400
+         |   40.3752   37.3655    0.1749
+---------+------------------------------
+    2021 |  1.17e+04  1.17e+04  1.17e+04
+         |   49.7119   49.6886    0.1505
+         |   49.8687   46.6111    0.1856
+---------+------------------------------
+    2022 |  1.18e+04  1.18e+04  1.18e+04
+         |   50.2332   50.0126    0.1321
+         |   48.7979   45.3233    0.2182
+---------+------------------------------
+    2023 |  1.24e+04  1.24e+04  1.24e+04
+         |   59.5834   59.3986    0.1471
+         |   43.7991   40.5187    0.1646
+---------+------------------------------
+   Total |  6.98e+04  6.98e+04  6.98e+04
+         |   43.5500   43.4869    0.1376
+         |   42.8382   39.7719    0.1718
+----------------------------------------
+
+. 
+. foreach v in tasa_hom_eb_bar tasa_hom_eb_dev iica_bar iica_dev {
+  2.     quietly count if _mi_m > 0 & missing(`v')
+  3.     display "  `v': filas sin valor en m>0 = " r(N)
+  4. }
+  tasa_hom_eb_bar: filas sin valor en m>0 = 0
+  tasa_hom_eb_dev: filas sin valor en m>0 = 0
+  iica_bar: filas sin valor en m>0 = 0
+  iica_dev: filas sin valor en m>0 = 0
+
+. 
+. * Deben ser constantes dentro de cada municipio-ano, como el resto del Nivel 3.
+. bysort _mi_m cole_cod_mcpio_ubicacion year: egen double _sd_eb = sd(tasa_hom_eb)
+
+. quietly count if _sd_eb > 1e-10 & !missing(_sd_eb)
+
+. display _newline "Municipio-ano con tasa suavizada no constante: " r(N) " (debe ser 0)"
+
+Municipio-ano con tasa suavizada no constante: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. drop _sd_eb
+
+. 
+. 
+. ********************************************************************************
+. * [5] GUARDADO
+. ********************************************************************************
+. 
+. * Los bloques de variables se redefinen en cada script que las use: las
+. * globales NO se guardan dentro del .dta.
+. global v_n1 mujer edad repitente lectura_30min libros_26omas ///
+>             trabaja_mas20 internet_hogar computador_hogar
+
+. 
+. global v_n2 ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>             dotacion_tic rural ju_unica tecnico tecnico_academico ///
+>             cole_femenino
+
+. 
+. compress
+  variable sede_id was long now int
+  variable mcpio_id was long now byte
+  (7,323,750 bytes saved)
+
+. save "Base_Estimacion.dta", replace
+file Base_Estimacion.dta saved
+
+. 
+. timer off 1
+
+. display _newline "--- Tiempo total ---"
+
+--- Tiempo total ---
+
+. timer list 1
+   1:    137.08 /        1 =     137.0840
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "Base_Estimacion.dta REGENERADA con las variables de C7."
+Base_Estimacion.dta REGENERADA con las variables de C7.
+
+. display "Siguiente: 16_territorial.do"
+Siguiente: 16_territorial.do
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase16a
+      name:  fase16a
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_16a_rehacer_base_202610
+> 19c.log
+  log type:  text
+ closed on:  19 Oct 2026, 10:54:44
+---------------------------------------------------------------------------------------------

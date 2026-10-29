@@ -1,0 +1,618 @@
+---------------------------------------------------------------------------------------------
+      name:  fase7c
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_07c_actualizar_n3_20261
+> 019c.log
+  log type:  text
+ opened on:  19 Oct 2026, 10:44:13
+
+. 
+. 
+. ********************************************************************************
+. * [0] AVISO DE COPIA DE SEGURIDAD
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[0] AVISO"
+[0] AVISO
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. display "Este script SOBRESCRIBE Base_Multinivel_MI.dta."
+Este script SOBRESCRIBE Base_Multinivel_MI.dta.
+
+. display "Si no se hizo copia de seguridad, interrumpir ahora."
+Si no se hizo copia de seguridad, interrumpir ahora.
+
+. 
+. capture confirm file "Base_Multinivel_MI_pre_C7.dta"
+
+. if _rc != 0 {
+.     display as error "No encuentro Base_Multinivel_MI_pre_C7.dta."
+.     display as error "Correr antes, en la ventana de comandos:"
+.     display as error `"    copy "Base_Multinivel_MI.dta" "Base_Multinivel_MI_pre_C7.dta""'
+.     display as error "y volver a lanzar este script."
+.     exit 601
+. }
+
+. display "Copia de seguridad encontrada. Se continúa."
+Copia de seguridad encontrada. Se continúa.
+
+. 
+. 
+. ********************************************************************************
+. * [1] PREPARACIÓN DE LAS VARIABLES NUEVAS
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[1] VARIABLES MUNICIPALES ACTUALIZADAS"
+[1] VARIABLES MUNICIPALES ACTUALIZADAS
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "N3_Municipios_PCA.dta", clear
+
+. capture xtset, clear
+
+. 
+. * C7: verificación de que el 06 v3 corrió con los dos parches. Si el PARCHE 2b
+. * no se aplicó, las variables existen en N3_Municipios_PCA.dta pero NO en la
+. * base de estudiantes; aquí se comprueba el primer eslabón.
+. foreach v in tasa_hom_eb tasa_hom_eb_bar tasa_hom_eb_dev ///
+>              iica iica_bar iica_dev minas tasa_hom_td ///
+>              desercion_of cob_neta_media {
+  2.     capture confirm variable `v'
+  3.     if _rc != 0 {
+  4.         display as error "`v' no está en N3_Municipios_PCA.dta."
+  5.         display as error "Correr 04 v5 y 06 v3 antes de este script."
+  6.         exit 111
+  7.     }
+  8. }
+
+. display "Las diez variables de C7 están presentes."
+Las diez variables de C7 están presentes.
+
+. 
+. keep cole_cod_mcpio_ubicacion year ///
+>      indice_vuln indice_vuln_anual vuln_bar vuln_dev ///
+>      tasa_homicidios tasa_homicidios_bar tasa_homicidios_dev ///
+>      coca ln_coca ln_coca_bar ln_coca_dev ///
+>      ln_inversion_pc ln_inversion_pc_bar ln_inversion_pc_dev ///
+>      ln_inv_fut_pc ln_inv_fut_pc_bar ln_inv_fut_pc_dev ///
+>      ln_inv_fut_pc_x ln_inv_fut_pc_x_bar ln_inv_fut_pc_x_dev ///
+>      ln_ing_trib_pc ln_ing_trib_pc_bar ln_ing_trib_pc_dev ///
+>      ln_sgp_pae_pc ln_sgp_total_pc ///
+>      tasa_hom_eb tasa_hom_eb_bar tasa_hom_eb_dev ///
+>      iica iica_bar iica_dev minas tasa_hom_td ///
+>      desercion_of cob_neta_media
+
+. 
+. quietly count
+
+. display "Municipio-año: " r(N) " (esperados: 252)"
+Municipio-año: 252 (esperados: 252)
+
+. assert _N == 252
+
+. isid cole_cod_mcpio_ubicacion year
+
+. 
+. display _newline "--- Índice corregido por año ---"
+
+--- Índice corregido por año ---
+
+. tabstat indice_vuln, by(year) stat(n mean sd min max) format(%9.4f)
+
+Summary for variables: indice_vuln
+Group variable: year (Año de la cohorte Saber 11 (llave de cruce))
+
+    year |         N      Mean        SD       Min       Max
+---------+--------------------------------------------------
+    2018 |   42.0000   -0.3689    0.6997   -1.7988    1.0826
+    2019 |   42.0000   -0.1430    0.8778   -1.6479    1.8132
+    2020 |   42.0000   -0.0562    0.9478   -1.7281    1.7802
+    2021 |   42.0000   -0.0190    1.1564   -1.7210    3.6998
+    2022 |   42.0000    0.2005    1.1085   -1.3593    3.8412
+    2023 |   42.0000    0.3864    1.0195   -1.2973    2.3341
+---------+--------------------------------------------------
+   Total |  252.0000   -0.0000    1.0000   -1.7988    3.8412
+------------------------------------------------------------
+
+. 
+. display _newline "--- Variables de C7 por año ---"
+
+--- Variables de C7 por año ---
+
+. tabstat tasa_homicidios tasa_hom_eb iica minas, ///
+>     by(year) stat(n mean sd min max) format(%9.4f)
+
+Summary statistics: N, Mean, SD, Min, Max
+Group variable: year (Año de la cohorte Saber 11 (llave de cruce))
+
+    year |  tasa_h~s  tasa_h~b      iica     minas
+---------+----------------------------------------
+    2018 |   42.0000   42.0000   42.0000   42.0000
+         |   19.8220   20.2107    0.1310    0.6190
+         |   21.9114   16.2745    0.1101    2.9380
+         |    0.0000    3.2137    0.0000    0.0000
+         |   74.9906   64.4223    0.5100   19.0000
+---------+----------------------------------------
+    2019 |   42.0000   42.0000   42.0000   42.0000
+         |   36.2919   36.5684    0.1731    0.4524
+         |   36.3960   32.3616    0.1648    1.4348
+         |    0.0000    2.9457    0.0100    0.0000
+         |  139.3695  131.8095    0.8000    7.0000
+---------+----------------------------------------
+    2020 |   42.0000   42.0000   42.0000   42.0000
+         |   42.4451   42.7125    0.1476    0.4286
+         |   41.8552   37.2542    0.1861    0.8874
+         |    0.0000    4.1036    0.0000    0.0000
+         |  171.3129  158.5733    0.8900    4.0000
+---------+----------------------------------------
+    2021 |   42.0000   42.0000   42.0000   42.0000
+         |   47.5245   48.5862    0.1669    0.4762
+         |   56.1035   51.6645    0.1990    1.6115
+         |    0.0000    2.5090    0.0000    0.0000
+         |  293.0238  275.4351    0.9800   10.0000
+---------+----------------------------------------
+    2022 |   42.0000   42.0000   42.0000   42.0000
+         |   53.6340   53.2071    0.1593    1.1667
+         |   58.4098   52.8353    0.2820    5.5477
+         |    0.0000    3.5864    0.0000    0.0000
+         |  290.6327  273.0489    1.7200   36.0000
+---------+----------------------------------------
+    2023 |   42.0000   42.0000   42.0000   42.0000
+         |   60.6172   60.7456    0.1617    2.2381
+         |   45.6043   39.6430    0.1870    7.9627
+         |    0.0000    9.8220    0.0000    0.0000
+         |  144.0443  134.9248    1.0000   43.0000
+---------+----------------------------------------
+   Total |  252.0000  252.0000  252.0000  252.0000
+         |   43.3891   43.6718    0.1566    0.8968
+         |   46.5159   41.9343    0.1935    4.2554
+         |    0.0000    2.5090    0.0000    0.0000
+         |  293.0238  275.4351    1.7200   43.0000
+--------------------------------------------------
+
+. 
+. tempfile n3nuevo
+
+. save `n3nuevo', replace
+(file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_4ac0_000001.tmp not found)
+file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_4ac0_000001.tmp saved as .dta format
+
+. 
+. 
+. ********************************************************************************
+. * [2] SUSTITUCIÓN DENTRO DE LA BASE IMPUTADA
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[2] SUSTITUCIÓN EN LA BASE IMPUTADA"
+[2] SUSTITUCIÓN EN LA BASE IMPUTADA
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "Base_Multinivel_MI.dta", clear
+
+. 
+. quietly count
+
+. display "Filas del conjunto imputado: " r(N)
+Filas del conjunto imputado: 1464750
+
+. 
+. * Las variables municipales viejas se retiran del registro antes de borrarlas,
+. * porque `mi` no permite eliminar una variable registrada sin desregistrarla.
+. *
+. * LAS DE C7 TAMBIÉN VAN EN ESTA LISTA, aunque la primera vez no existan: el
+. * `capture` las ignora. Importa para la SEGUNDA corrida, cuando ya existen y
+. * el `mi merge` fallaría al intentar pegar variables duplicadas.
+. local n3viejas indice_vuln indice_vuln_anual vuln_bar vuln_dev ///
+>                tasa_homicidios tasa_homicidios_bar tasa_homicidios_dev ///
+>                coca ln_coca ln_coca_bar ln_coca_dev ///
+>                ln_inversion_pc ln_inversion_pc_bar ln_inversion_pc_dev ///
+>                ln_inv_fut_pc ln_inv_fut_pc_bar ln_inv_fut_pc_dev ///
+>                ln_inv_fut_pc_x ln_inv_fut_pc_x_bar ln_inv_fut_pc_x_dev ///
+>                ln_ing_trib_pc ln_ing_trib_pc_bar ln_ing_trib_pc_dev ///
+>                ln_sgp_pae_pc ln_sgp_total_pc inversion_pc ///
+>                tasa_hom_eb tasa_hom_eb_bar tasa_hom_eb_dev ///
+>                iica iica_bar iica_dev minas tasa_hom_td ///
+>                desercion_of cob_neta_media
+
+. 
+. foreach v of local n3viejas {
+  2.     capture mi unregister `v'
+  3.     capture drop `v'
+  4. }
+
+. 
+. display _newline "Variables municipales antiguas eliminadas."
+
+Variables municipales antiguas eliminadas.
+
+. 
+. * El merge es m:1 sobre municipio y año. Como las variables son idénticas en
+. * todas las imputaciones, se replican correctamente en las 21 copias de cada
+. * estudiante.
+. mi merge m:1 cole_cod_mcpio_ubicacion year using `n3nuevo', generate(_m_n3)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                            69,750  (_m_n3==3)
+    -----------------------------------------
+
+. 
+. display _newline "--- Resultado de la unión ---"
+
+--- Resultado de la unión ---
+
+. tabulate _m_n3
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+            Matched (3) |  1,464,750      100.00      100.00
+------------------------+-----------------------------------
+                  Total |  1,464,750      100.00
+
+. assert _m_n3 == 3
+
+. drop _m_n3
+
+. 
+. * Se registran como regulares: son completas y no varían entre imputaciones.
+. mi register regular indice_vuln indice_vuln_anual vuln_bar vuln_dev ///
+>     tasa_homicidios tasa_homicidios_bar tasa_homicidios_dev ///
+>     coca ln_coca ln_coca_bar ln_coca_dev ///
+>     ln_inversion_pc ln_inversion_pc_bar ln_inversion_pc_dev ///
+>     ln_inv_fut_pc ln_inv_fut_pc_bar ln_inv_fut_pc_dev ///
+>     ln_ing_trib_pc ln_ing_trib_pc_bar ln_ing_trib_pc_dev ///
+>     ln_sgp_pae_pc ln_sgp_total_pc
+
+. 
+. * La serie depurada del FUT también se registra como regular, aunque tiene
+. * faltantes en el municipio-año excluido. `mi update` emitirá una nota
+. * advirtiendo que una variable regular tiene valores perdidos: es esperado y no
+. * es un error. Lo que NO debe hacerse es registrarla como imputada, porque el
+. * dato no falta, sino que se descartó a propósito por ser un error de reporte.
+. * La consecuencia práctica es que la prueba R5b estimará sobre un número de
+. * observaciones menor que R5, diferencia que hay que declarar en los resultados.
+. mi register regular ln_inv_fut_pc_x ln_inv_fut_pc_x_bar ln_inv_fut_pc_x_dev
+
+. 
+. * --- C7 ---
+. * Mismo tratamiento: registros administrativos agregados, completos e
+. * idénticos en las veinte imputaciones. Si `minas` tuviera faltantes, `mi
+. * update` emitirá la misma nota que con ln_inv_fut_pc_x y por la misma razón.
+. mi register regular tasa_hom_eb tasa_hom_eb_bar tasa_hom_eb_dev ///
+>     iica iica_bar iica_dev minas tasa_hom_td ///
+>     desercion_of cob_neta_media
+
+. 
+. quietly count if missing(ln_inv_fut_pc_x)
+
+. display _newline "Filas sin valor en la serie depurada del FUT: " r(N)
+
+Filas sin valor en la serie depurada del FUT: 16002
+
+. 
+. quietly count if missing(minas)
+
+. display "Filas sin valor en minas: " r(N)
+Filas sin valor en minas: 0
+
+. 
+. mi update
+
+. 
+. 
+. ********************************************************************************
+. * [3] VERIFICACIÓN
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[3] VERIFICACIÓN"
+[3] VERIFICACIÓN
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. mi describe
+
+Style: flong
+       last mi update 19oct2026 10:51:12, 6 seconds ago
+
+Observations:
+   Complete       58,948
+   Incomplete     10,802  (M = 20 imputations)
+   ---------------------
+   Total          69,750
+
+Variables:
+   Imputed: 14; estu_inse_individual(3249) mujer(2) lectura_30min(5432) libros_26omas(7196)
+            trabaja_mas20(3368) internet_hogar(5322) computador_hogar(3435)
+            ln_matricula(179) ratio_alumnos_docente(179) pct_planta(179) pct_posgrado(179)
+            dotacion_tic(1614) tecnico(532) tecnico_academico(532)
+
+   Passive: 5; z_posgrado(179) inse_prom_sede(0) c_inse(3249) cwc_inse(3249)
+            c_inse_prom_sede(0)
+
+   Regular: 43; punt_global edad repitente estrato year rural ju_unica evaluados_sede
+            indice_vuln indice_vuln_anual vuln_bar vuln_dev tasa_homicidios
+            tasa_homicidios_bar tasa_homicidios_dev coca ln_coca ln_coca_bar ln_coca_dev
+            ln_inversion_pc ln_inversion_pc_bar ln_inversion_pc_dev ln_inv_fut_pc
+            ln_inv_fut_pc_bar ln_inv_fut_pc_dev ln_ing_trib_pc ln_ing_trib_pc_bar
+            ln_ing_trib_pc_dev ln_sgp_pae_pc ln_sgp_total_pc ln_inv_fut_pc_x
+            ln_inv_fut_pc_x_bar ln_inv_fut_pc_x_dev tasa_hom_eb tasa_hom_eb_bar
+            tasa_hom_eb_dev iica iica_bar iica_dev minas tasa_hom_td desercion_of
+            cob_neta_media
+
+   System:  3; _mi_m _mi_id _mi_miss
+
+   (there are 115 unregistered variables)
+
+. 
+. display _newline "--- El índice debe ser idéntico en todas las imputaciones ---"
+
+--- El índice debe ser idéntico en todas las imputaciones ---
+
+. bysort _mi_id: egen double _sd_idx = sd(indice_vuln)
+
+. quietly count if _sd_idx > 1e-10 & !missing(_sd_idx)
+
+. display "Estudiantes con índice distinto entre imputaciones: " r(N) " (debe ser 0)"
+Estudiantes con índice distinto entre imputaciones: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. drop _sd_idx
+
+. 
+. display _newline "--- El índice debe ser constante dentro de cada municipio-año ---"
+
+--- El índice debe ser constante dentro de cada municipio-año ---
+
+. bysort _mi_m cole_cod_mcpio_ubicacion year: egen double _sd_mcp = sd(indice_vuln)
+
+. quietly count if _sd_mcp > 1e-10 & !missing(_sd_mcp)
+
+. display "Municipio-año con índice no constante: " r(N) " (debe ser 0)"
+Municipio-año con índice no constante: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. drop _sd_mcp
+
+. 
+. quietly count if missing(indice_vuln)
+
+. display _newline "Estudiantes sin valor del índice: " r(N) " (debe ser 0)"
+
+Estudiantes sin valor del índice: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. 
+. * --- C7: las mismas dos comprobaciones sobre la tasa suavizada ---
+. display _newline "--- C7: la tasa suavizada, idéntica entre imputaciones ---"
+
+--- C7: la tasa suavizada, idéntica entre imputaciones ---
+
+. bysort _mi_id: egen double _sd_eb = sd(tasa_hom_eb)
+
+. quietly count if _sd_eb > 1e-10 & !missing(_sd_eb)
+
+. display "Estudiantes con tasa suavizada distinta entre imputaciones: " r(N)
+Estudiantes con tasa suavizada distinta entre imputaciones: 0
+
+. assert r(N) == 0
+
+. drop _sd_eb
+
+. 
+. display _newline "--- C7: constante dentro de cada municipio-año ---"
+
+--- C7: constante dentro de cada municipio-año ---
+
+. bysort _mi_m cole_cod_mcpio_ubicacion year: egen double _sd_eb2 = sd(tasa_hom_eb)
+
+. quietly count if _sd_eb2 > 1e-10 & !missing(_sd_eb2)
+
+. display "Municipio-año con tasa suavizada no constante: " r(N) " (debe ser 0)"
+Municipio-año con tasa suavizada no constante: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. drop _sd_eb2
+
+. 
+. quietly count if missing(tasa_hom_eb)
+
+. display "Estudiantes sin tasa suavizada: " r(N) " (debe ser 0)"
+Estudiantes sin tasa suavizada: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. 
+. display _newline "--- Índice y componentes en la base de estudiantes ---"
+
+--- Índice y componentes en la base de estudiantes ---
+
+. tabstat indice_vuln vuln_bar vuln_dev ln_coca if _mi_m == 1, ///
+>     by(year) stat(n mean sd) format(%9.4f)
+
+Summary statistics: N, Mean, SD
+Group variable: year (Año de presentación de la prueba)
+
+    year |  indice~n  vuln_bar  vuln_dev   ln_coca
+---------+----------------------------------------
+    2018 |  1.15e+04  1.15e+04  1.15e+04  1.15e+04
+         |   -0.1670    0.1989   -0.3659    1.6086
+         |    0.5481    0.7787    0.4328    2.7486
+---------+----------------------------------------
+    2019 |  1.15e+04  1.15e+04  1.15e+04  1.15e+04
+         |    0.0532    0.2043   -0.1511    1.7101
+         |    0.7469    0.7814    0.2592    2.7342
+---------+----------------------------------------
+    2020 |  1.10e+04  1.10e+04  1.10e+04  1.10e+04
+         |    0.1514    0.2200   -0.0686    2.0221
+         |    0.8120    0.7840    0.2548    2.8568
+---------+----------------------------------------
+    2021 |  1.17e+04  1.17e+04  1.17e+04  1.17e+04
+         |    0.2381    0.2195    0.0186    2.0532
+         |    0.9549    0.7837    0.3128    2.7223
+---------+----------------------------------------
+    2022 |  1.18e+04  1.18e+04  1.18e+04  1.18e+04
+         |    0.4027    0.2064    0.1962    2.8648
+         |    0.9595    0.7735    0.3092    3.0342
+---------+----------------------------------------
+    2023 |  1.24e+04  1.24e+04  1.24e+04  1.24e+04
+         |    0.5867    0.2192    0.3675    2.7975
+         |    0.9631    0.7822    0.3616    2.9686
+---------+----------------------------------------
+   Total |  6.98e+04  6.98e+04  6.98e+04  6.98e+04
+         |    0.2171    0.2114    0.0057    2.1880
+         |    0.8815    0.7806    0.4059    2.8911
+--------------------------------------------------
+
+. 
+. display _newline "--- Medidas fiscales alternativas ---"
+
+--- Medidas fiscales alternativas ---
+
+. tabstat ln_inversion_pc ln_inv_fut_pc ln_ing_trib_pc if _mi_m == 1, ///
+>     by(year) stat(n mean sd) format(%9.4f)
+
+Summary statistics: N, Mean, SD
+Group variable: year (Año de presentación de la prueba)
+
+    year |  ln_~n_pc  ln_~t_pc  ln_ing~c
+---------+------------------------------
+    2018 |  1.15e+04  1.15e+04  1.15e+04
+         |   10.6776   13.7053   11.5633
+         |    0.6697    0.2139    0.9817
+---------+------------------------------
+    2019 |  1.15e+04  1.15e+04  1.15e+04
+         |   10.6615   13.7595   11.6487
+         |    0.6915    0.2114    0.8948
+---------+------------------------------
+    2020 |  1.10e+04  1.10e+04  1.10e+04
+         |   10.7008   13.8584   11.8237
+         |    0.6938    0.2207    0.8592
+---------+------------------------------
+    2021 |  1.17e+04  1.17e+04  1.17e+04
+         |   10.7173   13.7437   11.6433
+         |    0.6985    0.2185    0.9161
+---------+------------------------------
+    2022 |  1.18e+04  1.15e+04  1.12e+04
+         |   10.6652   13.6650   11.7499
+         |    0.6599    0.7300    0.8827
+---------+------------------------------
+    2023 |  1.24e+04  1.24e+04  1.24e+04
+         |   10.5093   13.8028   11.7802
+         |    0.6194    0.2121    0.8655
+---------+------------------------------
+   Total |  6.98e+04  6.94e+04  6.91e+04
+         |   10.6533   13.7557   11.7013
+         |    0.6755    0.3615    0.9053
+----------------------------------------
+
+. 
+. display _newline "--- C7: variables territoriales nuevas ---"
+
+--- C7: variables territoriales nuevas ---
+
+. tabstat tasa_homicidios tasa_hom_eb iica minas if _mi_m == 1, ///
+>     by(year) stat(n mean sd) format(%9.4f)
+
+Summary statistics: N, Mean, SD
+Group variable: year (Año de presentación de la prueba)
+
+    year |  tasa_h~s  tasa_h~b      iica     minas
+---------+----------------------------------------
+    2018 |  1.15e+04  1.15e+04  1.15e+04  1.15e+04
+         |   20.9380   21.0501    0.1076    0.6444
+         |   19.5737   15.7729    0.1064    3.0748
+---------+----------------------------------------
+    2019 |  1.15e+04  1.15e+04  1.15e+04  1.15e+04
+         |   36.8503   36.7823    0.1475    0.4857
+         |   35.3715   32.2032    0.1559    1.5168
+---------+----------------------------------------
+    2020 |  1.10e+04  1.10e+04  1.10e+04  1.10e+04
+         |   42.3756   42.3990    0.1400    0.3977
+         |   40.3752   37.3655    0.1749    0.8915
+---------+----------------------------------------
+    2021 |  1.17e+04  1.17e+04  1.17e+04  1.17e+04
+         |   49.7119   49.6886    0.1505    0.4911
+         |   49.8687   46.6111    0.1856    1.7357
+---------+----------------------------------------
+    2022 |  1.18e+04  1.18e+04  1.18e+04  1.18e+04
+         |   50.2332   50.0126    0.1321    0.7970
+         |   48.7979   45.3233    0.2182    4.1630
+---------+----------------------------------------
+    2023 |  1.24e+04  1.24e+04  1.24e+04  1.24e+04
+         |   59.5834   59.3986    0.1471    1.6092
+         |   43.7991   40.5187    0.1646    6.1298
+---------+----------------------------------------
+   Total |  6.98e+04  6.98e+04  6.98e+04  6.98e+04
+         |   43.5500   43.4869    0.1376    0.7506
+         |   42.8382   39.7719    0.1718    3.5111
+--------------------------------------------------
+
+. 
+. 
+. ********************************************************************************
+. * [4] GUARDADO
+. ********************************************************************************
+. 
+. compress
+  variable _mi_m was int now byte
+  (1,464,750 bytes saved)
+
+. save "Base_Multinivel_MI.dta", replace
+file Base_Multinivel_MI.dta saved
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "BASE IMPUTADA ACTUALIZADA con el Nivel 3 corregido y las variables C7."
+BASE IMPUTADA ACTUALIZADA con el Nivel 3 corregido y las variables C7.
+
+. display "Siguiente: 16a_rehacer_base.do, que regenera Base_Estimacion.dta."
+Siguiente: 16a_rehacer_base.do, que regenera Base_Estimacion.dta.
+
+. display "NO correr el 08 completo: re-estimaría toda la progresión transversal."
+NO correr el 08 completo: re-estimaría toda la progresión transversal.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase7c
+      name:  fase7c
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_07c_actualizar_n3_20261
+> 019c.log
+  log type:  text
+ closed on:  19 Oct 2026, 10:51:54
+---------------------------------------------------------------------------------------------

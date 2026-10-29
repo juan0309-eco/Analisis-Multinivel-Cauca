@@ -1,0 +1,222 @@
+---------------------------------------------------------------------------------------------
+      name:  fase15c
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_15c_figuras_20261013_19
+> 30.log
+  log type:  text
+ opened on:  13 Oct 2026, 19:30:58
+
+. display "Inicio: " c(current_date) " " c(current_time)
+Inicio: 13 Oct 2026 19:30:58
+
+. 
+. *------------------------------------------------------------------------------
+. * [1] ZONA DE CADA SEDE (para la versión coloreada de la Figura 7)
+. *------------------------------------------------------------------------------
+. use "Base_Estimacion.dta", clear
+
+. mi extract 1, clear
+
+. collapse (mean) rural, by(cole_cod_dane_sede)
+
+. tempfile sedes
+
+. save "`sedes'"
+file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_3048_000001.tmp saved as .dta format
+
+. 
+. *------------------------------------------------------------------------------
+. * [2] EFECTOS ALEATORIOS DE M4r
+. *------------------------------------------------------------------------------
+. use "Efectos_sede_M4r_`fin'.dta", clear
+
+. merge 1:1 cole_cod_dane_sede using "`sedes'", keep(master match)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               437  (_merge==3)
+    -----------------------------------------
+
+. tabulate _merge
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+            Matched (3) |        437      100.00      100.00
+------------------------+-----------------------------------
+                  Total |        437      100.00
+
+. drop _merge
+
+. 
+. label variable b_int  "Efecto aleatorio del intercepto de la sede"
+
+. label variable b_pend "Efecto aleatorio de la pendiente de la sede"
+
+. 
+. display _newline "--- Descriptivos de los efectos predichos (BLUP, imputación 1) ---"
+
+--- Descriptivos de los efectos predichos (BLUP, imputación 1) ---
+
+. summarize b_int b_pend se_int se_pend
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+       b_int |        437   -1.87e-09     10.1226  -34.90036   48.52331
+      b_pend |        437    2.75e-16    .2126339  -.6013417   .7462805
+      se_int |        437    5.925259    1.020604   4.295169   10.88007
+     se_pend |        437    .2613388      .04407   .1319761   .3367711
+
+. correlate b_int b_pend
+(obs=437)
+
+             |    b_int   b_pend
+-------------+------------------
+       b_int |   1.0000
+      b_pend |   0.5590   1.0000
+
+
+. 
+. *------------------------------------------------------------------------------
+. * [3] FIGURA 6: interceptos de sede ordenados
+. *     Mismas opciones que el bloque [6] del 09: banda gris, línea negra,
+. *     yline(0) discontinua, sin leyenda y sin título dentro de la imagen.
+. *------------------------------------------------------------------------------
+. sort b_int
+
+. generate long rango = _n
+
+. generate double lo = b_int - 1.96*se_int
+
+. generate double hi = b_int + 1.96*se_int
+
+. 
+. twoway (rarea lo hi rango, color(gs13))                                      ///
+>        (line b_int rango, lcolor(black)),                                    ///
+>     yline(0, lpattern(dash) lcolor(gs8))                                     ///
+>     legend(off)                                                              ///
+>     ytitle("Efecto aleatorio de la sede (puntos)")                           ///
+>     xtitle("Sedes ordenadas por su efecto estimado")                         ///
+>     xsize(5.9) ysize(4.1)                                                    ///
+>     name(g_caterpillar, replace)
+
+. graph export "Fig6_efectos_sede_C6_`f'.png", replace width(2000)
+(file Fig6_efectos_sede_C6_20261013.png not found)
+file Fig6_efectos_sede_C6_20261013.png saved as PNG format
+
+. 
+. display _newline "--- Sedes con mayor efecto positivo ---"
+
+--- Sedes con mayor efecto positivo ---
+
+. gsort -b_int
+
+. list sede_id b_int in 1/5, clean noobs
+
+    sede_id      b_int  
+         90   48.52331  
+         10    37.0617  
+        233    33.0955  
+         86    27.3883  
+         64   26.11469  
+
+. display _newline "--- Sedes con mayor efecto negativo ---"
+
+--- Sedes con mayor efecto negativo ---
+
+. sort b_int
+
+. list sede_id b_int in 1/5, clean noobs
+
+    sede_id       b_int  
+        427   -34.90036  
+        424   -26.33214  
+        400   -25.58949  
+        125   -22.94623  
+        362   -21.75519  
+
+. 
+. *------------------------------------------------------------------------------
+. * [4] FIGURA 7: intercepto frente a pendiente
+. *     Orientación del informe: intercepto en Y, pendiente en X.
+. *     Se exportan dos versiones; elija una sola para el documento.
+. *------------------------------------------------------------------------------
+. 
+. * (a) Versión idéntica a la del informe actual: un solo color, sin leyenda.
+. twoway (scatter b_int b_pend, msymbol(oh) mcolor(gs6))                       ///
+>        (lfit b_int b_pend, lcolor(black)),                                   ///
+>     legend(off)                                                              ///
+>     ytitle("Intercepto de la sede")                                          ///
+>     xtitle("Pendiente socioeconómica de la sede")                            ///
+>     xsize(5.9) ysize(4.1)                                                    ///
+>     name(g_grad_sincolor, replace)
+
+. graph export "Fig7_int_pend_C6_sincolor_`f'.png", replace width(2000)
+(file Fig7_int_pend_C6_sincolor_20261013.png not found)
+file Fig7_int_pend_C6_sincolor_20261013.png saved as PNG format
+
+. 
+. * (b) Versión distinguiendo zona. La diferencia entre sedes rurales y urbanas
+. *     es el resultado nuevo de C6, de modo que aquí la leyenda sí aporta.
+. twoway (scatter b_int b_pend if rural <  0.5, msymbol(oh) mcolor(gs6))       ///
+>        (scatter b_int b_pend if rural >= 0.5, msymbol(th) mcolor(gs10))      ///
+>        (lfit b_int b_pend, lcolor(black)),                                   ///
+>     legend(order(1 "Urbana" 2 "Rural") rows(1) size(small) region(lstyle(none))) ///
+>     ytitle("Intercepto de la sede")                                          ///
+>     xtitle("Pendiente socioeconómica de la sede")                            ///
+>     xsize(5.9) ysize(4.1)                                                    ///
+>     name(g_grad_color, replace)
+
+. graph export "Fig7_int_pend_C6_`f'.png", replace width(2000)
+(file Fig7_int_pend_C6_20261013.png not found)
+file Fig7_int_pend_C6_20261013.png saved as PNG format
+
+. 
+. display _newline "--- Correlación de los efectos predichos, por zona ---"
+
+--- Correlación de los efectos predichos, por zona ---
+
+. correlate b_int b_pend
+(obs=437)
+
+             |    b_int   b_pend
+-------------+------------------
+       b_int |   1.0000
+      b_pend |   0.5590   1.0000
+
+
+. foreach z in 0 1 {
+  2.     display _newline "rural = `z':"
+  3.     capture noisily correlate b_int b_pend if (rural >= 0.5) == `z'
+  4. }
+
+rural = 0:
+(obs=113)
+
+             |    b_int   b_pend
+-------------+------------------
+       b_int |   1.0000
+      b_pend |   0.4135   1.0000
+
+
+rural = 1:
+(obs=324)
+
+             |    b_int   b_pend
+-------------+------------------
+       b_int |   1.0000
+      b_pend |   0.6566   1.0000
+
+
+. 
+. display _newline "Fin: " c(current_date) " " c(current_time)
+
+Fin: 13 Oct 2026 19:31:22
+
+. log close fase15c
+      name:  fase15c
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_15c_figuras_20261013_19
+> 30.log
+  log type:  text
+ closed on:  13 Oct 2026, 19:31:22
+---------------------------------------------------------------------------------------------

@@ -1,0 +1,416 @@
+---------------------------------------------------------------------------------------------
+      name:  fase17
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_17_diagnosticos_C7_2026
+> 1029b.log
+  log type:  text
+ opened on:  29 Oct 2026, 09:50:48
+
+. display "Tarea: `tarea'   salida: `hoy'   " c(current_date) " " c(current_time)
+Tarea: 17_diagnosticos_C7   salida: 20261029b   29 Oct 2026 09:50:48
+
+. 
+. timer clear
+
+. timer on 1
+
+. 
+. set scheme s1mono
+
+. 
+. global v_n1 mujer edad repitente lectura_30min libros_26omas ///
+>             trabaja_mas20 internet_hogar computador_hogar
+
+. global v_n2 ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>             dotacion_tic rural ju_unica tecnico tecnico_academico ///
+>             cole_femenino
+
+. global v_mun tasa_homicidios_bar tasa_homicidios_dev ln_coca_bar ///
+>              ln_coca_dev ln_inversion_pc_bar ln_inversion_pc_dev
+
+. 
+. 
+. ********************************************************************************
+. * [1] LOS 29 MUNICIPIO-ANO SIN REGISTRO DE HOMICIDIOS (sin cambios; apagado)
+. ********************************************************************************
+. if `hacer_ceros' == 1 {
+.     display _newline(2) "{hline 78}"
+.     display "[1] MUNICIPIO-ANO SIN REGISTRO DE HOMICIDIOS"
+.     display "{hline 78}"
+. 
+.     use "N3_Municipios_PCA.dta", clear
+.     xtset cole_cod_mcpio_ubicacion year
+.     quietly count if homicidios == 0
+.     display "  Municipio-ano con homicidios == 0: " r(N) " (esperados: 29)"
+.     quietly xtsum tasa_homicidios
+.     scalar sdw_con = r(sd_w)
+.     quietly xtsum tasa_homicidios if homicidios > 0
+.     scalar sdw_sin = r(sd_w)
+.     display "  DE dentro con ceros " %9.4f sdw_con "  sin ceros " %9.4f sdw_sin ///
+>             "  cambio " %6.2f 100*(sdw_sin - sdw_con)/sdw_con " %"
+.     display "  Detalle completo: log_17_diagnosticos_C7_20261022.log, bloque [1]."
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [2] ML3b SOBRE LA PRIMERA IMPUTACION Y COLA INFERIOR DE LA FIGURA 8
+. ********************************************************************************
+. if `hacer_cola' == 1 | `hacer_figuras' == 1 {
+. 
+.     display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+.     display "[2] ML3b SOBRE LA IMPUTACION 1 Y EFECTOS PREDICHOS"
+[2] ML3b SOBRE LA IMPUTACION 1 Y EFECTOS PREDICHOS
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     use "Base_Estimacion.dta", clear
+.     mi extract 1, clear
+. 
+.     capture drop mcpio_anio sede_anio
+.     egen long mcpio_anio = group(cole_cod_mcpio_ubicacion year)
+.     egen long sede_anio  = group(cole_cod_dane_sede year)
+. 
+.     * Misma especificacion que el bloque [3.2] del 14 (ML3b, cuatro
+.     * componentes, REML)
+.     timer on 2
+.     mixed punt_global c_inse $v_n1 $v_n2 $v_mun ib2018.year              ///
+>         || mcpio_id: || mcpio_id: R.year                                 ///
+>         || sede_id: || sede_anio: , reml
+
+Performing EM optimization ...
+
+Performing gradient-based optimization: 
+Iteration 0:   log restricted-likelihood =    -346676  
+Iteration 1:   log restricted-likelihood = -346674.76  
+Iteration 2:   log restricted-likelihood = -346674.75  
+
+Computing standard errors ...
+
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Wald chi2(30)     =    7370.92
+Log restricted-likelihood = -346674.75          Prob > chi2       =     0.0000
+
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+               c_inse |   .2831854   .0265972    10.65   0.000     .2310559     .335315
+                mujer |  -8.227366    .276517   -29.75   0.000     -8.76933   -7.685403
+                 edad |  -7.475618   .1240339   -60.27   0.000     -7.71872   -7.232516
+            repitente |   5.929199   .4163067    14.24   0.000     5.113253    6.745145
+        lectura_30min |   6.823822     .28094    24.29   0.000      6.27319    7.374454
+        libros_26omas |   5.383882   .3749661    14.36   0.000     4.648961    6.118802
+        trabaja_mas20 |  -3.222239   .6889508    -4.68   0.000    -4.572558    -1.87192
+       internet_hogar |   .2577185   .3673112     0.70   0.483    -.4621983    .9776353
+     computador_hogar |   .5073803   .3542991     1.43   0.152    -.1870332    1.201794
+         ln_matricula |   5.252609   1.032697     5.09   0.000     3.228559    7.276658
+ratio_alumnos_docente |  -.0919124    .079113    -1.16   0.245     -.246971    .0631462
+           pct_planta |   9.502558   1.665042     5.71   0.000     6.239135    12.76598
+           z_posgrado |   .0470362   .2015717     0.23   0.815    -.3480371    .4421095
+         dotacion_tic |   1.625904   1.662913     0.98   0.328    -1.633345    4.885153
+                rural |  -10.72648   1.789492    -5.99   0.000    -14.23382   -7.219138
+             ju_unica |    .287567    .824514     0.35   0.727    -1.328451    1.903585
+              tecnico |    -.82494   1.308627    -0.63   0.528    -3.389802    1.739922
+    tecnico_academico |  -5.787893   2.373707    -2.44   0.015    -10.44027   -1.135513
+        cole_femenino |   35.90418   5.556342     6.46   0.000     25.01395    46.79441
+  tasa_homicidios_bar |   .0015349   .0662796     0.02   0.982    -.1283708    .1314405
+  tasa_homicidios_dev |  -.0086687   .0097111    -0.89   0.372    -.0277021    .0103647
+          ln_coca_bar |  -1.047362   .8147195    -1.29   0.199    -2.644183    .5494588
+          ln_coca_dev |  -.0573504    .263159    -0.22   0.827    -.5731326    .4584318
+  ln_inversion_pc_bar |  -.5104114   3.106504    -0.16   0.869    -6.599047    5.578224
+  ln_inversion_pc_dev |   2.811711   1.611123     1.75   0.081     -.346033    5.969454
+                      |
+                 year |
+                2019  |  -4.783628   .7846335    -6.10   0.000    -6.321481   -3.245774
+                2020  |  -3.344376   .8446978    -3.96   0.000    -4.999954   -1.688799
+                2021  |  -7.658418    .861362    -8.89   0.000    -9.346656   -5.970179
+                2022  |   -3.18307   .9092922    -3.50   0.000     -4.96525    -1.40089
+                2023  |   .1627711   .9958652     0.16   0.870    -1.789089    2.114631
+                      |
+                _cons |   329.7747   36.46668     9.04   0.000     258.3014    401.2481
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  var(_cons) |   188.3901   49.20322      112.9129    314.3205
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                 var(R.year) |   3.138899   1.160861      1.520467     6.48004
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                  var(_cons) |   127.3776   10.78365      107.9025    150.3678
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                  var(_cons) |   21.59938   2.118565       17.8218    26.17767
+-----------------------------+------------------------------------------------
+               var(Residual) |   1180.667    6.40926      1168.172    1193.296
+------------------------------------------------------------------------------
+LR test vs. linear model: chi2(4) = 12395.92              Prob > chi2 = 0.0000
+
+Note: LR test is conservative and provided only for reference.
+.     timer off 2
+.     estimates save "ML3b_m1_diag_`hoy'.ster"
+file ML3b_m1_diag_20261029b.ster saved
+. 
+.     display _newline "--- Control: varianzas (Anexo H: 188,390 / 3,139 / 127,378 / 21,599 /
+>  1.180,667) ---"
+
+--- Control: varianzas (Anexo H: 188,390 / 3,139 / 127,378 / 21,599 / 1.180,667) ---
+.     display "  municipio     " %10.3f exp(2*_b[lns1_1_1:_cons])
+  municipio        188.390
+.     display "  municipio-ano " %10.3f exp(2*_b[lns1_2_1:_cons])
+  municipio-ano      3.139
+.     display "  sede          " %10.3f exp(2*_b[lns2_1_1:_cons])
+  sede             127.378
+.     display "  sede-ano      " %10.3f exp(2*_b[lns3_1_1:_cons])
+  sede-ano          21.599
+.     display "  residual      " %10.3f exp(2*_b[lnsig_e:_cons])
+  residual        1180.667
+. 
+.     * Cuatro ecuaciones aleatorias: municipio, municipio-ano, sede y sede-ano
+.     timer on 3
+.     predict double re_mcpio re_mcpio_anio re_sede re_sede_anio, reffects
+.     predict double res, residuals
+.     timer off 3
+. 
+.     * VERIFICACION DEL ORDEN: cada efecto debe ser constante en su nivel
+.     display _newline "--- Orden de los efectos predichos ---"
+
+--- Orden de los efectos predichos ---
+.     bysort mcpio_id: egen double _sd1 = sd(re_mcpio)
+.     quietly count if _sd1 > 1e-8 & !missing(_sd1)
+.     display "  Municipios con re_mcpio no constante: " r(N) " (debe ser 0)"
+  Municipios con re_mcpio no constante: 0 (debe ser 0)
+.     assert r(N) == 0
+.     bysort sede_anio: egen double _sd4 = sd(re_sede_anio)
+(13 missing values generated)
+.     quietly count if _sd4 > 1e-8 & !missing(_sd4)
+.     display "  Sede-ano con re_sede_anio no constante: " r(N) " (debe ser 0)"
+  Sede-ano con re_sede_anio no constante: 0 (debe ser 0)
+.     assert r(N) == 0
+.     drop _sd1 _sd4
+. 
+.     capture drop _tm _tsa
+.     egen byte _tm  = tag(mcpio_id)
+.     egen byte _tsa = tag(sede_anio)
+. 
+.     display _newline "--- Desviacion estandar residual por ano (control: Tabla 45) ---"
+
+--- Desviacion estandar residual por ano (control: Tabla 45) ---
+.     tabstat res, by(year) stat(n mean sd) format(%9.3f)
+
+Summary for variables: res
+Group variable: year (Año de presentación de la prueba)
+
+    year |         N      Mean        SD
+---------+------------------------------
+    2018 | 11456.000    -0.000    33.143
+    2019 | 11487.000    -0.000    33.913
+    2020 | 10992.000    -0.000    32.265
+    2021 | 11652.000    -0.000    34.322
+    2022 | 11797.000    -0.000    34.950
+    2023 | 12366.000    -0.000    35.711
+---------+------------------------------
+   Total | 69750.000    -0.000    34.107
+----------------------------------------
+. }
+
+. 
+. if `hacer_cola' == 1 {
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "COLA INFERIOR DE LA FIGURA 8"
+COLA INFERIOR DE LA FIGURA 8
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+.     preserve
+.         keep if _tm == 1
+(69,708 observations deleted)
+.         gsort re_mcpio
+.         display _newline "--- Municipios por debajo de -13 ---"
+
+--- Municipios por debajo de -13 ---
+.         list cole_cod_mcpio_ubicacion re_mcpio indice_vuln if re_mcpio < -13, ///
+>             clean noobs abbreviate(24)
+
+    cole_cod_mcpio_ubicacion     re_mcpio   indice_vuln  
+                       19573   -26.547738     .14950141  
+                       19418   -24.914203     .45487253  
+                       19318   -23.015214     .22991264  
+                       19809   -22.488061     .13284375  
+                       19513   -21.130705    -.74372565  
+                       19300   -19.761287    -.12607262  
+                       19845   -16.920495    -.22418649  
+                       19821   -13.734246     -.7405731  
+.         quietly count if re_mcpio < -13
+.         display "  Son " r(N) " (C5 leyo ocho sobre el grafico)"
+  Son 8 (C5 leyo ocho sobre el grafico)
+. 
+.         display _newline "--- Los ocho mas bajos ---"
+
+--- Los ocho mas bajos ---
+.         list cole_cod_mcpio_ubicacion re_mcpio indice_vuln in 1/8, ///
+>             clean noobs abbreviate(24)
+
+    cole_cod_mcpio_ubicacion     re_mcpio   indice_vuln  
+                       19573   -26.547738     .14950141  
+                       19418   -24.914203     .45487253  
+                       19318   -23.015214     .22991264  
+                       19809   -22.488061     .13284375  
+                       19513   -21.130705    -.74372565  
+                       19300   -19.761287    -.12607262  
+                       19845   -16.920495    -.22418649  
+                       19821   -13.734246     -.7405731  
+. 
+.         display _newline "--- Los seis mas altos, para contraste ---"
+
+--- Los seis mas altos, para contraste ---
+.         gsort -re_mcpio
+.         list cole_cod_mcpio_ubicacion re_mcpio indice_vuln in 1/6, ///
+>             clean noobs abbreviate(24)
+
+    cole_cod_mcpio_ubicacion    re_mcpio   indice_vuln  
+                       19001   17.431342    -.07729946  
+                       19701   15.326583    -1.7987656  
+                       19256   14.881759     1.0826402  
+                       19392   13.403962    -1.0937666  
+                       19050   13.331357     .36252613  
+                       19075   13.107976     .04883723  
+. 
+.         display _newline "--- Relacion con el indice de vulnerabilidad ---"
+
+--- Relacion con el indice de vulnerabilidad ---
+.         quietly correlate re_mcpio indice_vuln
+.         display "  Correlacion efecto del municipio e indice: " %7.4f r(rho)
+  Correlacion efecto del municipio e indice: -0.1017
+.         quietly count
+.         display "  Municipios: " r(N) " (esperados: 42)"
+  Municipios: 42 (esperados: 42)
+.         summarize re_mcpio, detail
+
+                BLUP r.e. for mcpio_id: _cons
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -26.54774      -26.54774
+ 5%    -23.01521       -24.9142
+10%     -21.1307      -23.01521       Obs                  42
+25%    -7.296427      -22.48806       Sum of wgt.          42
+
+50%     3.255347                      Mean           5.84e-13
+                        Largest       Std. dev.      12.47532
+75%     10.29374       13.40396
+90%     13.33136       14.88176       Variance       155.6336
+95%     14.88176       15.32658       Skewness      -.6929193
+99%     17.43134       17.43134       Kurtosis       2.379283
+.     restore
+.     display _newline "LECTURA: descriptiva. Los efectos predichos estan encogidos hacia"
+
+LECTURA: descriptiva. Los efectos predichos estan encogidos hacia
+.     display "la media; el grafico es indicativo, no un contraste."
+la media; el grafico es indicativo, no un contraste.
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [3] FIGURAS 8 A 10 CON ROTULOS EN ESPANOL
+. ********************************************************************************
+. if `hacer_figuras' == 1 {
+.     display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+.     display "[3] FIGURAS 8 A 10"
+[3] FIGURAS 8 A 10
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     set dp comma
+. 
+.     * Figura 8: efectos predichos del municipio (42 puntos)
+.     qnorm re_mcpio if _tm == 1,                                           ///
+>         msymbol(O) mcolor(gs6) rlopts(lcolor(black))                       ///
+>         ytitle("Efecto predicho del municipio (puntos)")                   ///
+>         xtitle("Cuantiles de la distribución normal")                      ///
+>         ylabel(, angle(horizontal) format(%9.0f)) xlabel(, format(%9.0f))  ///
+>         title("") xsize(5.9) ysize(4.1) name(g_qq_m, replace)
+.     graph export "Fig8_qq_municipio_`hoy'.png", width(2000)
+file Fig8_qq_municipio_20261029b.png saved as PNG format
+. 
+.     * Figura 9: efectos predichos de la cohorte de sede (2.447 puntos)
+.     qnorm re_sede_anio if _tsa == 1,                                      ///
+>         msymbol(o) mcolor(gs6) rlopts(lcolor(black))                       ///
+>         ytitle("Efecto predicho de la cohorte de sede (puntos)")           ///
+>         xtitle("Cuantiles de la distribución normal")                      ///
+>         ylabel(, angle(horizontal) format(%9.0f)) xlabel(, format(%9.0f))  ///
+>         title("") xsize(5.9) ysize(4.1) name(g_qq_sa, replace)
+.     graph export "Fig9_qq_sede_anio_`hoy'.png", width(2000)
+file Fig9_qq_sede_anio_20261029b.png saved as PNG format
+. 
+.     * Figura 10: residuos individuales (69.750 puntos)
+.     qnorm res,                                                            ///
+>         msymbol(p) mcolor(gs6) rlopts(lcolor(black))                       ///
+>         ytitle("Residuo individual (puntos)")                              ///
+>         xtitle("Cuantiles de la distribución normal")                      ///
+>         ylabel(, angle(horizontal) format(%9.0f)) xlabel(, format(%9.0f))  ///
+>         title("") xsize(5.9) ysize(4.1) name(g_qq_r, replace)
+.     graph export "Fig10_qq_residuos_`hoy'.png", width(2000)
+file Fig10_qq_residuos_20261029b.png saved as PNG format
+. 
+.     set dp period
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [4] CIERRE
+. ********************************************************************************
+. timer off 1
+
+. display _newline "--- Tiempos: 1 total, 2 estimacion, 3 predict ---"
+
+--- Tiempos: 1 total, 2 estimacion, 3 predict ---
+
+. timer list
+   1:    184.09 /        1 =     184.0910
+   2:    145.10 /        1 =     145.1030
+   3:     18.60 /        1 =      18.5990
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "17 v2 TERMINADO. Comparar las varianzas con el Anexo H antes de usar"
+17 v2 TERMINADO. Comparar las varianzas con el Anexo H antes de usar
+
+. display "las figuras. Si coinciden, sustituir las Figuras 8 a 10 del informe."
+las figuras. Si coinciden, sustituir las Figuras 8 a 10 del informe.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase17
+      name:  fase17
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_17_diagnosticos_C7_2026
+> 1029b.log
+  log type:  text
+ closed on:  29 Oct 2026, 09:53:52
+---------------------------------------------------------------------------------------------

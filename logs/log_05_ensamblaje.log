@@ -1,0 +1,684 @@
+---------------------------------------------------------------------------------------------
+      name:  fase5
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_05_ensamblaje.log
+  log type:  text
+ opened on:  21 Aug 2026, 22:20:33
+
+. 
+. 
+. ********************************************************************************
+. * [1] BASE DE ESTUDIANTES (NIVEL 1)
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[1] BASE DE ESTUDIANTES"
+[1] BASE DE ESTUDIANTES
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "N1_Saber11_2018_2023.dta", clear
+
+. 
+. quietly count
+
+. display "Estudiantes: " r(N)
+Estudiantes: 69750
+
+. display _newline "--- Distribución por año ---"
+
+--- Distribución por año ---
+
+. tabulate year, missing
+
+     Año de |
+ presentaci |
+   ón de la |
+     prueba |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       2018 |     11,456       16.42       16.42
+       2019 |     11,487       16.47       32.89
+       2020 |     10,992       15.76       48.65
+       2021 |     11,652       16.71       65.36
+       2022 |     11,797       16.91       82.27
+       2023 |     12,366       17.73      100.00
+------------+-----------------------------------
+      Total |     69,750      100.00
+
+. 
+. * ----------------------------------------------------------------------
+. * [1.1] LIMPIEZA DE COLUMNAS QUE COLISIONARÍAN CON EL MERGE
+. * ----------------------------------------------------------------------
+. * Atributos de sede a nivel de estudiante: se generaron en el 01 solo para
+. * poder construir el esqueleto de sede-año. Ya cumplieron su función.
+. foreach v in rural cole_femenino cole_masculino tecnico mixto ///
+>              sede_principal ju_unica ju_completa                ///
+>              inse_prom_sede evaluados_sede {
+  2.     capture drop `v'
+  3. }
+
+. 
+. * Marcadores y auxiliares que se recrean más adelante.
+. foreach v in tag_sede tag_mcpio sede_id mcpio_id n2_incompleto {
+  2.     capture drop `v'
+  3. }
+
+. 
+. display _newline "Columnas conflictivas eliminadas."
+
+Columnas conflictivas eliminadas.
+
+. display "Los atributos de sede vendrán del panel de sedes, no del estudiante."
+Los atributos de sede vendrán del panel de sedes, no del estudiante.
+
+. 
+. 
+. ********************************************************************************
+. * [2] CRUCE CON EL NIVEL 2
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[2] CRUCE CON EL PANEL DE SEDES"
+[2] CRUCE CON EL PANEL DE SEDES
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. merge m:1 cole_cod_dane_sede year using "N2_Sedes_2018_2023.dta", ///
+>     generate(_m_n2)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                            69,750  (_m_n2==3)
+    -----------------------------------------
+
+. 
+. display _newline "--- Resultado del cruce ---"
+
+--- Resultado del cruce ---
+
+. display "  1 = estudiante sin sede en el panel  <- no debería existir"
+  1 = estudiante sin sede en el panel  <- no debería existir
+
+. display "  2 = sede-año sin estudiantes         <- no debería existir"
+  2 = sede-año sin estudiantes         <- no debería existir
+
+. display "  3 = cruce exitoso"
+  3 = cruce exitoso
+
+. tabulate _m_n2
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+            Matched (3) |     69,750      100.00      100.00
+------------------------+-----------------------------------
+                  Total |     69,750      100.00
+
+. 
+. quietly count if _m_n2 == 1
+
+. if r(N) > 0 {
+.     display as error "ATENCIÓN: hay estudiantes sin su sede-año en el panel."
+.     display as error "Revisar el formato de cole_cod_dane_sede en ambas bases."
+.     list cole_cod_dane_sede year if _m_n2 == 1 in 1/20, clean noobs
+. }
+
+. 
+. assert _m_n2 == 3
+
+. display _newline "Verificado: los " _N " estudiantes encontraron su sede-año."
+
+Verificado: los 69750 estudiantes encontraron su sede-año.
+
+. drop _m_n2
+
+. 
+. * ----------------------------------------------------------------------
+. * [2.1] VERIFICACIÓN DE PRERREQUISITO
+. * ----------------------------------------------------------------------
+. * z_posgrado solo existe si el panel de sedes se construyó con la versión 2 del
+. * script 03. Sin ella, la formación docente entraría al modelo con la variable
+. * cruda, que no es comparable entre años.
+. capture confirm variable z_posgrado
+
+. if _rc != 0 {
+.     display as error "{hline 78}"
+.     display as error "ERROR: N2_Sedes_2018_2023.dta no contiene z_posgrado."
+.     display as error "Ese archivo viene de la PRIMERA versión del script 03."
+.     display as error "Vuelva a correr 03_panel_tic_N2_v2.do y repita este script."
+.     display as error "{hline 78}"
+.     log close fase5
+.     exit 111
+. }
+
+. display "Verificado: z_posgrado presente (panel de sedes construido con 03 v2)."
+Verificado: z_posgrado presente (panel de sedes construido con 03 v2).
+
+. 
+. 
+. ********************************************************************************
+. * [3] CRUCE CON EL NIVEL 3
+. ********************************************************************************
+. * Recordatorio: en el panel municipal `year` es el año de la COHORTE y los
+. * datos corresponden a `year - 1`. El rezago ya está aplicado, así que aquí se
+. * cruza directamente por año de cohorte.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[3] CRUCE CON EL PANEL MUNICIPAL"
+[3] CRUCE CON EL PANEL MUNICIPAL
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. merge m:1 cole_cod_mcpio_ubicacion year using "N3_Municipios_2018_2023.dta", ///
+>     generate(_m_n3)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                            69,750  (_m_n3==3)
+    -----------------------------------------
+
+. 
+. display _newline "--- Resultado del cruce ---"
+
+--- Resultado del cruce ---
+
+. tabulate _m_n3
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+            Matched (3) |     69,750      100.00      100.00
+------------------------+-----------------------------------
+                  Total |     69,750      100.00
+
+. 
+. quietly count if _m_n3 == 1
+
+. if r(N) > 0 {
+.     display as error "ATENCIÓN: hay estudiantes sin su municipio-año."
+.     tabulate cole_cod_mcpio_ubicacion if _m_n3 == 1
+. }
+
+. 
+. assert _m_n3 == 3
+
+. display _newline "Verificado: todos los estudiantes encontraron su municipio-año."
+
+Verificado: todos los estudiantes encontraron su municipio-año.
+
+. drop _m_n3
+
+. 
+. * Confirmación del rezago: cada año de cohorte debe traer el dato del año
+. * anterior. Si esto falla, el desplazamiento temporal se perdió en algún punto.
+. assert year_dato == year - 1
+
+. display "Verificado: el rezago de un período está intacto."
+Verificado: el rezago de un período está intacto.
+
+. 
+. 
+. ********************************************************************************
+. * [4] INTEGRIDAD DE LA ESTRUCTURA JERÁRQUICA
+. ********************************************************************************
+. * Un modelo de tres niveles exige anidamiento estricto: cada estudiante en una
+. * sede, cada sede en un municipio. Si una sede apareciera en dos municipios, la
+. * estructura sería cruzada y no jerárquica, y `mixed` estimaría algo distinto
+. * de lo que dice el marco teórico.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[4] VERIFICACIÓN DE LA ESTRUCTURA JERÁRQUICA"
+[4] VERIFICACIÓN DE LA ESTRUCTURA JERÁRQUICA
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. preserve
+
+.     keep cole_cod_dane_sede cole_cod_mcpio_ubicacion
+
+.     duplicates drop
+
+Duplicates in terms of all variables
+
+(69,313 observations deleted)
+
+.     quietly duplicates tag cole_cod_dane_sede, generate(_sede_multi)
+
+.     quietly count if _sede_multi > 0
+
+.     display "Sedes asignadas a más de un municipio: " r(N) " (debe ser 0)"
+Sedes asignadas a más de un municipio: 0 (debe ser 0)
+
+.     assert _sede_multi == 0
+
+. restore
+
+. 
+. * Identificadores numéricos consecutivos. `mixed` los necesita numéricos y el
+. * código DANE de la sede es una cadena.
+. egen long sede_id  = group(cole_cod_dane_sede)
+
+. egen long mcpio_id = group(cole_cod_mcpio_ubicacion)
+
+. label variable sede_id  "Identificador numérico de la sede (Nivel 2)"
+
+. label variable mcpio_id "Identificador numérico del municipio (Nivel 3)"
+
+. 
+. display _newline "--- Tamaño de cada nivel ---"
+
+--- Tamaño de cada nivel ---
+
+. quietly summarize sede_id
+
+. display "Sedes distintas: " r(max)
+Sedes distintas: 437
+
+. quietly summarize mcpio_id
+
+. display "Municipios distintos: " r(max)
+Municipios distintos: 42
+
+. 
+. egen byte tag_sede  = tag(sede_id year)
+
+. egen byte tag_mcpio = tag(mcpio_id year)
+
+. label variable tag_sede  "Marca una fila por sede-año"
+
+. label variable tag_mcpio "Marca una fila por municipio-año"
+
+. 
+. quietly count if tag_sede == 1
+
+. display "Sede-año: " r(N)
+Sede-año: 2447
+
+. quietly count if tag_mcpio == 1
+
+. display "Municipio-año: " r(N)
+Municipio-año: 252
+
+. 
+. display _newline "--- Estudiantes por sede-año ---"
+
+--- Estudiantes por sede-año ---
+
+. preserve
+
+.     quietly keep if tag_sede == 1
+
+.     tabstat evaluados_sede, by(year) stat(n mean sd p10 p50 p90 min max) ///
+>         format(%9.1f)
+
+Summary for variables: evaluados_sede
+Group variable: year (Año de presentación de la prueba)
+
+    year |         N      Mean        SD       p10       p50       p90       Min       Max
+---------+--------------------------------------------------------------------------------
+    2018 |     388.0      29.5      27.4       7.0      20.0      66.0       1.0     148.0
+    2019 |     399.0      28.8      26.9       7.0      20.0      62.0       2.0     187.0
+    2020 |     406.0      27.1      26.5       6.0      18.0      59.0       1.0     202.0
+    2021 |     416.0      28.0      27.4       7.0      19.0      64.0       1.0     191.0
+    2022 |     417.0      28.3      26.9       7.0      18.0      66.0       1.0     185.0
+    2023 |     421.0      29.4      28.4       6.0      18.0      68.0       1.0     197.0
+---------+--------------------------------------------------------------------------------
+   Total |    2447.0      28.5      27.2       7.0      19.0      64.0       1.0     202.0
+------------------------------------------------------------------------------------------
+
+. restore
+
+. 
+. * Grupos con un solo estudiante aportan poco a la estimación de la varianza de
+. * sede. Se cuentan para poder declararlo en la metodología.
+. quietly count if tag_sede == 1 & evaluados_sede == 1
+
+. display _newline "Sede-año con un solo estudiante evaluado: " r(N)
+
+Sede-año con un solo estudiante evaluado: 13
+
+. quietly count if tag_sede == 1 & evaluados_sede < 5
+
+. display "Sede-año con menos de 5 estudiantes: " r(N)
+Sede-año con menos de 5 estudiantes: 121
+
+. 
+. 
+. ********************************************************************************
+. * [5] PANEL DE CONTROL DE LA BASE CONSOLIDADA
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[5] PANEL DE CONTROL"
+[5] PANEL DE CONTROL
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. display _newline "--- NIVEL 1: variable dependiente y covariables ---"
+
+--- NIVEL 1: variable dependiente y covariables ---
+
+. tabstat punt_global estu_inse_individual edad mujer repitente, ///
+>         by(year) stat(n mean sd) format(%9.4f)
+
+Summary statistics: N, Mean, SD
+Group variable: year (Año de presentación de la prueba)
+
+    year |  punt_g~l  estu_i~l      edad     mujer  repite~e
+---------+--------------------------------------------------
+    2018 |  1.15e+04  1.10e+04  1.15e+04  1.15e+04  1.15e+04
+         |  235.4713   42.9437   16.9453    0.5639    0.1623
+         |   45.3886    8.7134    1.1802    0.4959    0.3687
+---------+--------------------------------------------------
+    2019 |  1.15e+04  1.11e+04  1.15e+04  1.15e+04  1.15e+04
+         |  230.5352   43.3719   16.9005    0.5541    0.1253
+         |   46.7042    8.7696    1.1494    0.4971    0.3310
+---------+--------------------------------------------------
+    2020 |  1.10e+04  1.06e+04  1.10e+04  1.10e+04  1.10e+04
+         |  230.7022   44.5750   17.0966    0.5756    0.1428
+         |   43.9023    8.7950    1.1210    0.4943    0.3499
+---------+--------------------------------------------------
+    2021 |  1.17e+04  1.12e+04  1.17e+04  1.17e+04  1.17e+04
+         |  226.8585   44.5692   16.8569    0.5705    0.1347
+         |   44.7844    8.7989    1.1227    0.4950    0.3414
+---------+--------------------------------------------------
+    2022 |  1.18e+04  1.11e+04  1.18e+04  1.18e+04  1.18e+04
+         |  231.7224   44.5377   16.8486    0.5738    0.1171
+         |   47.0641    8.4871    1.1101    0.4945    0.3216
+---------+--------------------------------------------------
+    2023 |  1.24e+04  1.15e+04  1.24e+04  1.24e+04  1.24e+04
+         |  236.3955   44.5914   16.6994    0.5642    0.1074
+         |   47.0542    7.9498    1.1046    0.4959    0.3096
+---------+--------------------------------------------------
+   Total |  6.98e+04  6.65e+04  6.98e+04  6.97e+04  6.98e+04
+         |  231.9978   44.1003   16.8871    0.5670    0.1311
+         |   45.9767    8.6123    1.1374    0.4955    0.3376
+------------------------------------------------------------
+
+. 
+. display _newline "--- NIVEL 1: valores perdidos antes de MICE ---"
+
+--- NIVEL 1: valores perdidos antes de MICE ---
+
+. tabstat inse_miss mujer_miss trabaja_mas20_miss lectura_30min_miss ///
+>         libros_26omas_miss internet_miss compu_miss, ///
+>         by(year) stat(mean) format(%9.4f)
+
+Summary statistics: Mean
+Group variable: year (Año de presentación de la prueba)
+
+    year |  inse_m~s  mujer_~s  trabaj~s  lectur~s  libro~ss  intern~s  compu_~s
+---------+----------------------------------------------------------------------
+    2018 |    0.0404    0.0000    0.0429    0.0845    0.1191    0.0828    0.0421
+    2019 |    0.0347    0.0002    0.0350    0.0696    0.1045    0.0661    0.0338
+    2020 |    0.0338    0.0000    0.0413    0.0346    0.0344    0.0332    0.0488
+    2021 |    0.0397    0.0000    0.0399    0.0780    0.1135    0.0773    0.0420
+    2022 |    0.0557    0.0000    0.0573    0.0843    0.1210    0.0833    0.0572
+    2023 |    0.0724    0.0000    0.0712    0.1117    0.1216    0.1104    0.0699
+---------+----------------------------------------------------------------------
+   Total |    0.0466    0.0000    0.0483    0.0779    0.1032    0.0763    0.0492
+--------------------------------------------------------------------------------
+
+. 
+. display _newline "--- NIVEL 2: variables de sede (una fila por sede-año) ---"
+
+--- NIVEL 2: variables de sede (una fila por sede-año) ---
+
+. tabstat ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>         dotacion_tic rural ju_unica tecnico if tag_sede == 1, ///
+>         by(year) stat(n mean sd) format(%9.4f)
+
+Summary statistics: N, Mean, SD
+Group variable: year (Año de presentación de la prueba)
+
+    year |  ln_mat~a  ratio_~e  pct_pl~a  z_posg~o  dotaci~c     rural  ju_unica   tecnico
+---------+--------------------------------------------------------------------------------
+    2018 |  385.0000  385.0000  385.0000  385.0000  364.0000  388.0000  388.0000  383.0000
+         |    5.7647   17.6033    0.8223   -0.0000    0.2255    0.7191    0.0129    0.4674
+         |    0.7239    5.8161    0.2768    1.0000    0.2270    0.4500    0.1129    0.4996
+---------+--------------------------------------------------------------------------------
+    2019 |  398.0000  398.0000  398.0000  398.0000  382.0000  399.0000  399.0000  393.0000
+         |    5.7657   17.5627    0.8147   -0.0000    0.2068    0.7243    0.0326    0.4682
+         |    0.7255    5.1145    0.2897    1.0000    0.2025    0.4474    0.1778    0.4996
+---------+--------------------------------------------------------------------------------
+    2020 |  405.0000  405.0000  405.0000  405.0000  398.0000  406.0000  406.0000  400.0000
+         |    5.6759   17.2363    0.8368    0.0000    0.2403    0.7266    0.2217    0.4600
+         |    0.7310    4.8145    0.2810    1.0000    0.2303    0.4463    0.4159    0.4990
+---------+--------------------------------------------------------------------------------
+    2021 |  415.0000  415.0000  415.0000  415.0000  395.0000  416.0000  416.0000  409.0000
+         |    5.6718   17.5092    0.8274   -0.0000    0.2374    0.7332    0.2163    0.4597
+         |    0.7386    4.7884    0.2948    1.0000    0.2604    0.4428    0.4122    0.4990
+---------+--------------------------------------------------------------------------------
+    2022 |  416.0000  416.0000  416.0000  416.0000  401.0000  417.0000  417.0000  410.0000
+         |    5.6568   17.2657    0.8202   -0.0000    0.2258    0.7314    0.2134    0.4585
+         |    0.7346    4.8620    0.3001    1.0000    0.1916    0.4438    0.4102    0.4989
+---------+--------------------------------------------------------------------------------
+    2023 |  417.0000  417.0000  417.0000  417.0000  402.0000  421.0000  421.0000  414.0000
+         |    5.6265   16.9388    0.8171   -0.0000    0.2526    0.7316    0.2233    0.4517
+         |    0.7511    5.0037    0.3019    1.0000    0.2161    0.4437    0.4169    0.4983
+---------+--------------------------------------------------------------------------------
+   Total | 2436.0000 2436.0000 2436.0000 2436.0000 2342.0000 2447.0000 2447.0000 2409.0000
+         |    5.6922   17.3482    0.8231   -0.0000    0.2317    0.7278    0.1557    0.4608
+         |    0.7355    5.0699    0.2909    0.9990    0.2226    0.4452    0.3626    0.4986
+------------------------------------------------------------------------------------------
+
+. 
+. display _newline "--- NIVEL 3: variables municipales (una fila por municipio-año) ---"
+
+--- NIVEL 3: variables municipales (una fila por municipio-año) ---
+
+. tabstat tasa_homicidios ln_coca ln_inversion_pc if tag_mcpio == 1, ///
+>         by(year) stat(n mean sd) format(%9.4f)
+
+Summary statistics: N, Mean, SD
+Group variable: year (Año de presentación de la prueba)
+
+    year |  tasa_h~s   ln_coca  ln_~n_pc
+---------+------------------------------
+    2018 |   42.0000   42.0000   42.0000
+         |   19.8220    2.1513   11.2152
+         |   21.9114    3.0162    0.7684
+---------+------------------------------
+    2019 |   42.0000   42.0000   42.0000
+         |   36.2919    2.2223   11.1917
+         |   36.3960    2.9723    0.7672
+---------+------------------------------
+    2020 |   42.0000   42.0000   42.0000
+         |   42.4451    2.4846   11.2527
+         |   41.8552    3.0186    0.7852
+---------+------------------------------
+    2021 |   42.0000   42.0000   42.0000
+         |   47.5245    2.3667   11.2646
+         |   56.1035    2.9707    0.8175
+---------+------------------------------
+    2022 |   42.0000   42.0000   42.0000
+         |   53.6340    3.0456   11.1973
+         |   58.4098    3.1443    0.8088
+---------+------------------------------
+    2023 |   42.0000   42.0000   42.0000
+         |   60.6172    3.0981   11.0189
+         |   45.6043    3.0937    0.7691
+---------+------------------------------
+   Total |  252.0000  252.0000  252.0000
+         |   43.3891    2.5614   11.1901
+         |   46.5159    3.0298    0.7826
+----------------------------------------
+
+. 
+. display _newline "--- Cobertura de todas las variables del modelo ---"
+
+--- Cobertura de todas las variables del modelo ---
+
+. misstable summarize punt_global estu_inse_individual edad mujer         ///
+>     lectura_30min libros_26omas trabaja_mas20 internet_hogar            ///
+>     computador_hogar ln_matricula ratio_alumnos_docente pct_planta      ///
+>     z_posgrado dotacion_tic rural ju_unica tecnico                      ///
+>     tasa_homicidios ln_coca ln_inversion_pc
+                                                               Obs<.
+                                                +------------------------------
+               |                                | Unique
+      Variable |     Obs=.     Obs>.     Obs<.  | values        Min         Max
+  -------------+--------------------------------+------------------------------
+  estu_inse_~l |     3,249              66,501  |   >500    12.7171    82.80698
+         mujer |         2              69,748  |      2          0           1
+  lectura_30~n |     5,432              64,318  |      2          0           1
+  libros_26~as |     7,196              62,554  |      2          0           1
+  trabaja_m~20 |     3,368              66,382  |      2          0           1
+  internet_h~r |     5,322              64,428  |      2          0           1
+  computador~r |     3,435              66,315  |      2          0           1
+  ln_matricula |       179              69,571  |   >500   3.178054    7.779885
+  ratio_alum~e |       179              69,571  |   >500        4.5          63
+    pct_planta |       179              69,571  |    308          0           1
+    z_posgrado |       179              69,571  |   >500  -1.287188    4.958486
+  dotacion_tic |     1,614              68,136  |   >500          0    3.230769
+       tecnico |       532              69,218  |      2          0           1
+  -----------------------------------------------------------------------------
+
+. 
+. * Cuántos estudiantes arrastran algún vacío de Nivel 2. Es la magnitud del
+. * trabajo que le queda a la imputación en ese nivel.
+. generate byte n2_incompleto = missing(ln_matricula) | missing(pct_planta) | ///
+>                               missing(dotacion_tic) | missing(z_posgrado)
+
+. label variable n2_incompleto "Alguna variable de sede vacía (1 = sí)"
+
+. quietly count if n2_incompleto == 1
+
+. display _newline "Estudiantes con alguna variable de sede vacía: " r(N) ///
+>         " (" %5.2f 100*r(N)/_N "%)"
+
+Estudiantes con alguna variable de sede vacía: 1614 ( 2.31%)
+
+. tabulate year n2_incompleto, row nofreq
+
+    Año de |
+presentaci |  Alguna variable de
+  ón de la |  sede vacía (1 = sí)
+    prueba |         0          1 |     Total
+-----------+----------------------+----------
+      2018 |     95.56       4.44 |    100.00 
+      2019 |     97.75       2.25 |    100.00 
+      2020 |     98.99       1.01 |    100.00 
+      2021 |     97.85       2.15 |    100.00 
+      2022 |     97.98       2.02 |    100.00 
+      2023 |     98.00       2.00 |    100.00 
+-----------+----------------------+----------
+     Total |     97.69       2.31 |    100.00 
+
+. 
+. display _newline "--- Descomposición de la varianza del puntaje (referencia) ---"
+
+--- Descomposición de la varianza del puntaje (referencia) ---
+
+. * Modelo nulo de tres niveles: da la partición inicial que responde al
+. * Objetivo 2. Se estima aquí solo como verificación de que la estructura
+. * jerárquica funciona; la estimación formal va sobre los datos imputados.
+. quietly mixed punt_global || mcpio_id: || sede_id: , mle
+
+. estat icc
+
+Intraclass correlation
+
+------------------------------------------------------------------------------
+                       Level |        ICC   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+                    mcpio_id |   .1181788   .0266704      .0750635    .1812072
+            sede_id|mcpio_id |   .2760296   .0232176      .2329093    .3237637
+------------------------------------------------------------------------------
+
+. 
+. 
+. ********************************************************************************
+. * [6] GUARDADO
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[6] GUARDADO"
+[6] GUARDADO
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. order estu_consecutivo cole_cod_dane_sede sede_id                       ///
+>       cole_cod_mcpio_ubicacion mcpio_id year year_dato                  ///
+>       punt_global estu_inse_individual mujer edad                       ///
+>       ln_matricula pct_planta z_posgrado dotacion_tic rural ju_unica    ///
+>       tasa_homicidios ln_coca ln_inversion_pc
+
+. 
+. compress
+  variable sede_id was long now int
+  variable mcpio_id was long now byte
+  (348,750 bytes saved)
+
+. save "Base_Multinivel_2018_2023.dta", replace
+file Base_Multinivel_2018_2023.dta saved
+
+. 
+. quietly count
+
+. display _newline "Base consolidada: " r(N) " estudiantes"
+
+Base consolidada: 69750 estudiantes
+
+. quietly count if tag_sede == 1
+
+. display "                  " r(N) " sede-año"
+                  2447 sede-año
+
+. quietly count if tag_mcpio == 1
+
+. display "                  " r(N) " municipio-año"
+                  252 municipio-año
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "ENSAMBLAJE COMPLETADO: Base_Multinivel_2018_2023.dta"
+ENSAMBLAJE COMPLETADO: Base_Multinivel_2018_2023.dta
+
+. display "Siguiente: PCA del índice de vulnerabilidad e imputación múltiple."
+Siguiente: PCA del índice de vulnerabilidad e imputación múltiple.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase5
+      name:  fase5
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_05_ensamblaje.log
+  log type:  text
+ closed on:  21 Aug 2026, 22:20:51
+---------------------------------------------------------------------------------------------

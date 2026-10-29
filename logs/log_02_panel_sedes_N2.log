@@ -1,0 +1,1077 @@
+--------------------------------------------------------------------------------------------
+      name:  fase2
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_02_panel_sedes_N2.log
+  log type:  text
+ opened on:  22 Aug 2026, 14:26:48
+
+. 
+. * Interruptor: convertir la matrícula igual a cero en missing.
+. * Se deja en 1 porque una matrícula de cero no es un tamaño de sede válido,
+. * pero el bloque [1] reporta cuántos casos son ANTES de aplicarlo, así que
+. * puede ponerse en 0 y volver a correr si el diagnóstico lo desaconseja.
+. local cero_matricula_a_missing = 1
+
+. 
+. 
+. ********************************************************************************
+. * [0] ESQUELETO DE SEDE-AÑO Y ATRIBUTOS DE ORIGEN ICFES
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[0] ESQUELETO DE SEDE-AÑO DESDE LA BASE DE ESTUDIANTES"
+[0] ESQUELETO DE SEDE-AÑO DESDE LA BASE DE ESTUDIANTES
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "N1_Saber11_2018_2023.dta", clear
+
+. 
+. quietly count
+
+. display "Estudiantes en la base de Nivel 1: " r(N)
+Estudiantes en la base de Nivel 1: 69750
+
+. 
+. keep cole_cod_dane_sede cole_cod_mcpio_ubicacion year               ///
+>      rural cole_femenino cole_masculino tecnico mixto               ///
+>      sede_principal ju_unica ju_completa                            ///
+>      estu_inse_individual punt_global
+
+. 
+. * Se renombra el carácter técnico/académico: "mixto" se confunde con sede de
+. * género mixto cuando ambas variables aparecen juntas en una tabla.
+. rename mixto tecnico_academico
+
+. 
+. * ----------------------------------------------------------------------
+. * [0.1] JORNADA: DE ATRIBUTO DEL ESTUDIANTE A ATRIBUTO DE LA SEDE
+. * ----------------------------------------------------------------------
+. * La jornada única fue una política de establecimiento, así que se consolida
+. * como atributo de la sede aunque cambie de un año a otro. Se construyen dos
+. * versiones y ambas se conservan:
+. *   pct_unica : proporción de estudiantes de la sede-año en jornada única
+. *   ju_unica  : dummy por regla de mayoría (más de la mitad de la cohorte)
+. * Se guardan las dos porque en las sede-año con una sola jornada coinciden
+. * por construcción, y la diferencia solo aparece en el pequeño grupo con
+. * jornadas mixtas.
+. 
+. bysort cole_cod_dane_sede year: egen double pct_unica    = mean(ju_unica)
+
+. bysort cole_cod_dane_sede year: egen double pct_completa = mean(ju_completa)
+
+. 
+. * Cuántas sede-año tienen la jornada repartida entre categorías.
+. egen byte _tag = tag(cole_cod_dane_sede year)
+
+. quietly count if _tag == 1 & pct_unica > 0 & pct_unica < 1
+
+. display _newline "Sede-año con jornada única repartida (ni 0 ni 1): " r(N)
+
+Sede-año con jornada única repartida (ni 0 ni 1): 7
+
+. quietly count if _tag == 1
+
+. display "Total de sede-año: " r(N)
+Total de sede-año: 2447
+
+. drop _tag
+
+. 
+. * ----------------------------------------------------------------------
+. * [0.2] COLAPSO A SEDE-AÑO
+. * ----------------------------------------------------------------------
+. * Los atributos de establecimiento se promedian. Si son realmente constantes
+. * dentro de la sede-año, el promedio queda exactamente en 0 o en 1; cualquier
+. * valor intermedio delata una inconsistencia de la fuente. El bloque [0.3]
+. * verifica precisamente eso, en vez de darlo por hecho.
+. 
+. collapse (mean) rural cole_femenino cole_masculino tecnico             ///
+>                 tecnico_academico sede_principal                       ///
+>                 pct_unica pct_completa                                 ///
+>                 inse_prom_sede = estu_inse_individual                  ///
+>                 mcpio_mean = cole_cod_mcpio_ubicacion                  ///
+>          (min)  mcpio_min = cole_cod_mcpio_ubicacion                   ///
+>          (max)  mcpio_max = cole_cod_mcpio_ubicacion                   ///
+>          (count) evaluados_sede = punt_global,                         ///
+>          by(cole_cod_dane_sede year)
+
+. 
+. quietly count
+
+. display _newline "Sede-año en el esqueleto: " r(N)
+
+Sede-año en el esqueleto: 2447
+
+. 
+. * ----------------------------------------------------------------------
+. * [0.3] VERIFICACIÓN DE CONSTANCIA DE LOS ATRIBUTOS
+. * ----------------------------------------------------------------------
+. display _newline "--- Atributos que deberían ser constantes dentro de la sede-año ---"
+
+--- Atributos que deberían ser constantes dentro de la sede-año ---
+
+. foreach v in rural cole_femenino cole_masculino tecnico tecnico_academico sede_principal {
+  2.     quietly count if `v' > 0 & `v' < 1 & !missing(`v')
+  3.     display "  `v': sede-año con valor intermedio (inconsistencia): " r(N)
+  4. }
+  rural: sede-año con valor intermedio (inconsistencia): 0
+  cole_femenino: sede-año con valor intermedio (inconsistencia): 0
+  cole_masculino: sede-año con valor intermedio (inconsistencia): 0
+  tecnico: sede-año con valor intermedio (inconsistencia): 0
+  tecnico_academico: sede-año con valor intermedio (inconsistencia): 0
+  sede_principal: sede-año con valor intermedio (inconsistencia): 0
+
+. 
+. * Una sede no puede estar en dos municipios a la vez.
+. quietly count if mcpio_min != mcpio_max
+
+. display "  Sede-año asignadas a más de un municipio: " r(N)
+  Sede-año asignadas a más de un municipio: 0
+
+. generate long cole_cod_mcpio_ubicacion = round(mcpio_mean)
+
+. drop mcpio_mean mcpio_min mcpio_max
+
+. label variable cole_cod_mcpio_ubicacion "Código DANE del municipio"
+
+. 
+. * ----------------------------------------------------------------------
+. * [0.4] JORNADA ÚNICA COMO DUMMY DE SEDE
+. * ----------------------------------------------------------------------
+. generate byte ju_unica = (pct_unica > 0.5) if !missing(pct_unica)
+
+. label variable ju_unica    "Sede en jornada única (regla de mayoría)"
+
+. label variable pct_unica   "Proporción de la cohorte en jornada única"
+
+. label variable pct_completa "Proporción de la cohorte en jornada completa"
+
+. 
+. * Cuántas sede-año clasificaría distinto una regla de presencia en vez de
+. * mayoría. Es la magnitud del margen de discrecionalidad de esta decisión.
+. quietly count if pct_unica > 0 & ju_unica == 0
+
+. display _newline "Sede-año con algo de jornada única que la regla de mayoría clasifica com
+> o 0: " r(N)
+
+Sede-año con algo de jornada única que la regla de mayoría clasifica como 0: 3
+
+. 
+. * ----------------------------------------------------------------------
+. * [0.5] DIAGNÓSTICO DE LOS ATRIBUTOS ESCASOS
+. * ----------------------------------------------------------------------
+. * Una dummy que solo vale 1 en un puñado de sede-año produce un coeficiente
+. * inestable y no interpretable. Conviene saberlo antes de ponerla en el modelo.
+. display _newline "--- Frecuencia de los atributos de sede (sobre sede-año) ---"
+
+--- Frecuencia de los atributos de sede (sobre sede-año) ---
+
+. foreach v in rural cole_femenino cole_masculino tecnico tecnico_academico ju_unica {
+  2.     quietly count if `v' == 1
+  3.     display "  `v' == 1 en " r(N) " sede-año"
+  4. }
+  rural == 1 en 1781 sede-año
+  cole_femenino == 1 en 30 sede-año
+  cole_masculino == 1 en 6 sede-año
+  tecnico == 1 en 1110 sede-año
+  tecnico_academico == 1 en 213 sede-año
+  ju_unica == 1 en 381 sede-año
+
+. 
+. display _newline "--- Evolución de la jornada única ---"
+
+--- Evolución de la jornada única ---
+
+. tabstat ju_unica pct_unica, by(year) stat(n mean) format(%9.4f)
+
+Summary statistics: N, Mean
+Group variable: year (Año de presentación de la prueba)
+
+    year |  ju_unica  pct_un~a
+---------+--------------------
+    2018 |  388.0000  388.0000
+         |    0.0129    0.0129
+---------+--------------------
+    2019 |  399.0000  399.0000
+         |    0.0326    0.0326
+---------+--------------------
+    2020 |  406.0000  406.0000
+         |    0.2217    0.2207
+---------+--------------------
+    2021 |  416.0000  416.0000
+         |    0.2163    0.2163
+---------+--------------------
+    2022 |  417.0000  417.0000
+         |    0.2134    0.2142
+---------+--------------------
+    2023 |  421.0000  421.0000
+         |    0.2233    0.2234
+---------+--------------------
+   Total | 2447.0000 2447.0000
+         |    0.1557    0.1557
+------------------------------
+
+. 
+. label variable rural             "Sede rural (1 = sí)"
+
+. label variable cole_femenino     "Sede exclusivamente femenina (1 = sí)"
+
+. label variable cole_masculino    "Sede exclusivamente masculina (1 = sí)"
+
+. label variable tecnico           "Sede de carácter técnico (1 = sí)"
+
+. label variable tecnico_academico "Sede de carácter técnico/académico (1 = sí)"
+
+. label variable sede_principal    "Sede principal del establecimiento (1 = sí)"
+
+. label variable inse_prom_sede    "INSE promedio de la cohorte (escala original)"
+
+. label variable evaluados_sede    "Estudiantes evaluados en la sede-año"
+
+. 
+. isid cole_cod_dane_sede year
+
+. save "temp_esqueleto.dta", replace
+(file temp_esqueleto.dta not found)
+file temp_esqueleto.dta saved
+
+. 
+. 
+. ********************************************************************************
+. * [1] PANEL DE MATRÍCULA
+. ********************************************************************************
+. * Se procesa primero por ser el denominador de dos variables derivadas.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[1] PANEL DE MATRÍCULA"
+[1] PANEL DE MATRÍCULA
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. import excel "Panel_matricula.xlsx", sheet("Panel_matricula") firstrow clear
+(3 vars, 319,612 obs)
+
+. 
+. quietly count
+
+. display "Filas leídas (base nacional): " r(N)
+Filas leídas (base nacional): 319612
+
+. 
+. rename periodo year
+
+. keep cole_cod_dane_sede year matricula
+
+. 
+. * Llave a string con el mismo contrato del script 01: %20.0f, sin decimales.
+. capture confirm string variable cole_cod_dane_sede
+
+. if _rc != 0 {
+.     quietly tostring cole_cod_dane_sede, replace format(%20.0f) force
+. }
+
+. quietly replace cole_cod_dane_sede = trim(cole_cod_dane_sede)
+
+. 
+. quietly destring year matricula, replace force
+
+. quietly keep if inrange(year, 2018, 2023)
+
+. 
+. display _newline "--- Diagnóstico de matrícula (nacional) ---"
+
+--- Diagnóstico de matrícula (nacional) ---
+
+. tabulate year, missing
+
+    periodo |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       2018 |     53,202       16.65       16.65
+       2019 |     53,527       16.75       33.39
+       2020 |     53,484       16.73       50.13
+       2021 |     53,066       16.60       66.73
+       2022 |     53,185       16.64       83.37
+       2023 |     53,148       16.63      100.00
+------------+-----------------------------------
+      Total |    319,612      100.00
+
+. quietly count if missing(matricula)
+
+. display "Sede-año con matrícula vacía: " r(N)
+Sede-año con matrícula vacía: 3
+
+. quietly count if matricula == 0
+
+. display "Sede-año con matrícula igual a cero: " r(N)
+Sede-año con matrícula igual a cero: 0
+
+. quietly count if matricula > 0 & matricula < 10 & !missing(matricula)
+
+. display "Sede-año con matrícula entre 1 y 9: " r(N)
+Sede-año con matrícula entre 1 y 9: 43096
+
+. tabstat matricula, stat(n mean sd p1 p50 p99 min max) format(%9.1f)
+
+    Variable |         N      Mean        SD        p1       p50       p99       Min
+-------------+----------------------------------------------------------------------
+   matricula |  319609.0     184.3     358.4       3.0      40.0    1737.0       1.0
+------------------------------------------------------------------------------------
+
+    Variable |       Max
+-------------+----------
+   matricula |    7440.0
+------------------------
+
+. 
+. if `cero_matricula_a_missing' == 1 {
+.     quietly replace matricula = . if matricula == 0
+.     display "Aplicado: matrícula igual a cero convertida en missing."
+Aplicado: matrícula igual a cero convertida en missing.
+. }
+
+. 
+. quietly drop if missing(cole_cod_dane_sede) | cole_cod_dane_sede == "" | missing(year)
+
+. isid cole_cod_dane_sede year
+
+. save "temp_matricula.dta", replace
+(file temp_matricula.dta not found)
+file temp_matricula.dta saved
+
+. 
+. 
+. ********************************************************************************
+. * [2] PANEL DE DOCENTES Y FORMACIÓN
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[2] PANEL DE DOCENTES"
+[2] PANEL DE DOCENTES
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. import excel "Panel_doc.xlsx", sheet("Panel_doc") firstrow clear
+(4 vars, 319,612 obs)
+
+. 
+. quietly count
+
+. display "Filas leídas (base nacional): " r(N)
+Filas leídas (base nacional): 319612
+
+. 
+. rename periodo year
+
+. rename docentes docentes_doc
+
+. keep cole_cod_dane_sede year docentes_doc pct_posgrado
+
+. 
+. capture confirm string variable cole_cod_dane_sede
+
+. if _rc != 0 {
+.     quietly tostring cole_cod_dane_sede, replace format(%20.0f) force
+. }
+
+. quietly replace cole_cod_dane_sede = trim(cole_cod_dane_sede)
+
+. 
+. quietly destring year docentes_doc pct_posgrado, replace force
+
+. quietly keep if inrange(year, 2018, 2023)
+
+. 
+. display _newline "--- Diagnóstico de docentes y posgrado (nacional) ---"
+
+--- Diagnóstico de docentes y posgrado (nacional) ---
+
+. tabstat docentes_doc pct_posgrado, stat(n mean sd min p50 max) format(%9.4f)
+
+   Stats |  docent~c  pct_po~o
+---------+--------------------
+       N |  3.20e+05  3.20e+05
+    Mean |    8.8345    0.2122
+      SD |   15.2408    0.3516
+     Min |    1.0000    0.0000
+     p50 |    2.0000    0.0000
+     Max |  314.0000    1.0000
+------------------------------
+
+. 
+. quietly count if pct_posgrado > 1 & !missing(pct_posgrado)
+
+. display "Valores de pct_posgrado por encima de 1: " r(N) " (deben ser 0)"
+Valores de pct_posgrado por encima de 1: 0 (deben ser 0)
+
+. quietly count if docentes_doc == 0
+
+. display "Sede-año con cero docentes reportados: " r(N)
+Sede-año con cero docentes reportados: 0
+
+. 
+. quietly drop if missing(cole_cod_dane_sede) | cole_cod_dane_sede == "" | missing(year)
+
+. isid cole_cod_dane_sede year
+
+. save "temp_docentes.dta", replace
+(file temp_docentes.dta not found)
+file temp_docentes.dta saved
+
+. 
+. 
+. ********************************************************************************
+. * [3] PANEL DE ESTABILIDAD DOCENTE
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[3] PANEL DE ESTABILIDAD DOCENTE"
+[3] PANEL DE ESTABILIDAD DOCENTE
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. import excel "Panel_estabilidad.xlsx", sheet("Panel_estabilidad") firstrow clear
+(8 vars, 319,612 obs)
+
+. 
+. quietly count
+
+. display "Filas leídas (base nacional): " r(N)
+Filas leídas (base nacional): 319612
+
+. 
+. rename periodo year
+
+. rename docentes docentes_estab
+
+. keep cole_cod_dane_sede year planta_con_escalafon planta_sin_escalafon ///
+>      contrato_con_escalafon contrato_sin_escalafon docentes_estab pct_planta
+
+. 
+. capture confirm string variable cole_cod_dane_sede
+
+. if _rc != 0 {
+.     quietly tostring cole_cod_dane_sede, replace format(%20.0f) force
+. }
+
+. quietly replace cole_cod_dane_sede = trim(cole_cod_dane_sede)
+
+. 
+. quietly destring year docentes_estab pct_planta planta_con_escalafon ///
+>     planta_sin_escalafon contrato_con_escalafon contrato_sin_escalafon, ///
+>     replace force
+
+. quietly keep if inrange(year, 2018, 2023)
+
+. 
+. display _newline "--- Diagnóstico de estabilidad (nacional) ---"
+
+--- Diagnóstico de estabilidad (nacional) ---
+
+. tabstat pct_planta planta_con_escalafon planta_sin_escalafon ///
+>         contrato_con_escalafon contrato_sin_escalafon, ///
+>         stat(n mean sd min p50 max) format(%9.4f)
+
+   Stats |  pct_pl~a  p~con_~n  p~sin_~n  c~con_~n  c~sin_~n
+---------+--------------------------------------------------
+       N |  3.20e+05  3.20e+05  3.20e+05  3.20e+05  3.20e+05
+    Mean |    0.7067    0.6528    0.0539    0.1408    0.1526
+      SD |    0.4405    0.4614    0.2160    0.3108    0.3324
+     Min |    0.0000    0.0000    0.0000    0.0000    0.0000
+     p50 |    1.0000    1.0000    0.0000    0.0000    0.0000
+     Max |    1.0000    1.0000    1.0000    1.0000    1.0000
+------------------------------------------------------------
+
+. 
+. * Coherencia interna: las cuatro categorías son proporciones y suman 1, y
+. * pct_planta debe ser la suma de las dos categorías de planta.
+. generate double _suma4 = planta_con_escalafon + planta_sin_escalafon + ///
+>                          contrato_con_escalafon + contrato_sin_escalafon
+
+. quietly count if abs(_suma4 - 1) > 0.001 & !missing(_suma4)
+
+. display "Sede-año donde las cuatro categorías NO suman 1: " r(N)
+Sede-año donde las cuatro categorías NO suman 1: 0
+
+. 
+. generate double _planta_calc = planta_con_escalafon + planta_sin_escalafon
+
+. quietly count if abs(_planta_calc - pct_planta) > 0.001 & !missing(pct_planta)
+
+. display "Sede-año donde pct_planta != planta_con + planta_sin: " r(N)
+Sede-año donde pct_planta != planta_con + planta_sin: 0
+
+. drop _suma4 _planta_calc
+
+. 
+. quietly drop if missing(cole_cod_dane_sede) | cole_cod_dane_sede == "" | missing(year)
+
+. isid cole_cod_dane_sede year
+
+. save "temp_estabilidad.dta", replace
+(file temp_estabilidad.dta not found)
+file temp_estabilidad.dta saved
+
+. 
+. 
+. ********************************************************************************
+. * [4] CRUCE SOBRE EL ESQUELETO
+. ********************************************************************************
+. * El esqueleto manda: se conservan sus 2.447 filas pase lo que pase. Las
+. * variables del DANE que no crucen quedan vacías y las imputa MICE.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[4] CRUCE DE LOS PANELES DANE SOBRE EL ESQUELETO"
+[4] CRUCE DE LOS PANELES DANE SOBRE EL ESQUELETO
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "temp_esqueleto.dta", clear
+
+. 
+. merge 1:1 cole_cod_dane_sede year using "temp_matricula.dta", ///
+>     keep(master match) generate(_m_mat)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                            11
+        from master                        11  (_m_mat==1)
+        from using                          0  (_m_mat==2)
+
+    Matched                             2,436  (_m_mat==3)
+    -----------------------------------------
+
+. display _newline "--- Cruce con matrícula ---"
+
+--- Cruce con matrícula ---
+
+. tabulate _m_mat
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+        Master only (1) |         11        0.45        0.45
+            Matched (3) |      2,436       99.55      100.00
+------------------------+-----------------------------------
+                  Total |      2,447      100.00
+
+. 
+. merge 1:1 cole_cod_dane_sede year using "temp_docentes.dta", ///
+>     keep(master match) generate(_m_doc)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                            11
+        from master                        11  (_m_doc==1)
+        from using                          0  (_m_doc==2)
+
+    Matched                             2,436  (_m_doc==3)
+    -----------------------------------------
+
+. display _newline "--- Cruce con docentes ---"
+
+--- Cruce con docentes ---
+
+. tabulate _m_doc
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+        Master only (1) |         11        0.45        0.45
+            Matched (3) |      2,436       99.55      100.00
+------------------------+-----------------------------------
+                  Total |      2,447      100.00
+
+. 
+. merge 1:1 cole_cod_dane_sede year using "temp_estabilidad.dta", ///
+>     keep(master match) generate(_m_est)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                            11
+        from master                        11  (_m_est==1)
+        from using                          0  (_m_est==2)
+
+    Matched                             2,436  (_m_est==3)
+    -----------------------------------------
+
+. display _newline "--- Cruce con estabilidad ---"
+
+--- Cruce con estabilidad ---
+
+. tabulate _m_est
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+        Master only (1) |         11        0.45        0.45
+            Matched (3) |      2,436       99.55      100.00
+------------------------+-----------------------------------
+                  Total |      2,447      100.00
+
+. 
+. display _newline "--- Sede-año de la muestra SIN datos DANE, por año ---"
+
+--- Sede-año de la muestra SIN datos DANE, por año ---
+
+. display "Matrícula:"
+Matrícula:
+
+. tabulate year if _m_mat == 1
+
+     Año de |
+ presentaci |
+   ón de la |
+     prueba |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       2018 |          3       27.27       27.27
+       2019 |          1        9.09       36.36
+       2020 |          1        9.09       45.45
+       2021 |          1        9.09       54.55
+       2022 |          1        9.09       63.64
+       2023 |          4       36.36      100.00
+------------+-----------------------------------
+      Total |         11      100.00
+
+. display "Docentes:"
+Docentes:
+
+. tabulate year if _m_doc == 1
+
+     Año de |
+ presentaci |
+   ón de la |
+     prueba |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       2018 |          3       27.27       27.27
+       2019 |          1        9.09       36.36
+       2020 |          1        9.09       45.45
+       2021 |          1        9.09       54.55
+       2022 |          1        9.09       63.64
+       2023 |          4       36.36      100.00
+------------+-----------------------------------
+      Total |         11      100.00
+
+. display "Estabilidad:"
+Estabilidad:
+
+. tabulate year if _m_est == 1
+
+     Año de |
+ presentaci |
+   ón de la |
+     prueba |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       2018 |          3       27.27       27.27
+       2019 |          1        9.09       36.36
+       2020 |          1        9.09       45.45
+       2021 |          1        9.09       54.55
+       2022 |          1        9.09       63.64
+       2023 |          4       36.36      100.00
+------------+-----------------------------------
+      Total |         11      100.00
+
+. 
+. drop _m_mat _m_doc _m_est
+
+. 
+. 
+. ********************************************************************************
+. * [5] LOS DOS CONTEOS DE DOCENTES
+. ********************************************************************************
+. * Panel_doc y Panel_estabilidad reportan cifras distintas de docentes para la
+. * misma sede-año, aun viniendo ambas del DANE. Cada proporción se calcula con
+. * el total de su propia base (así vienen construidas y así se conservan), pero
+. * el cociente alumnos/docente necesita un único denominador.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[5] DISCREPANCIA ENTRE LOS DOS CONTEOS DE DOCENTES"
+[5] DISCREPANCIA ENTRE LOS DOS CONTEOS DE DOCENTES
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. generate double dif_docentes = docentes_estab - docentes_doc
+(11 missing values generated)
+
+. label variable dif_docentes "Docentes (estabilidad) menos docentes (formación)"
+
+. 
+. quietly count if !missing(docentes_doc) & !missing(docentes_estab)
+
+. local n_ambos = r(N)
+
+. display "Sede-año con ambos conteos disponibles: `n_ambos'"
+Sede-año con ambos conteos disponibles: 2436
+
+. 
+. if `n_ambos' > 0 {
+.     quietly count if dif_docentes == 0 & !missing(dif_docentes)
+.     display "  Coinciden exactamente: " r(N) " (" %5.2f 100*r(N)/`n_ambos' "%)"
+  Coinciden exactamente: 411 (16.87%)
+.     quietly count if dif_docentes > 0 & !missing(dif_docentes)
+.     display "  Estabilidad reporta MÁS: " r(N)
+  Estabilidad reporta MÁS: 1830
+.     quietly count if dif_docentes < 0 & !missing(dif_docentes)
+.     display "  Formación reporta MÁS: " r(N)
+  Formación reporta MÁS: 195
+. 
+.     display _newline "--- Magnitud de la diferencia ---"
+
+--- Magnitud de la diferencia ---
+.     tabstat dif_docentes, stat(n mean sd p1 p25 p50 p75 p99 min max) format(%9.2f)
+
+    Variable |         N      Mean        SD        p1       p25       p50       p75
+-------------+----------------------------------------------------------------------
+dif_docentes |   2436.00      1.20      3.19    -12.00      1.00      1.00      3.00
+------------------------------------------------------------------------------------
+
+    Variable |       p99       Min       Max
+-------------+------------------------------
+dif_docentes |      6.00    -39.00      9.00
+--------------------------------------------
+. 
+.     display _newline "--- Correlación entre los dos conteos ---"
+
+--- Correlación entre los dos conteos ---
+.     correlate docentes_doc docentes_estab
+(obs=2,436)
+
+             | docent~c docent~b
+-------------+------------------
+docentes_doc |   1.0000
+docentes_e~b |   0.9718   1.0000
+
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [6] VARIABLES DERIVADAS
+. ********************************************************************************
+. * Los vacíos se propagan como vacíos. Nada se rellena con cero.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[6] CONSTRUCCIÓN DE VARIABLES DERIVADAS"
+[6] CONSTRUCCIÓN DE VARIABLES DERIVADAS
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. * (6.1) Tamaño de la sede
+. generate double ln_matricula = ln(matricula)
+(11 missing values generated)
+
+. label variable ln_matricula "Tamaño de la sede (logaritmo de la matrícula)"
+
+. 
+. * (6.2) Razón alumnos por docente.
+. *       DECISIÓN: el denominador es docentes_doc, el conteo del panel de
+. *       formación. Un conteo de cero docentes no es un dato válido para un
+. *       cociente, así que esos casos quedan en missing.
+. generate double ratio_alumnos_docente = matricula / docentes_doc ///
+>     if docentes_doc > 0 & !missing(docentes_doc)
+(11 missing values generated)
+
+. label variable ratio_alumnos_docente "Razón alumnos por docente"
+
+. 
+. * Versión con el otro conteo, reservada para la prueba de robustez.
+. generate double ratio_alt = matricula / docentes_estab ///
+>     if docentes_estab > 0 & !missing(docentes_estab)
+(11 missing values generated)
+
+. label variable ratio_alt "Razón alumnos/docente (conteo de estabilidad)"
+
+. 
+. label variable matricula      "Matrícula total de la sede"
+
+. label variable docentes_doc   "Docentes (panel de formación)"
+
+. label variable docentes_estab "Docentes (panel de estabilidad)"
+
+. label variable pct_planta     "Proporción de docentes de planta (0 a 1)"
+
+. label variable pct_posgrado   "Proporción de docentes con posgrado (0 a 1)"
+
+. 
+. display _newline "--- Variables derivadas (muestra analítica) ---"
+
+--- Variables derivadas (muestra analítica) ---
+
+. tabstat ln_matricula ratio_alumnos_docente ratio_alt pct_planta pct_posgrado, ///
+>         stat(n mean sd p1 p50 p99 min max) format(%9.4f)
+
+   Stats |  ln_mat~a  ratio_~e  ratio_~t  pct_pl~a  pct_po~o
+---------+--------------------------------------------------
+       N | 2436.0000 2436.0000 2436.0000 2436.0000 2436.0000
+    Mean |    5.6922   17.3482   16.1625    0.8231    0.2545
+      SD |    0.7355    5.0699    4.9796    0.2909    0.2645
+      p1 |    3.9890    7.7778    6.8889    0.0000    0.0000
+     p50 |    5.6040   16.5359   15.3801    1.0000    0.1667
+     p99 |    7.4018   31.6591   30.4643    1.0000    1.0000
+     Min |    3.1781    4.5000    3.8571    0.0000    0.0000
+     Max |    7.7799   63.0000   63.0000    1.0000    1.0000
+------------------------------------------------------------
+
+. 
+. quietly count if !missing(ratio_alumnos_docente) & !missing(ratio_alt)
+
+. if r(N) > 0 {
+.     display _newline "--- Correlación entre las dos versiones de la razón ---"
+
+--- Correlación entre las dos versiones de la razón ---
+.     correlate ratio_alumnos_docente ratio_alt
+(obs=2,436)
+
+             | ratio_~e ratio_~t
+-------------+------------------
+ratio_alum~e |   1.0000
+   ratio_alt |   0.9240   1.0000
+
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [7] PANEL DE CONTROL DE LA FASE 2
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[7] PANEL DE CONTROL"
+[7] PANEL DE CONTROL
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. display _newline "--- Sede-año por año ---"
+
+--- Sede-año por año ---
+
+. tabulate year, missing
+
+     Año de |
+ presentaci |
+   ón de la |
+     prueba |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       2018 |        388       15.86       15.86
+       2019 |        399       16.31       32.16
+       2020 |        406       16.59       48.75
+       2021 |        416       17.00       65.75
+       2022 |        417       17.04       82.80
+       2023 |        421       17.20      100.00
+------------+-----------------------------------
+      Total |      2,447      100.00
+
+. 
+. display _newline "--- Cobertura de las variables del DANE ---"
+
+--- Cobertura de las variables del DANE ---
+
+. misstable summarize matricula ln_matricula docentes_doc docentes_estab ///
+>     ratio_alumnos_docente pct_planta pct_posgrado
+                                                               Obs<.
+                                                +------------------------------
+               |                                | Unique
+      Variable |     Obs=.     Obs>.     Obs<.  | values        Min         Max
+  -------------+--------------------------------+------------------------------
+     matricula |        11               2,436  |   >500         24        2392
+  ln_matricula |        11               2,436  |   >500   3.178054    7.779885
+  docentes_doc |        11               2,436  |     79          2         111
+  docentes_e~b |        11               2,436  |     77          2         111
+  ratio_alum~e |        11               2,436  |   >500        4.5          63
+    pct_planta |        11               2,436  |    308          0           1
+  pct_posgrado |        11               2,436  |    395          0           1
+  -----------------------------------------------------------------------------
+
+. 
+. display _newline "--- Descriptivos de Nivel 2 por año ---"
+
+--- Descriptivos de Nivel 2 por año ---
+
+. tabstat ln_matricula ratio_alumnos_docente pct_planta pct_posgrado ///
+>         rural ju_unica inse_prom_sede evaluados_sede, ///
+>         by(year) stat(n mean sd) format(%9.4f)
+
+Summary statistics: N, Mean, SD
+Group variable: year (Año de presentación de la prueba)
+
+    year |  ln_mat~a  ratio_~e  pct_pl~a  pct_po~o     rural  ju_unica  inse_p~e  evalua~e
+---------+--------------------------------------------------------------------------------
+    2018 |  385.0000  385.0000  385.0000  385.0000  388.0000  388.0000  388.0000  388.0000
+         |    5.7647   17.6033    0.8223    0.3308    0.7191    0.0129   40.7032   29.5258
+         |    0.7239    5.8161    0.2768    0.3039    0.4500    0.1129    4.5080   27.4342
+---------+--------------------------------------------------------------------------------
+    2019 |  398.0000  398.0000  398.0000  398.0000  399.0000  399.0000  399.0000  399.0000
+         |    5.7657   17.5627    0.8147    0.3331    0.7243    0.0326   40.9373   28.7895
+         |    0.7255    5.1145    0.2897    0.3095    0.4474    0.1778    4.5348   26.9169
+---------+--------------------------------------------------------------------------------
+    2020 |  405.0000  405.0000  405.0000  405.0000  406.0000  406.0000  406.0000  406.0000
+         |    5.6759   17.2363    0.8368    0.3478    0.7266    0.2217   42.0821   27.0739
+         |    0.7310    4.8145    0.2810    0.3284    0.4463    0.4159    4.6834   26.4531
+---------+--------------------------------------------------------------------------------
+    2021 |  415.0000  415.0000  415.0000  415.0000  416.0000  416.0000  416.0000  416.0000
+         |    5.6718   17.5092    0.8274    0.2321    0.7332    0.2163   42.0814   28.0096
+         |    0.7386    4.7884    0.2948    0.1803    0.4428    0.4122    4.5112   27.3696
+---------+--------------------------------------------------------------------------------
+    2022 |  416.0000  416.0000  416.0000  416.0000  417.0000  417.0000  417.0000  417.0000
+         |    5.6568   17.2657    0.8202    0.1533    0.7314    0.2134   42.4056   28.2902
+         |    0.7346    4.8620    0.3001    0.1601    0.4438    0.4102    4.3677   26.9179
+---------+--------------------------------------------------------------------------------
+    2023 |  417.0000  417.0000  417.0000  417.0000  421.0000  421.0000  421.0000  421.0000
+         |    5.6265   16.9388    0.8171    0.1414    0.7316    0.2233   42.7348   29.3729
+         |    0.7511    5.0037    0.3019    0.1636    0.4437    0.4169    3.9915   28.4105
+---------+--------------------------------------------------------------------------------
+   Total | 2436.0000 2436.0000 2436.0000 2436.0000 2447.0000 2447.0000 2447.0000 2447.0000
+         |    5.6922   17.3482    0.8231    0.2545    0.7278    0.1557   41.8441   28.5043
+         |    0.7355    5.0699    0.2909    0.2645    0.4452    0.3626    4.4918   27.2480
+------------------------------------------------------------------------------------------
+
+. 
+. display _newline "--- Variación within y between de las variables de sede ---"
+
+--- Variación within y between de las variables de sede ---
+
+. * Codificación numérica de la sede solo para el xtset del diagnóstico.
+. egen long sede_id = group(cole_cod_dane_sede)
+
+. xtset sede_id year
+
+Panel variable: sede_id (unbalanced)
+ Time variable: year, 2018 to 2023, but with gaps
+         Delta: 1 unit
+
+. xtsum ln_matricula ratio_alumnos_docente pct_planta pct_posgrado ju_unica rural
+
+Variable         |      Mean   Std. dev.       Min        Max |    Observations
+-----------------+--------------------------------------------+----------------
+ln_mat~a overall |  5.692169   .7355084   3.178054   7.779885 |     N =    2436
+         between |             .7420764   3.433987   7.681089 |     n =     436
+         within  |             .1419115   4.991943   6.659813 | T-bar = 5.58716
+                 |                                            |
+ratio_~e overall |  17.34822   5.069886        4.5         63 |     N =    2436
+         between |             4.449836   6.044444   39.26667 |     n =     436
+         within  |             2.441952  -4.985118   57.61286 | T-bar = 5.58716
+                 |                                            |
+pct_pl~a overall |  .8230633   .2908867          0          1 |     N =    2436
+         between |             .2862276          0          1 |     n =     436
+         within  |             .0915509  -.0102701   1.600841 | T-bar = 5.58716
+                 |                                            |
+pct_po~o overall |  .2544669   .2644697          0          1 |     N =    2436
+         between |             .1395422          0   .6128205 |     n =     436
+         within  |             .2268635  -.2945527   1.004467 | T-bar = 5.58716
+                 |                                            |
+ju_unica overall |  .1557009   .3626456          0          1 |     N =    2447
+         between |             .2827819          0          1 |     n =     437
+         within  |             .2198577  -.6776325   .9890342 | T-bar = 5.59954
+                 |                                            |
+rural    overall |    .72783   .4451679          0          1 |     N =    2447
+         between |             .4383568          0          1 |     n =     437
+         within  |                    0     .72783     .72783 | T-bar = 5.59954
+
+. 
+. isid cole_cod_dane_sede year
+
+. assert inrange(year, 2018, 2023)
+
+. assert !missing(cole_cod_mcpio_ubicacion)
+
+. display _newline "Llaves verificadas: sede-año única, municipio sin vacíos."
+
+Llaves verificadas: sede-año única, municipio sin vacíos.
+
+. 
+. 
+. ********************************************************************************
+. * [8] GUARDADO
+. ********************************************************************************
+. 
+. drop sede_id
+
+. order cole_cod_dane_sede cole_cod_mcpio_ubicacion year ///
+>       matricula ln_matricula docentes_doc ratio_alumnos_docente ///
+>       pct_planta pct_posgrado rural ju_unica
+
+. 
+. compress
+  variable cole_cod_mcpio_ubicacion was long now int
+  variable rural was float now byte
+  variable cole_femenino was float now byte
+  variable cole_masculino was float now byte
+  variable tecnico was float now byte
+  variable tecnico_academico was float now byte
+  variable sede_principal was float now byte
+  variable evaluados_sede was long now int
+  variable dif_docentes was double now byte
+  (70,963 bytes saved)
+
+. save "N2_Sedes_sinTIC.dta", replace
+file N2_Sedes_sinTIC.dta saved
+
+. 
+. erase "temp_esqueleto.dta"
+
+. erase "temp_matricula.dta"
+
+. erase "temp_docentes.dta"
+
+. erase "temp_estabilidad.dta"
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "PANEL DE SEDES CONSOLIDADO: N2_Sedes_sinTIC.dta"
+PANEL DE SEDES CONSOLIDADO: N2_Sedes_sinTIC.dta
+
+. display "Pendiente: incorporar el panel TIC desde sus hojas anuales."
+Pendiente: incorporar el panel TIC desde sus hojas anuales.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase2
+      name:  fase2
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_02_panel_sedes_N2.log
+  log type:  text
+ closed on:  22 Aug 2026, 14:34:56
+--------------------------------------------------------------------------------------------

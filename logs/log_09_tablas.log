@@ -1,0 +1,1213 @@
+---------------------------------------------------------------------------------------------
+      name:  fase9
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_09_tablas.log
+  log type:  text
+ opened on:  24 Aug 2026, 09:53:39
+
+. 
+. capture which esttab
+
+. if _rc != 0 {
+.     display as error "Falta el paquete estout. Ejecute: ssc install estout, replace"
+.     exit 111
+. }
+
+. 
+. * Esquema gráfico único para las cuatro figuras. Un documento con figuras de
+. * estilos distintos se lee como un collage.
+. set scheme s1mono
+
+. 
+. 
+. ********************************************************************************
+. * [1] TABLA Y GRÁFICOS DE LA PARTICIÓN DE LA VARIANZA (OBJETIVO 2)
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[1] OBJETIVO 2"
+[1] OBJETIVO 2
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "ICC_por_year.dta", clear
+
+. 
+. foreach v in icc_mcpio icc_sede icc_est {
+  2.     generate double p_`v' = 100 * `v'
+  3. }
+
+. 
+. format p_* %6.2f
+
+. format v_* %9.1f
+
+. 
+. display _newline "--- Partición de la varianza por año (porcentajes) ---"
+
+--- Partición de la varianza por año (porcentajes) ---
+
+. list year p_icc_mcpio p_icc_sede p_icc_est, clean noobs
+
+    year   p_icc_~o   p_icc_~e   p_icc_~t  
+    2018      11.59      19.36      69.06  
+    2019      13.32      19.11      67.57  
+    2020      10.55      17.35      72.10  
+    2021      10.59      16.67      72.75  
+    2022      11.42      16.91      71.67  
+    2023      11.63      16.37      72.00  
+
+. 
+. display _newline "--- Componentes de varianza en unidades de puntaje ---"
+
+--- Componentes de varianza en unidades de puntaje ---
+
+. list year v_mcpio v_sede v_est, clean noobs
+
+    year   v_mcpio   v_sede    v_est  
+    2018     207.6    346.8   1237.3  
+    2019     255.3    366.2   1294.9  
+    2020     172.0    282.9   1175.5  
+    2021     189.7    298.6   1303.2  
+    2022     216.9    321.3   1361.6  
+    2023     225.4    317.2   1395.4  
+
+. 
+. export delimited using "Tabla_Obj2_ICC.csv", replace
+file Tabla_Obj2_ICC.csv saved
+
+. 
+. * --- Figura 1: composición de la varianza ---
+. generate double acum1 = p_icc_mcpio
+
+. generate double acum2 = p_icc_mcpio + p_icc_sede
+
+. generate double acum3 = 100
+
+. 
+. twoway (area acum3 year, color(gs14))                                        ///
+>        (area acum2 year, color(gs10))                                        ///
+>        (area acum1 year, color(gs5)),                                        ///
+>     legend(order(3 "Municipio" 2 "Sede" 1 "Estudiante") rows(1) position(6)) ///
+>     ytitle("Porcentaje de la varianza total") xtitle("Año de la cohorte")    ///
+>     ylabel(0(20)100, angle(horizontal)) xlabel(2018(1)2023)                  ///
+>     title("") name(g_icc_area, replace)
+
+. graph export "Fig_Obj2_particion.png", replace width(2000)
+file Fig_Obj2_particion.png saved as PNG format
+
+. 
+. * --- Figura 2: las dos cuotas que se mueven ---
+. * La cuota del municipio es casi plana; el intercambio ocurre entre sede y
+. * estudiante, así que conviene un gráfico que lo aísle.
+. twoway (connected p_icc_sede year, msymbol(O) lpattern(solid))               ///
+>        (connected p_icc_mcpio year, msymbol(S) lpattern(dash)),              ///
+>     legend(order(1 "Sede" 2 "Municipio") rows(1) position(6))                ///
+>     ytitle("Porcentaje de la varianza total") xtitle("Año de la cohorte")    ///
+>     ylabel(8(2)22, angle(horizontal)) xlabel(2018(1)2023)                    ///
+>     title("") name(g_icc_lineas, replace)
+
+. graph export "Fig_Obj2_evolucion.png", replace width(2000)
+file Fig_Obj2_evolucion.png saved as PNG format
+
+. 
+. 
+. ********************************************************************************
+. * [2] TABLAS DE LA PROGRESIÓN TRANSVERSAL ANUAL (OBJETIVO 3)
+. ********************************************************************************
+. * Se producen tres tablas de distinta extensión, pensadas para lugares
+. * distintos del documento:
+. *
+. *   Tabla_Obj3_anual_resumen.rtf
+. *       Los coeficientes que el capítulo discute, con una columna por cohorte,
+. *       tomados del modelo contextual M3ctx. Es la tabla del CUERPO: responde
+. *       de un vistazo si las magnitudes se movieron durante el periodo.
+. *
+. *   Tabla_Obj3_anual_<año>.rtf   (seis archivos)
+. *       La progresión completa M1a -> M3ctx de cada cohorte. Son las tablas
+. *       del ANEXO.
+. *
+. *   Tabla_Obj3_cwc_anual.rtf
+. *       Los dos coeficientes del centrado al clúster por cohorte. También del
+. *       ANEXO, porque su función es descartar la falacia ecológica y no
+. *       constituir un hallazgo en sí.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[2] OBJETIVO 3 - PROGRESIÓN ANUAL"
+[2] OBJETIVO 3 - PROGRESIÓN ANUAL
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. * ----------------------------------------------------------------------
+. * [2.1] Tabla compacta del modelo contextual, una columna por cohorte
+. * ----------------------------------------------------------------------
+. * Se usa M3ctx y no M3 porque es la especificación de referencia: al incluir
+. * el INSE medio de la sede, el coeficiente individual deja de ser una mezcla
+. * del efecto dentro y entre sedes.
+. 
+. capture estimates clear
+
+. local cols_res ""
+
+. foreach a in 2018 2019 2020 2021 2022 2023 {
+  2.     capture estimates use "M3ctx_`a'.ster"
+  3.     if _rc == 0 {
+  4.         estimates store R`a'
+  5.         local cols_res "`cols_res' R`a'"
+  6.     }
+  7.     else {
+  8.         display as error "No se encontró M3ctx_`a'.ster"
+  9.     }
+ 10. }
+
+. 
+. if "`cols_res'" != "" {
+.     esttab `cols_res' using "Tabla_Obj3_anual_resumen.rtf", replace          ///
+>         b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) noomitted                   ///
+>         keep(c_inse c_inse_prom_sede pct_planta rural ln_matricula           ///
+>              ratio_alumnos_docente z_posgrado dotacion_tic ju_unica          ///
+>              indice_vuln)                                                    ///
+>         mtitles("2018" "2019" "2020" "2021" "2022" "2023")                   ///
+>         title("Modelo contextual estimado por separado en cada cohorte")     ///
+>         addnotes("Cada columna es un modelo multinivel de tres niveles estimado solo con la
+>  cohorte de ese año." ///
+>                  "c_inse mide el efecto dentro de la sede y c_inse_prom_sede el efecto cont
+> extual del establecimiento." ///
+>                  "Todos incluyen el bloque individual e institucional completo; se muestran
+>  los coeficientes discutidos en el texto." ///
+>                  "El coeficiente de sedes exclusivamente femeninas se omite por descansar e
+> n unas cinco sedes por año.") ///
+>         nogaps compress
+(output written to Tabla_Obj3_anual_resumen.rtf)
+. 
+.     esttab `cols_res', b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) noomitted    ///
+>         keep(c_inse c_inse_prom_sede pct_planta rural ln_matricula indice_vuln) ///
+>         mtitles("2018" "2019" "2020" "2021" "2022" "2023") nogaps compress
+
+----------------------------------------------------------------------------------------
+                 (1)          (2)          (3)          (4)          (5)          (6)   
+                2018         2019         2020         2021         2022         2023   
+----------------------------------------------------------------------------------------
+punt_glo~l                                                                              
+c_inse         0.397***     0.366***     0.104        0.300***     0.118*       0.348***
+             (0.065)      (0.067)      (0.064)      (0.067)      (0.070)      (0.072)   
+c_inse_p~e     0.606**      0.923***     0.863***     1.248***     0.853***     1.018***
+             (0.261)      (0.269)      (0.245)      (0.249)      (0.250)      (0.262)   
+ln_matri~a     7.439***     7.030***     4.787***     4.750***     8.174***     6.607***
+             (1.618)      (1.738)      (1.629)      (1.675)      (1.745)      (1.809)   
+pct_planta    15.329***    12.625***    12.443***    12.141***    17.100***    17.363***
+             (3.820)      (3.561)      (3.555)      (3.161)      (2.941)      (3.153)   
+rural         -2.892       -4.789**     -5.092**     -4.646**     -6.321***    -7.729***
+             (2.373)      (2.398)      (2.206)      (2.217)      (2.214)      (2.184)   
+indice_v~n    -4.133       -4.367       -3.246       -2.875       -1.983       -2.263   
+             (3.478)      (2.888)      (2.225)      (1.976)      (2.093)      (2.311)   
+----------------------------------------------------------------------------------------
+N              11456        11487        10992        11652        11797        12366   
+----------------------------------------------------------------------------------------
+Standard errors in parentheses
+* p<0.10, ** p<0.05, *** p<0.01
+. }
+
+. 
+. * ----------------------------------------------------------------------
+. * [2.2] Tablas extensas: la progresión completa de cada cohorte
+. * ----------------------------------------------------------------------
+. foreach a in 2018 2019 2020 2021 2022 2023 {
+  2. 
+.     capture estimates clear
+  3.     local cols ""
+  4.     foreach m in M1a M1 M2 M3 M3ctx {
+  5.         capture estimates use "`m'_`a'.ster"
+  6.         if _rc == 0 {
+  7.             estimates store P`m'
+  8.             local cols "`cols' P`m'"
+  9.         }
+ 10.     }
+ 11. 
+.     if "`cols'" != "" {
+ 12.         esttab `cols' using "Tabla_Obj3_anual_`a'.rtf", replace              ///
+>             b(3) se(3) star(* 0.10 ** 0.05 *** 0.01)                         ///
+>             keep(punt_global:*) noomitted                                    ///
+>             mtitles("M1a" "M1" "M2" "M3" "M3ctx")                            ///
+>             title("Progresión de modelos, cohorte `a'")                      ///
+>             addnotes("M1a estima el gradiente socioeconómico total; M1 el gradiente neto de
+>  la dotación del hogar." ///
+>                      "M3ctx añade el INSE medio de la sede, con lo que el coeficiente indiv
+> idual pasa a medir el efecto dentro de la sede." ///
+>                      "Estimación por máxima verosimilitud sobre 20 imputaciones múltiples."
+> ) ///
+>             nogaps compress
+ 13.         display "Generada: Tabla_Obj3_anual_`a'.rtf"
+ 14.     }
+ 15. }
+(output written to Tabla_Obj3_anual_2018.rtf)
+Generada: Tabla_Obj3_anual_2018.rtf
+(output written to Tabla_Obj3_anual_2019.rtf)
+Generada: Tabla_Obj3_anual_2019.rtf
+(output written to Tabla_Obj3_anual_2020.rtf)
+Generada: Tabla_Obj3_anual_2020.rtf
+(output written to Tabla_Obj3_anual_2021.rtf)
+Generada: Tabla_Obj3_anual_2021.rtf
+(output written to Tabla_Obj3_anual_2022.rtf)
+Generada: Tabla_Obj3_anual_2022.rtf
+(output written to Tabla_Obj3_anual_2023.rtf)
+Generada: Tabla_Obj3_anual_2023.rtf
+
+. 
+. * ----------------------------------------------------------------------
+. * [2.3] Figura: evolución del gradiente socioeconómico
+. * ----------------------------------------------------------------------
+. * Una figura comunica la estabilidad o la tendencia mejor que una fila de
+. * números, que es justamente la pregunta que motiva estimar año por año.
+. 
+. preserve
+
+.     use "Coef_por_year.dta", clear
+
+.     keep if inlist(modelo, "M1a", "M3ctx")
+(24 observations deleted)
+
+. 
+.     generate double lo = b_ind - 1.96*se_ind
+
+.     generate double hi = b_ind + 1.96*se_ind
+
+. 
+.     generate byte mod = 1 if modelo == "M1a"
+(6 missing values generated)
+
+.     replace     mod = 2 if modelo == "M3ctx"
+(6 real changes made)
+
+. 
+.     display _newline "--- Datos de la figura de evolución ---"
+
+--- Datos de la figura de evolución ---
+
+.     list year modelo b_ind lo hi, clean noobs
+
+    year   modelo       b_ind           lo          hi  
+    2018      M1a   .48908392    .40036977   .57779807  
+    2018    M3ctx   .39665157    .26888426   .52441888  
+    2019      M1a   .53440282    .44529404   .62351161  
+    2019    M3ctx   .36648201     .2348877   .49807632  
+    2020      M1a   .47686502    .38909817   .56463186  
+    2020    M3ctx   .10408213   -.02147155   .22963581  
+    2021      M1a   .53995136    .44993296   .62996976  
+    2021    M3ctx   .30048699    .16955778    .4314162  
+    2022      M1a   .41894631    .32352062     .514372  
+    2022    M3ctx   .11806322   -.01874008   .25486651  
+    2023      M1a   .48474556    .38915976   .58033137  
+    2023    M3ctx   .34795709     .2073468   .48856737  
+
+. 
+.     twoway (rarea lo hi year if mod == 1, color(gs13))                       ///
+>            (connected b_ind year if mod == 1, msymbol(O) lcolor(black)       ///
+>                 mcolor(black))                                               ///
+>            (rarea lo hi year if mod == 2, color(gs15))                       ///
+>            (connected b_ind year if mod == 2, msymbol(S) lpattern(dash)      ///
+>                 lcolor(black) mcolor(black)),                                ///
+>         legend(order(2 "Gradiente total (M1a)"                               ///
+>                      4 "Efecto dentro de la sede (M3ctx)")                   ///
+>                rows(1) position(6) size(small))                              ///
+>         ytitle("Puntos por unidad del índice socioeconómico")                ///
+>         xtitle("Año de la cohorte")                                          ///
+>         xlabel(2018(1)2023) yline(0, lpattern(dot) lcolor(gs8))              ///
+>         name(g_grad_anual, replace)
+
+. 
+.     graph export "Fig_Obj3_evolucion_coef.png", replace width(2000)
+file Fig_Obj3_evolucion_coef.png saved as PNG format
+
+.     display "Generada: Fig_Obj3_evolucion_coef.png"
+Generada: Fig_Obj3_evolucion_coef.png
+
+. restore
+
+. 
+. 
+. ********************************************************************************
+. * [3] VARIANZA EXPLICADA POR BLOQUE, COHORTE POR COHORTE
+. ********************************************************************************
+. * La comparación correcta es contra el modelo nulo DEL MISMO AÑO: usar el nulo
+. * agrupado mezclaría la varianza de seis cohortes distintas.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[3] VARIANZA EXPLICADA POR BLOQUE Y POR COHORTE"
+[3] VARIANZA EXPLICADA POR BLOQUE Y POR COHORTE
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. display _newline "Año   Modelo   Municipio     Sede    Residuo   R2mcpio  R2sede"
+
+Año   Modelo   Municipio     Sede    Residuo   R2mcpio  R2sede
+
+. 
+. foreach a in 2018 2019 2020 2021 2022 2023 {
+  2. 
+.     capture estimates use "M0_`a'.ster"
+  3.     if _rc != 0 {
+  4.         display as error "Falta M0_`a'.ster"
+  5.         continue
+  6.     }
+  7.     scalar vm0 = exp(2*_b[lns1_1_1:_cons])
+  8.     scalar vs0 = exp(2*_b[lns2_1_1:_cons])
+  9.     scalar vr0 = exp(2*_b[lnsig_e:_cons])
+ 10.     display "`a'  Nulo   " %9.2f vm0 " " %9.2f vs0 " " %9.2f vr0
+ 11. 
+.     foreach m in M1a M1 M2 M3 M3ctx {
+ 12.         capture estimates use "`m'_`a'.ster"
+ 13.         if _rc == 0 {
+ 14.             scalar vm = exp(2*_b[lns1_1_1:_cons])
+ 15.             scalar vs = exp(2*_b[lns2_1_1:_cons])
+ 16.             scalar vr = exp(2*_b[lnsig_e:_cons])
+ 17.             display "`a'  `m'  " %9.2f vm " " %9.2f vs " " %9.2f vr ///
+>                     "   " %6.3f (vm0-vm)/vm0 "  " %6.3f (vs0-vs)/vs0
+ 18.         }
+ 19.     }
+ 20. }
+2018  Nulo      207.60    346.83   1237.26
+2018  M1a     177.71    279.57   1120.32    0.144   0.194
+2018  M1     172.40    268.32   1107.78    0.170   0.226
+2018  M2     182.54    142.41   1107.57    0.121   0.589
+2018  M3     178.89    142.09   1107.59    0.138   0.590
+2018  M3ctx     194.71    135.91   1107.84    0.062   0.608
+2019  Nulo      255.27    366.25   1294.86
+2019  M1a     209.58    289.99   1180.81    0.179   0.208
+2019  M1     200.25    280.78   1164.18    0.216   0.233
+2019  M2     220.32    149.10   1163.87    0.137   0.593
+2019  M3     211.88    148.95   1163.88    0.170   0.593
+2019  M3ctx     224.02    139.47   1164.16    0.122   0.619
+2020  Nulo      172.02    282.86   1175.54
+2020  M1a     142.88    231.61   1082.27    0.169   0.181
+2020  M1     135.08    215.04   1057.39    0.215   0.240
+2020  M2     134.11    121.54   1057.29    0.220   0.570
+2020  M3     130.60    121.31   1057.30    0.241   0.571
+2020  M3ctx     146.45    111.13   1057.79    0.149   0.607
+2021  Nulo      189.71    298.56   1303.21
+2021  M1a     161.98    239.71   1215.43    0.146   0.197
+2021  M1     151.02    226.99   1194.53    0.204   0.240
+2021  M2     152.01    143.05   1194.76    0.199   0.521
+2021  M3     149.30    142.68   1194.78    0.213   0.522
+2021  M3ctx     176.43    123.02   1195.56    0.070   0.588
+2022  Nulo      216.90    321.28   1361.57
+2022  M1a     185.32    270.84   1264.74    0.146   0.157
+2022  M1     176.12    252.36   1238.90    0.188   0.215
+2022  M2     187.22    128.50   1238.95    0.137   0.600
+2022  M3     184.03    128.51   1238.94    0.152   0.600
+2022  M3ctx     189.78    118.71   1239.66    0.125   0.630
+2023  Nulo      225.42    317.17   1395.41
+2023  M1a     197.02    269.74   1315.63    0.126   0.150
+2023  M1     193.49    257.64   1294.51    0.142   0.188
+2023  M2     185.37    138.88   1294.89    0.178   0.562
+2023  M3     182.25    138.74   1294.91    0.192   0.563
+2023  M3ctx     194.42    126.25   1295.55    0.138   0.602
+
+. 
+. display _newline "La reducción proporcional respecto del modelo nulo es la"
+
+La reducción proporcional respecto del modelo nulo es la
+
+. display "medida habitual de varianza explicada en modelos multinivel. Un valor"
+medida habitual de varianza explicada en modelos multinivel. Un valor
+
+. display "negativo es posible y no indica error: ocurre cuando una covariable de"
+negativo es posible y no indica error: ocurre cuando una covariable de
+
+. display "un nivel redistribuye varianza entre niveles."
+un nivel redistribuye varianza entre niveles.
+
+. 
+. 
+. ********************************************************************************
+. * [3B] EL GRADIENTE SOCIOECONÓMICO, COHORTE POR COHORTE
+. ********************************************************************************
+. * El ICFES construye el índice socioeconómico a partir de ítems que incluyen la
+. * tenencia de computador e internet. Incluir esas variables junto al índice le
+. * pide a este que explique lo que queda tras descontar parte de su propio
+. * contenido, de modo que el coeficiente resultante es un efecto PARCIAL.
+. *
+. * M1a estima el gradiente TOTAL. La diferencia entre ambos es la fracción de la
+. * asociación socioeconómica que opera a través de la dotación material del
+. * hogar. Los dos se reportan porque responden a preguntas distintas.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[3B] GRADIENTE SOCIOECONÓMICO POR COHORTE"
+[3B] GRADIENTE SOCIOECONÓMICO POR COHORTE
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "Base_Estimacion.dta", clear
+
+. 
+. display _newline "Año   SD INSE   SD puntaje   Total   Ptos/SD   En SD   Dentro sede   Abso
+> rbido"
+
+Año   SD INSE   SD puntaje   Total   Ptos/SD   En SD   Dentro sede   Absorbido
+
+. 
+. foreach a in 2018 2019 2020 2021 2022 2023 {
+  2. 
+.     quietly summarize estu_inse_individual if _mi_m == 1 & year == `a'
+  3.     scalar sd_inse = r(sd)
+  4.     quietly summarize punt_global if _mi_m == 1 & year == `a'
+  5.     scalar sd_punt = r(sd)
+  6. 
+.     scalar b_total = .
+  7.     scalar b_dentro = .
+  8. 
+.     capture estimates use "M1a_`a'.ster"
+  9.     if _rc == 0 scalar b_total = _b[c_inse]
+ 10. 
+.     capture estimates use "M3ctx_`a'.ster"
+ 11.     if _rc == 0 scalar b_dentro = _b[c_inse]
+ 12. 
+.     if !missing(b_total) & !missing(b_dentro) {
+ 13.         display "`a'  " %7.3f sd_inse "  " %8.3f sd_punt "  " ///
+>                 %7.4f b_total "  " %7.3f b_total*sd_inse "  " ///
+>                 %6.4f b_total*sd_inse/sd_punt "  " %9.4f b_dentro "  " ///
+>                 %6.1f 100*(1 - b_dentro/b_total) "%"
+ 14.     }
+ 15. }
+2018    8.713    45.389   0.4891    4.261  0.0939     0.3967    18.9%
+2019    8.760    46.704   0.5344    4.682  0.1002     0.3665    31.4%
+2020    8.782    43.902   0.4769    4.188  0.0954     0.1041    78.2%
+2021    8.824    44.784   0.5400    4.764  0.1064     0.3005    44.3%
+2022    8.496    47.064   0.4189    3.560  0.0756     0.1181    71.8%
+2023    7.927    47.054   0.4847    3.843  0.0817     0.3480    28.2%
+
+. 
+. display _newline "La última columna es la fracción del gradiente total que"
+
+La última columna es la fracción del gradiente total que
+
+. display "absorben las variables del hogar y la composición de la sede."
+absorben las variables del hogar y la composición de la sede.
+
+. 
+. 
+. ********************************************************************************
+. * [4] EFECTO CONTEXTUAL: LAS DOS PARAMETRIZACIONES
+. ********************************************************************************
+. * M3ctx y M3cwc contienen la misma información escrita de dos formas. Bajo
+. * centrado al clúster los dos coeficientes son ortogonales y se leen directo:
+. * uno es el efecto dentro de la sede y el otro el efecto entre sedes. Bajo
+. * centrado en la gran media, el coeficiente de la media de sede mide
+. * directamente el efecto CONTEXTUAL, es decir la diferencia entre ambos.
+. *
+. * El contraste de igualdad es lo que decide si existe un efecto composicional
+. * distinguible del individual. Estimarlo por cohorte permite ver si esa
+. * conclusión se sostiene en todas o si el promedio del periodo oculta
+. * comportamientos distintos.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[4] EFECTO CONTEXTUAL POR COHORTE"
+[4] EFECTO CONTEXTUAL POR COHORTE
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. capture estimates clear
+
+. local cols_cwc ""
+
+. foreach a in 2018 2019 2020 2021 2022 2023 {
+  2.     capture estimates use "M3cwc_`a'.ster"
+  3.     if _rc == 0 {
+  4.         estimates store C`a'
+  5.         local cols_cwc "`cols_cwc' C`a'"
+  6.     }
+  7. }
+
+. 
+. if "`cols_cwc'" != "" {
+.     esttab `cols_cwc' using "Tabla_Obj3_cwc_anual.rtf", replace              ///
+>         b(3) se(3) star(* 0.10 ** 0.05 *** 0.01) noomitted                   ///
+>         keep(cwc_inse c_inse_prom_sede)                                      ///
+>         mtitles("2018" "2019" "2020" "2021" "2022" "2023")                   ///
+>         title("Especificación con centrado al clúster, por cohorte")         ///
+>         addnotes("cwc_inse mide la ventaja del estudiante frente a sus propios compañeros d
+> e sede." ///
+>                  "c_inse_prom_sede mide el efecto de estudiar en una sede de mayor nivel so
+> cioeconómico." ///
+>                  "Ambos modelos incluyen el bloque individual, el institucional y el índice
+>  de vulnerabilidad.") ///
+>         nogaps compress
+(output written to Tabla_Obj3_cwc_anual.rtf)
+. }
+
+. 
+. display _newline "--- Contraste dentro frente a entre sedes, por cohorte ---"
+
+--- Contraste dentro frente a entre sedes, por cohorte ---
+
+. display "Año    Dentro    Entre    Diferencia   Error est.        p"
+Año    Dentro    Entre    Diferencia   Error est.        p
+
+. 
+. foreach a in 2018 2019 2020 2021 2022 2023 {
+  2.     capture estimates use "M3cwc_`a'.ster"
+  3.     if _rc == 0 {
+  4.         scalar b_w = _b[cwc_inse]
+  5.         scalar b_b = _b[c_inse_prom_sede]
+  6.         quietly lincom cwc_inse - c_inse_prom_sede
+  7.         display "`a'  " %8.4f b_w "  " %8.4f b_b "  " %10.4f r(estimate) ///
+>                 "  " %10.4f r(se) "  " ///
+>                 %8.4f 2*(1-normal(abs(r(estimate)/r(se))))
+  8.     }
+  9. }
+2018    0.3967    1.0024     -0.6057      0.2612    0.0204
+2019    0.3665    1.2892     -0.9228      0.2686    0.0006
+2020    0.1041    0.9671     -0.8630      0.2448    0.0004
+2021    0.3005    1.5484     -1.2479      0.2494    0.0000
+2022    0.1181    0.9712     -0.8531      0.2499    0.0006
+2023    0.3480    1.3658     -1.0179      0.2618    0.0001
+
+. 
+. display _newline "Si el contraste no se rechaza en ninguna cohorte, la"
+
+Si el contraste no se rechaza en ninguna cohorte, la
+
+. display "conclusión se sostiene en todo el periodo y no es un promedio que"
+conclusión se sostiene en todo el periodo y no es un promedio que
+
+. display "oculte comportamientos distintos entre años."
+oculte comportamientos distintos entre años.
+
+. 
+. ********************************************************************************
+. * [5] TABLA DEL OBJETIVO 4
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[5] OBJETIVO 4"
+[5] OBJETIVO 4
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. foreach m in ML1 ML2 ML3 ML4 {
+  2.     capture estimates use "`m'.ster"
+  3.     if _rc == 0 {
+  4.         estimates store `m'
+  5.     }
+  6.     else {
+  7.         display as error "No se encontró `m'.ster"
+  8.     }
+  9. }
+
+. 
+. esttab ML1 ML2 ML3 ML4 using "Tabla_Obj4_temporal.rtf", replace        ///
+>     b(3) se(3) star(* 0.10 ** 0.05 *** 0.01)                           ///
+>     keep(punt_global:*)                                                ///
+>     mtitles("ML1" "ML2" "ML3" "ML4")                                   ///
+>     title("Cortes transversales repetidos y entorno municipal rezagado") ///
+>     addnotes("ML2 descompone el índice en componente entre municipios y componente dentro d
+> el municipio." ///
+>              "ML3 aplica la misma descomposición a las tres dimensiones por separado." ///
+>              "Los datos municipales corresponden al año anterior al de la cohorte.") ///
+>     nogaps compress
+(output written to Tabla_Obj4_temporal.rtf)
+
+. 
+. esttab ML1 ML2 ML3 ML4, b(3) se(3) star(* 0.10 ** 0.05 *** 0.01)      ///
+>     keep(punt_global:*) mtitles("ML1" "ML2" "ML3" "ML4") nogaps compress
+
+--------------------------------------------------------------
+                 (1)          (2)          (3)          (4)   
+                 ML1          ML2          ML3          ML4   
+--------------------------------------------------------------
+punt_glo~l                                                    
+c_inse         0.271***     0.271***     0.272***     0.270***
+             (0.027)      (0.027)      (0.027)      (0.027)   
+mujer         -8.149***    -8.149***    -8.147***    -8.149***
+             (0.278)      (0.278)      (0.278)      (0.278)   
+edad          -7.499***    -7.499***    -7.496***    -7.496***
+             (0.124)      (0.124)      (0.124)      (0.124)   
+repitente      5.899***     5.897***     5.911***     5.926***
+             (0.418)      (0.418)      (0.418)      (0.418)   
+lectura_~n     6.837***     6.837***     6.845***     6.840***
+             (0.293)      (0.293)      (0.293)      (0.293)   
+libros_~as     5.522***     5.522***     5.521***     5.521***
+             (0.401)      (0.401)      (0.401)      (0.401)   
+trabaja~20    -3.002***    -3.002***    -3.010***    -2.994***
+             (0.711)      (0.711)      (0.711)      (0.711)   
+internet~r     0.350        0.351        0.350        0.359   
+             (0.380)      (0.380)      (0.380)      (0.380)   
+computad~r     0.572        0.572        0.568        0.574   
+             (0.364)      (0.364)      (0.364)      (0.364)   
+ln_matri~a     4.081***     4.106***     4.105***     4.130***
+             (0.931)      (0.933)      (0.934)      (0.935)   
+ratio_al~e    -0.049       -0.049       -0.051       -0.056   
+             (0.062)      (0.062)      (0.062)      (0.062)   
+pct_planta     6.922***     6.928***     7.123***     6.951***
+             (1.431)      (1.431)      (1.432)      (1.434)   
+z_posgrado     0.062        0.061        0.072        0.056   
+             (0.149)      (0.149)      (0.149)      (0.150)   
+dotacion~c    -0.048       -0.040        0.262       -0.070   
+             (1.494)      (1.493)      (1.493)      (1.493)   
+rural        -12.050***   -12.023***   -11.929***   -12.016***
+             (1.755)      (1.756)      (1.755)      (1.757)   
+ju_unica       0.132        0.135        0.112        0.216   
+             (0.625)      (0.625)      (0.625)      (0.626)   
+tecnico       -0.679       -0.693       -0.671       -0.716   
+             (1.345)      (1.345)      (1.345)      (1.343)   
+tecnico_~o    -5.873**     -5.895**     -5.941**     -5.910** 
+             (2.606)      (2.606)      (2.607)      (2.606)   
+cole_fem~o    36.322***    36.306***    36.299***    36.327***
+             (5.595)      (5.594)      (5.588)      (5.595)   
+indice_v~n    -0.889**                                        
+             (0.401)                                          
+2018.year      0.000        0.000        0.000        0.000   
+                 (.)          (.)          (.)          (.)   
+2019.year     -4.527***    -4.534***    -4.530***    -4.165***
+             (0.471)      (0.471)      (0.474)      (0.583)   
+2020.year     -3.676***    -3.684***    -3.861***    -3.527***
+             (0.516)      (0.516)      (0.520)      (0.598)   
+2021.year     -8.580***    -8.591***    -8.799***    -8.570***
+             (0.527)      (0.528)      (0.534)      (0.594)   
+2022.year     -3.026***    -3.040***    -3.117***    -2.997***
+             (0.555)      (0.556)      (0.561)      (0.618)   
+2023.year      0.344        0.325        0.592        1.301*  
+             (0.588)      (0.590)      (0.597)      (0.681)   
+vuln_bar                   -1.814                    -1.810   
+                          (2.412)                   (2.415)   
+vuln_dev                   -0.862**                  -1.059   
+                          (0.407)                   (0.858)   
+tasa_hom~r                               0.007                
+                                       (0.063)                
+tasa_hom~v                              -0.007                
+                                       (0.006)                
+ln_coca_~r                              -1.034                
+                                       (0.772)                
+ln_coca_~v                              -0.149                
+                                       (0.154)                
+ln_inver~r                              -0.617                
+                                       (2.949)                
+ln_inver~v                               3.266***             
+                                       (1.035)                
+2018.yea~v                                            0.000   
+                                                        (.)   
+2019.yea~v                                            2.238   
+                                                    (1.548)   
+2020.yea~v                                            1.751   
+                                                    (1.677)   
+2021.yea~v                                            1.650   
+                                                    (1.509)   
+2022.yea~v                                            0.207   
+                                                    (1.573)   
+2023.yea~v                                           -2.330*  
+                                                    (1.363)   
+_cons        331.153***   331.026***   339.944***   330.878***
+             (6.863)      (6.869)     (34.557)      (6.883)   
+--------------------------------------------------------------
+N              69750        69750        69750        69750   
+--------------------------------------------------------------
+Standard errors in parentheses
+* p<0.10, ** p<0.05, *** p<0.01
+
+. 
+. * ----------------------------------------------------------------------
+. * [5.1] Pendiente de la vulnerabilidad en cada año
+. * ----------------------------------------------------------------------
+. * Los coeficientes de la interacción no se leen directamente: cada uno es la
+. * diferencia respecto de 2018. La pendiente de un año es la suma del efecto
+. * principal más su interacción, y eso es lo que se reporta.
+. 
+. capture estimates use "ML4.ster"
+
+. if _rc == 0 {
+.     display _newline "--- Asociación entre vulnerabilidad y puntaje, por año ---"
+
+--- Asociación entre vulnerabilidad y puntaje, por año ---
+. 
+.     display _newline "2018 (categoría de referencia):"
+
+2018 (categoría de referencia):
+.     lincom vuln_dev
+
+ ( 1)  [punt_global]vuln_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -1.059303   .8584499    -1.23   0.217    -2.741834    .6232274
+------------------------------------------------------------------------------
+. 
+.     foreach a in 2019 2020 2021 2022 2023 {
+  2.         display _newline "`a':"
+  3.         lincom vuln_dev + `a'.year#c.vuln_dev
+  4.     }
+
+2019:
+
+ ( 1)  [punt_global]vuln_dev + [punt_global]2019.year#c.vuln_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   1.178217   1.413605     0.83   0.405    -1.592398    3.948832
+------------------------------------------------------------------------------
+
+2020:
+
+ ( 1)  [punt_global]vuln_dev + [punt_global]2020.year#c.vuln_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .6918254   1.431605     0.48   0.629    -2.114069     3.49772
+------------------------------------------------------------------------------
+
+2021:
+
+ ( 1)  [punt_global]vuln_dev + [punt_global]2021.year#c.vuln_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .5902715   1.150988     0.51   0.608    -1.665623    2.846167
+------------------------------------------------------------------------------
+
+2022:
+
+ ( 1)  [punt_global]vuln_dev + [punt_global]2022.year#c.vuln_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.8523093   1.174502    -0.73   0.468    -3.154292    1.449673
+------------------------------------------------------------------------------
+
+2023:
+
+ ( 1)  [punt_global]vuln_dev + [punt_global]2023.year#c.vuln_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -3.389467   .9831864    -3.45   0.001    -5.316477   -1.462457
+------------------------------------------------------------------------------
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [6] EFECTOS ALEATORIOS DE SEDE
+. ********************************************************************************
+. * Este bloque sí estima: predecir efectos aleatorios exige un ajuste individual,
+. * porque no están definidos sobre el conjunto combinado de imputaciones. Se usa
+. * la primera imputación y así debe declararse en el pie de la figura.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[6] EFECTOS ALEATORIOS DE SEDE"
+[6] EFECTOS ALEATORIOS DE SEDE
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "Base_Estimacion.dta", clear
+
+. mi extract 1, clear
+
+. 
+. display _newline "Reestimando M4 sobre la primera imputación para predecir los"
+
+Reestimando M4 sobre la primera imputación para predecir los
+
+. display "efectos aleatorios. Esto tarda unos minutos."
+efectos aleatorios. Esto tarda unos minutos.
+
+. 
+. global v_n1 mujer edad repitente lectura_30min libros_26omas ///
+>             trabaja_mas20 internet_hogar computador_hogar
+
+. global v_n2 ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>             dotacion_tic rural ju_unica tecnico tecnico_academico ///
+>             cole_femenino
+
+. 
+. quietly mixed punt_global cwc_inse c_inse_prom_sede $v_n1 $v_n2 indice_vuln ///
+>     || mcpio_id: || sede_id: cwc_inse , mle covariance(unstructured)
+
+. 
+. predict double re_*, reffects
+
+. predict double se_*, reses
+
+. 
+. display _newline "--- Efectos aleatorios generados ---"
+
+--- Efectos aleatorios generados ---
+
+. describe re_* se_*
+
+Variable      Storage   Display    Value
+    name         type    format    label      Variable label
+---------------------------------------------------------------------------------------------
+re_1            double  %10.0g                BLUP r.e. for mcpio_id: _cons
+re_2            double  %10.0g                BLUP r.e. for sede_id: cwc_inse
+re_3            double  %10.0g                BLUP r.e. for sede_id: _cons
+se_1            double  %10.0g                BLUP r.e. std. errors for mcpio_id: _cons
+se_2            double  %10.0g                BLUP r.e. std. errors for sede_id: cwc_inse
+se_3            double  %10.0g                BLUP r.e. std. errors for sede_id: _cons
+
+. display "El orden es: municipio, luego pendiente y constante de la sede."
+El orden es: municipio, luego pendiente y constante de la sede.
+
+. 
+. * --- Figura 3: efectos aleatorios de sede ordenados ---
+. * Muestra qué sedes rinden por encima o por debajo de lo que predicen sus
+. * características observables.
+. preserve
+
+.     egen byte _t = tag(sede_id)
+
+.     keep if _t == 1
+(69,313 observations deleted)
+
+. 
+.     * El nombre de la constante de sede depende de cuántos niveles y pendientes
+.     * tenga el modelo. Se toma la última variable generada, que corresponde a
+.     * la constante del nivel más interno.
+.     unab lista_re : re_*
+
+.     local n_re : word count `lista_re'
+
+.     local vre : word `n_re' of `lista_re'
+
+.     unab lista_se : se_*
+
+.     local vse : word `n_re' of `lista_se'
+
+.     display "Usando `vre' como constante de sede."
+Usando re_3 como constante de sede.
+
+. 
+.     generate double lo = `vre' - 1.96*`vse'
+
+.     generate double hi = `vre' + 1.96*`vse'
+
+.     sort `vre'
+
+.     generate long rango = _n
+
+. 
+.     twoway (rarea lo hi rango, color(gs13))                                  ///
+>            (line `vre' rango, lcolor(black)),                                ///
+>         yline(0, lpattern(dash) lcolor(gs8))                                 ///
+>         legend(off)                                                          ///
+>         ytitle("Efecto aleatorio de la sede (puntos)")                       ///
+>         xtitle("Sedes ordenadas por su efecto estimado")                     ///
+>         name(g_caterpillar, replace)
+
+.     graph export "Fig_Obj3_efectos_sede.png", replace width(2000)
+file Fig_Obj3_efectos_sede.png saved as PNG format
+
+. 
+.     display _newline "--- Sedes con mayor efecto positivo ---"
+
+--- Sedes con mayor efecto positivo ---
+
+.     gsort -`vre'
+
+.     list sede_id `vre' in 1/5, clean noobs
+
+    sede_id        re_3  
+         90   50.472451  
+         10    38.24601  
+        233    34.99249  
+         86   29.064351  
+        170   28.551211  
+
+.     display _newline "--- Sedes con mayor efecto negativo ---"
+
+--- Sedes con mayor efecto negativo ---
+
+.     sort `vre'
+
+.     list sede_id `vre' in 1/5, clean noobs
+
+    sede_id         re_3  
+        427   -34.793382  
+        424   -28.636814  
+        400   -26.447945  
+        362   -23.437777  
+        234   -23.340077  
+
+. restore
+
+. 
+. * --- Figura 4: gradiente socioeconómico por sede ---
+. * La correlación positiva entre pendiente e intercepto significa que las sedes
+. * con mejor desempeño medio tienen gradientes más pronunciados. El gráfico lo
+. * muestra de forma directa.
+. preserve
+
+.     egen byte _t = tag(sede_id)
+
+.     keep if _t == 1
+(69,313 observations deleted)
+
+. 
+.     unab lista_re : re_*
+
+.     local n_re : word count `lista_re'
+
+.     local v_cons : word `n_re' of `lista_re'
+
+.     local pos_pend = `n_re' - 1
+
+.     local v_pend : word `pos_pend' of `lista_re'
+
+.     display "Constante de sede: `v_cons'   Pendiente de sede: `v_pend'"
+Constante de sede: re_3   Pendiente de sede: re_2
+
+. 
+.     twoway (scatter `v_cons' `v_pend', msymbol(oh) mcolor(gs6))              ///
+>            (lfit `v_cons' `v_pend', lcolor(black)),                          ///
+>         legend(off)                                                          ///
+>         ytitle("Intercepto de la sede")                                      ///
+>         xtitle("Pendiente socioeconómica de la sede")                        ///
+>         name(g_gradiente, replace)
+
+.     graph export "Fig_Obj3_gradiente.png", replace width(2000)
+file Fig_Obj3_gradiente.png saved as PNG format
+
+. restore
+
+. 
+. 
+. ********************************************************************************
+. * [7] TABLA DE ROBUSTEZ
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[7] ROBUSTEZ"
+[7] ROBUSTEZ
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. * R5 y R6 (añadidos en el 08 v3) reemplazan la medida principal de inversión
+. * por la inversión ejecutada del FUT y por el recaudo tributario municipal,
+. * respectivamente. Antes de esta corrección la tabla de robustez no las
+. * incluía, aunque ya se guardaban en R5_inv_fut.ster y R6_ing_trib.ster.
+. foreach m in R1_indice_anual R3_parsimonioso R5_inv_fut R5b_inv_fut_dep R6_ing_trib {
+  2.     capture estimates use "`m'.ster"
+  3.     if _rc == 0 {
+  4.         estimates store `m'
+  5.     }
+  6.     else {
+  7.         display as error "No se encontró `m'.ster"
+  8.     }
+  9. }
+
+. 
+. capture estimates use "ML1.ster"
+
+. if _rc == 0 estimates store ML1b
+
+. 
+. esttab ML1b R1_indice_anual R3_parsimonioso R5_inv_fut R5b_inv_fut_dep R6_ing_trib using "T
+> abla_robustez.rtf", replace ///
+>     b(3) se(3) star(* 0.10 ** 0.05 *** 0.01)                            ///
+>     keep(punt_global:*) noomitted                                       ///
+>     mtitles("Principal" "Índice alternativo" "Parsimonioso" "FUT completo" "FUT depurado" "
+> Recaudo tributario") ///
+>     title("Pruebas de robustez")                                        ///
+>     addnotes("El índice alternativo estandariza las tres dimensiones dentro de cada año; co
+> rrelaciona 0,96 con el principal." ///
+>              "La especificación parsimoniosa se reporta como robustez, no como resultado pr
+> incipal." ///
+>              "R5 sustituye la inversión principal por la inversión ejecutada del FUT (ln_in
+> v_fut_pc); R6 la sustituye por el recaudo tributario municipal (ln_ing_trib_pc)." ///
+>              "R5b repite R5 sobre la serie del FUT sin el municipio-año con error de report
+> e, por lo que su número de observaciones es menor." ///
+>              "Todas conservan la descomposición entre/dentro del municipio; el coeficiente 
+> relevante es el componente dentro (_dev).") ///
+>     nogaps compress
+(output written to Tabla_robustez.rtf)
+
+. 
+. esttab ML1b R1_indice_anual R3_parsimonioso R5_inv_fut R5b_inv_fut_dep R6_ing_trib, b(3) se
+> (3) star(* 0.10 ** 0.05 *** 0.01) ///
+>     keep(punt_global:*) noomitted ///
+>     mtitles("Principal" "Índ. anual" "Parsim." "FUT" "FUT dep." "Trib.") nogaps compress
+
+----------------------------------------------------------------------------------------
+                 (1)          (2)          (3)          (4)          (5)          (6)   
+           Principal    Índ. an~l      Parsim.          FUT     FUT dep.        Trib.   
+----------------------------------------------------------------------------------------
+punt_glo~l                                                                              
+c_inse         0.271***     0.271***     0.401***     0.271***     0.271***     0.271***
+             (0.027)      (0.027)      (0.019)      (0.027)      (0.027)      (0.027)   
+mujer         -8.149***    -8.148***    -7.484***    -8.185***    -8.157***    -8.139***
+             (0.278)      (0.278)      (0.277)      (0.278)      (0.279)      (0.279)   
+edad          -7.499***    -7.500***    -7.555***    -7.483***    -7.485***    -7.485***
+             (0.124)      (0.124)      (0.125)      (0.125)      (0.125)      (0.125)   
+repitente      5.899***     5.890***     6.321***     5.872***     5.702***     5.800***
+             (0.418)      (0.418)      (0.420)      (0.418)      (0.420)      (0.419)   
+lectura_~n     6.837***     6.837***                  6.836***     6.802***     6.784***
+             (0.293)      (0.293)                   (0.294)      (0.295)      (0.294)   
+libros_~as     5.522***     5.524***                  5.559***     5.536***     5.572***
+             (0.401)      (0.401)                   (0.402)      (0.403)      (0.403)   
+trabaja~20    -3.002***    -3.003***                 -3.020***    -3.020***    -3.024***
+             (0.711)      (0.711)                   (0.713)      (0.712)      (0.712)   
+internet~r     0.350        0.338                     0.347        0.401        0.374   
+             (0.380)      (0.380)                   (0.381)      (0.382)      (0.382)   
+computad~r     0.572        0.574                     0.591        0.578        0.567   
+             (0.364)      (0.364)                   (0.365)      (0.366)      (0.366)   
+ln_matri~a     4.081***     4.081***     3.886***     4.155***     4.164***     4.101***
+             (0.931)      (0.931)      (0.871)      (0.935)      (0.938)      (0.938)   
+ratio_al~e    -0.049       -0.049                    -0.056       -0.050       -0.046   
+             (0.062)      (0.062)                   (0.063)      (0.063)      (0.063)   
+pct_planta     6.922***     6.873***     6.760***     6.848***     6.932***     6.950***
+             (1.431)      (1.430)      (1.453)      (1.432)      (1.435)      (1.432)   
+z_posgrado     0.062        0.055                     0.052        0.053        0.066   
+             (0.149)      (0.149)                   (0.150)      (0.150)      (0.150)   
+dotacion~c    -0.048       -0.074                     0.073       -0.169       -0.019   
+             (1.494)      (1.492)                   (1.500)      (1.514)      (1.509)   
+rural        -12.050***   -12.056***   -12.545***   -11.809***   -11.749***   -12.106***
+             (1.755)      (1.755)      (1.863)      (1.760)      (1.765)      (1.760)   
+ju_unica       0.132        0.141        0.088        0.104        0.058        0.163   
+             (0.625)      (0.625)      (0.622)      (0.628)      (0.630)      (0.630)   
+tecnico       -0.679       -0.680                    -0.695       -0.763       -0.759   
+             (1.345)      (1.345)                   (1.346)      (1.353)      (1.349)   
+tecnico_~o    -5.873**     -5.875**                  -6.001**     -5.973**     -6.005** 
+             (2.606)      (2.608)                   (2.612)      (2.626)      (2.622)   
+cole_fem~o    36.322***    36.317***                 36.334***    36.326***    36.499***
+             (5.595)      (5.596)                   (5.599)      (5.622)      (5.610)   
+indice_v~n    -0.889**                                                                  
+             (0.401)                                                                    
+2018.year      0.000        0.000        0.000        0.000        0.000        0.000   
+                 (.)          (.)          (.)          (.)          (.)          (.)   
+2019.year     -4.527***    -4.739***    -4.584***    -4.604***    -4.498***    -4.589***
+             (0.471)      (0.463)      (0.473)      (0.475)      (0.480)      (0.475)   
+2020.year     -3.676***    -3.968***    -3.837***    -3.723***    -3.415***    -3.640***
+             (0.516)      (0.502)      (0.511)      (0.528)      (0.559)      (0.533)   
+2021.year     -8.580***    -8.929***    -9.047***    -8.679***    -8.630***    -8.698***
+             (0.527)      (0.502)      (0.514)      (0.535)      (0.537)      (0.534)   
+2022.year     -3.026***    -3.550***    -3.493***    -3.177***    -2.967***    -3.083***
+             (0.555)      (0.504)      (0.544)      (0.563)      (0.581)      (0.570)   
+2023.year      0.344       -0.340       -0.074        0.152        0.324        0.200   
+             (0.588)      (0.506)      (0.577)      (0.583)      (0.594)      (0.586)   
+indice_v~l                 -0.750*                                                      
+                          (0.401)                                                       
+vuln_bar                                -1.842                                          
+                                       (2.466)                                          
+vuln_dev                                -0.884**                                        
+                                       (0.407)                                          
+tasa_hom~r                                            0.021        0.024        0.086   
+                                                    (0.060)      (0.059)      (0.065)   
+tasa_hom~v                                           -0.006       -0.005       -0.004   
+                                                    (0.006)      (0.006)      (0.006)   
+ln_coca_~r                                           -0.986       -1.010       -1.496** 
+                                                    (0.759)      (0.741)      (0.751)   
+ln_coca_~v                                           -0.182       -0.175       -0.184   
+                                                    (0.154)      (0.154)      (0.154)   
+l~t_pc_bar                                           11.527                             
+                                                    (8.274)                             
+l~t_pc_dev                                           -0.192                             
+                                                    (0.506)                             
+ln_i~x_bar                                                        18.837**              
+                                                                 (9.353)                
+ln_i~x_dev                                                        -2.445*               
+                                                                 (1.384)                
+ln_ing_t~r                                                                     -7.068** 
+                                                                              (2.875)   
+ln_ing_t~v                                                                     -0.672   
+                                                                              (0.584)   
+_cons        331.153***   331.545***   335.531***   173.392       71.851      411.871***
+             (6.863)      (6.860)      (6.830)    (114.848)    (129.847)     (32.591)   
+----------------------------------------------------------------------------------------
+N              69750        69750        69750        69441        68988        69118   
+----------------------------------------------------------------------------------------
+Standard errors in parentheses
+* p<0.10, ** p<0.05, *** p<0.01
+
+. 
+. 
+. ********************************************************************************
+. * [8] CIERRE
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "TABLAS Y GRÁFICOS GENERADOS"
+TABLAS Y GRÁFICOS GENERADOS
+
+. display "  Tabla_Obj2_ICC.csv"
+  Tabla_Obj2_ICC.csv
+
+. display "  Tabla_Obj3_progresion.rtf"
+  Tabla_Obj3_progresion.rtf
+
+. display "  Tabla_Obj3_centrados.rtf"
+  Tabla_Obj3_centrados.rtf
+
+. display "  Tabla_Obj4_temporal.rtf"
+  Tabla_Obj4_temporal.rtf
+
+. display "  Tabla_robustez.rtf"
+  Tabla_robustez.rtf
+
+. display "  Fig_Obj2_particion.png"
+  Fig_Obj2_particion.png
+
+. display "  Fig_Obj2_evolucion.png"
+  Fig_Obj2_evolucion.png
+
+. display "  Fig_Obj3_efectos_sede.png"
+  Fig_Obj3_efectos_sede.png
+
+. display "  Fig_Obj3_gradiente.png"
+  Fig_Obj3_gradiente.png
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase9
+      name:  fase9
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_09_tablas.log
+  log type:  text
+ closed on:  24 Aug 2026, 09:55:19
+---------------------------------------------------------------------------------------------

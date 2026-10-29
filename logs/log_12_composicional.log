@@ -1,0 +1,915 @@
+------------------------------------------------------------------------------------------------------------------------------------
+      name:  fase12
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_12_composicional.log
+  log type:  text
+ opened on:  12 Oct 2026, 21:33:27
+
+. 
+. timer clear
+
+. timer on 1
+
+. 
+. * ----------------------------------------------------------------------
+. * INTERRUPTORES DE BLOQUE
+. * ----------------------------------------------------------------------
+. * Poner en 0 los bloques ya corridos para reanudar sin repetirlos. El [0] debe
+. * haber corrido al menos una vez: los demas leen Base_C2.dta.
+. local hacer_prep    = 1    // [0] construye Base_C2.dta. Rapido.
+
+. local hacer_pool    = 1    // [1] LENTO
+
+. local hacer_permdev = 1    // [2] LENTO
+
+. local hacer_fe      = 1    // [3] minutos
+
+. local hacer_conf    = 1    // [4] rapido
+
+. local hacer_medida  = 1    // [5] rapido
+
+. 
+. global v_n1 mujer edad repitente lectura_30min libros_26omas ///
+>             trabaja_mas20 internet_hogar computador_hogar
+
+. 
+. global v_n2 ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>             dotacion_tic rural ju_unica tecnico tecnico_academico ///
+>             cole_femenino
+
+. 
+. * Covariables de sede que SI varian dentro de la sede a lo largo del periodo.
+. * Las cuatro restantes de $v_n2 son invariantes y las absorbe el efecto fijo
+. * del bloque [3]. Se listan aparte para que mi estimate no tropiece con una
+. * variable que Stata omita en unas imputaciones y no en otras.
+. global v_n2_fe ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>                dotacion_tic ju_unica
+
+. 
+. 
+. ********************************************************************************
+. * [0] PREPARACION: sede_anio, media permanente y desviacion de cohorte
+. ********************************************************************************
+. * El promedio permanente se toma sobre SEDE-ANOS, no sobre estudiantes, para
+. * que una cohorte grande no pese mas en la media permanente de la sede.
+. 
+. if `hacer_prep' == 1 {
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[0] PREPARACION DE LA BASE DE C2"
+[0] PREPARACION DE LA BASE DE C2
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     use "Base_Estimacion.dta", clear
+. 
+.     * --- Identificador de sede-ano para la estructura aleatoria de C1 ---
+.     capture drop sede_anio
+.     egen long sede_anio = group(cole_cod_dane_sede year)
+.     mi register regular sede_anio
+. 
+.     * --- Media permanente y desviacion de cohorte ---
+.     capture drop inse_sede_perm inse_sede_dev
+.     egen byte _tsa = tag(_mi_m cole_cod_dane_sede year) if _mi_m > 0
+.     bysort _mi_m cole_cod_dane_sede: egen double _suma = ///
+>         total(inse_prom_sede * _tsa)
+.     bysort _mi_m cole_cod_dane_sede: egen double _nsa  = total(_tsa)
+. 
+.     generate double inse_sede_perm = _suma / _nsa                    if _mi_m > 0
+(69,750 missing values generated)
+.     generate double inse_sede_dev  = inse_prom_sede - inse_sede_perm if _mi_m > 0
+(69,750 missing values generated)
+. 
+.     * Centrado de la componente permanente sobre la media NO PONDERADA de las
+.     * sedes, coherente con la forma en que se construyo. Solo mueve el
+.     * intercepto; ningun otro coeficiente depende de esta eleccion.
+.     egen byte _ts = tag(_mi_m cole_cod_dane_sede) if _mi_m > 0
+.     bysort _mi_m: egen double _sp = total(inse_sede_perm * _ts)
+.     bysort _mi_m: egen double _np = total(_ts)
+.     replace inse_sede_perm = inse_sede_perm - _sp/_np if _mi_m > 0
+(1,395,000 real changes made)
+. 
+.     drop _tsa _ts _suma _nsa _sp _np
+. 
+.     label variable inse_sede_perm "INSE medio permanente de la sede (centrado)"
+.     label variable inse_sede_dev  "Desviacion de la cohorte respecto de su sede"
+.     mi register imputed inse_sede_perm inse_sede_dev
+.     mi update
+. 
+.     * ----------------------------------------------------------------------
+.     * [0.1] Verificaciones
+.     * ----------------------------------------------------------------------
+.     display _newline "--- La media permanente debe ser constante dentro de la sede ---"
+
+--- La media permanente debe ser constante dentro de la sede ---
+.     bysort _mi_m cole_cod_dane_sede: egen double _sd_perm = sd(inse_sede_perm)
+(69,770 missing values generated)
+.     quietly count if _sd_perm > 1e-8 & !missing(_sd_perm)
+.     display "Observaciones con media permanente inconsistente: " r(N) " (debe ser 0)"
+Observaciones con media permanente inconsistente: 0 (debe ser 0)
+.     assert r(N) == 0
+.     drop _sd_perm
+. 
+.     quietly count if _mi_m > 0 & missing(inse_sede_dev)
+.     display "Faltantes de inse_sede_dev en las imputaciones: " r(N) " (debe ser 0)"
+Faltantes de inse_sede_dev en las imputaciones: 0 (debe ser 0)
+.     assert r(N) == 0
+. 
+.     display _newline "--- Descriptivos de las nuevas variables (m = 1) ---"
+
+--- Descriptivos de las nuevas variables (m = 1) ---
+.     tabstat inse_prom_sede inse_sede_perm inse_sede_dev cwc_inse ///
+>         c_inse_prom_sede if _mi_m == 1, stat(n mean sd min max) format(%9.4f)
+
+   Stats |  inse_p~e  inse_s~m  inse_s~v  cwc_inse  c_inse~e
+---------+--------------------------------------------------
+       N |  6.98e+04  6.98e+04  6.98e+04  6.98e+04  6.98e+04
+    Mean |   44.1145    2.3374   -0.0046   -0.0000    0.0000
+      SD |    4.9165    4.5986    1.7795    7.0650    4.8681
+     Min |   28.6799   -8.8518   -8.6438  -33.6513  -14.8761
+     Max |   61.7539   17.5871   11.5792   37.8332   18.8240
+------------------------------------------------------------
+. 
+.     display _newline "--- Numero de sede-anos observados por sede ---"
+
+--- Numero de sede-anos observados por sede ---
+.     display "Una sede con una sola cohorte no aporta nada a inse_sede_dev."
+Una sede con una sola cohorte no aporta nada a inse_sede_dev.
+.     preserve
+.         keep if _mi_m == 1
+(1,395,000 observations deleted)
+.         egen byte _t  = tag(cole_cod_dane_sede year)
+.         bysort cole_cod_dane_sede: egen int _nper = total(_t)
+.         egen byte _t2 = tag(cole_cod_dane_sede)
+.         tabulate _nper if _t2 == 1
+
+      _nper |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          1 |         10        2.29        2.29
+          2 |         11        2.52        4.81
+          3 |          8        1.83        6.64
+          4 |         16        3.66       10.30
+          5 |         25        5.72       16.02
+          6 |        367       83.98      100.00
+------------+-----------------------------------
+      Total |        437      100.00
+.     restore
+. 
+.     save "Base_C2.dta", replace
+(file Base_C2.dta not found)
+file Base_C2.dta saved
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [1] MODELO AGRUPADO CON EFECTOS DE ANO Y LA ESTRUCTURA DE C1
+. ********************************************************************************
+. * Reemplaza al M3_cwc de la version 4, que la cadena vigente no reproduce y que
+. * alimentaba el Anexo F.6.
+. 
+. if `hacer_pool' == 1 {
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[1] AGRUPADO CON CENTRADO AL CLUSTER, ESTRUCTURA DE C1"
+[1] AGRUPADO CON CENTRADO AL CLUSTER, ESTRUCTURA DE C1
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     use "Base_C2.dta", clear
+. 
+.     timer on 2
+.     mi estimate, dots post: mixed punt_global cwc_inse c_inse_prom_sede   ///
+>         $v_n1 $v_n2 indice_vuln ib2018.year                              ///
+>         || mcpio_id: || mcpio_id: R.year || sede_id: || sede_anio: , reml
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0233
+                                                Largest FMI       =     0.1108
+DF adjustment:   Large sample                   DF:     min       =   1,578.94
+                                                        avg       =   1.38e+07
+                                                        max       =   3.10e+08
+Model F test:       Equal FMI                   F(  26,635967.5)  =     274.85
+                                                Prob > F          =     0.0000
+
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+             cwc_inse |   .2785472   .0273844    10.17   0.000     .2248686    .3322259
+     c_inse_prom_sede |   .2550383   .0990722     2.57   0.010     .0608427    .4492339
+                mujer |  -8.215613    .276932   -29.67   0.000     -8.75839   -7.672836
+                 edad |  -7.480165   .1241183   -60.27   0.000    -7.723432   -7.236897
+            repitente |   5.934991   .4166803    14.24   0.000     5.118312    6.751669
+        lectura_30min |   6.794816   .2922823    23.25   0.000     6.221751    7.367881
+        libros_26omas |   5.419461    .397882    13.62   0.000     4.639028    6.199894
+        trabaja_mas20 |  -2.954206   .7085231    -4.17   0.000    -4.343113     -1.5653
+       internet_hogar |   .2922567   .3785625     0.77   0.440    -.4498815    1.034395
+     computador_hogar |   .5634061   .3626016     1.55   0.120    -.1473802    1.274192
+         ln_matricula |   5.148147    1.04338     4.93   0.000     3.103142    7.193152
+ratio_alumnos_docente |  -.0877959    .079405    -1.11   0.269    -.2434276    .0678358
+           pct_planta |   9.687277   1.696014     5.71   0.000      6.36312    13.01144
+           z_posgrado |    .055849   .2027287     0.28   0.783    -.3414929     .453191
+         dotacion_tic |    1.27615   1.796088     0.71   0.477    -2.246247    4.798548
+                rural |  -10.94736   1.812747    -6.04   0.000    -14.50028    -7.39444
+             ju_unica |   .2775043   .8262866     0.34   0.737    -1.341989    1.896997
+              tecnico |  -.5487975   1.350482    -0.41   0.684    -3.196132    2.098537
+    tecnico_academico |  -5.747841   2.507724    -2.29   0.022    -10.66461   -.8310731
+        cole_femenino |   36.23431   5.613117     6.46   0.000      25.2328    47.23581
+          indice_vuln |  -.8514868   .6401413    -1.33   0.183    -2.106141    .4031672
+                      |
+                 year |
+                2019  |  -4.753895   .7850798    -6.06   0.000    -6.292623   -3.215167
+                2020  |  -3.188188   .8448721    -3.77   0.000    -4.844107   -1.532269
+                2021  |  -7.465468   .8575816    -8.71   0.000    -9.146298   -5.784639
+                2022  |  -3.097182   .9030225    -3.43   0.001    -4.867074    -1.32729
+                2023  |  -.1049531   .9623248    -0.11   0.913    -1.991076    1.781169
+                      |
+                _cons |   321.8907   7.454981    43.18   0.000     307.2791    336.5023
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   13.43517   1.687144      10.50394     17.1844
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |   1.802561   .3222213      1.269788    2.558872
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                   sd(_cons) |   11.33116   .4864089      10.41682    12.32575
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |    4.65054   .2280009      4.224465    5.119588
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.36266    .093391       34.1801    34.54619
+------------------------------------------------------------------------------
+.     timer off 2
+.     estimates save "M3cwc_pool.ster", replace
+(note: file M3cwc_pool.ster not found)
+file M3cwc_pool.ster saved
+. 
+.     display _newline "--- beta_c agrupado = beta_b - beta_w ---"
+
+--- beta_c agrupado = beta_b - beta_w ---
+.     lincom c_inse_prom_sede - cwc_inse
+
+ ( 1)  - [punt_global]cwc_inse + [punt_global]c_inse_prom_sede = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   -.023509   .0987378    -0.24   0.812    -.2170314    .1700135
+------------------------------------------------------------------------------
+. 
+.     display _newline "--- Contraste de igualdad entre dentro y entre ---"
+
+--- Contraste de igualdad entre dentro y entre ---
+.     test cwc_inse = c_inse_prom_sede
+
+ ( 1)  [punt_global]cwc_inse - [punt_global]c_inse_prom_sede = 0
+
+           chi2(  1) =    0.06
+         Prob > chi2 =    0.8118
+. 
+.     display _newline "--- Tiempo del bloque [1] ---"
+
+--- Tiempo del bloque [1] ---
+.     timer list 2
+   2:   1762.26 /        1 =    1762.2560
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [2] MEDIA PERMANENTE DE LA SEDE FRENTE A DESVIACION DE CADA COHORTE
+. ********************************************************************************
+. * Es la prueba decisiva de C2. Si lo que predice el puntaje es la componente
+. * permanente y no la desviacion anual, lo que distingue a las sedes de mayor
+. * nivel socioeconomico es una diferencia persistente entre ellas, compatible
+. * con seleccion y con calidad, y no el cambio de composicion de una cohorte a
+. * otra (logica de Hoxby, 2000).
+. 
+. if `hacer_permdev' == 1 {
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[2] COMPONENTE PERMANENTE FRENTE A DESVIACION DE COHORTE"
+[2] COMPONENTE PERMANENTE FRENTE A DESVIACION DE COHORTE
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     use "Base_C2.dta", clear
+. 
+.     timer on 3
+.     mi estimate, dots post: mixed punt_global cwc_inse inse_sede_perm     ///
+>         inse_sede_dev $v_n1 $v_n2 indice_vuln ib2018.year                ///
+>         || mcpio_id: || mcpio_id: R.year || sede_id: || sede_anio: , reml
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0226
+                                                Largest FMI       =     0.1111
+DF adjustment:   Large sample                   DF:     min       =   1,570.36
+                                                        avg       = 5927981.97
+                                                        max       =   8.03e+07
+Model F test:       Equal FMI                   F(  27,712513.5)  =     269.28
+                                                Prob > F          =     0.0000
+
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+             cwc_inse |   .2786871   .0273749    10.18   0.000     .2250272     .332347
+       inse_sede_perm |   1.945774   .2478436     7.85   0.000     1.460007    2.431542
+        inse_sede_dev |   .0101221   .1057573     0.10   0.924    -.1971793    .2174234
+                mujer |  -8.214788   .2768945   -29.67   0.000    -8.757491   -7.672084
+                 edad |  -7.481708   .1240966   -60.29   0.000    -7.724933   -7.238483
+            repitente |   5.931319   .4166554    14.24   0.000     5.114689    6.747949
+        lectura_30min |   6.790629   .2923419    23.23   0.000     6.217443    7.363814
+        libros_26omas |    5.42111   .3979302    13.62   0.000     4.640579    6.201641
+        trabaja_mas20 |  -2.940162   .7084746    -4.15   0.000    -4.328973   -1.551351
+       internet_hogar |   .2875422   .3783767     0.76   0.447    -.4542278    1.029312
+     computador_hogar |   .5634791   .3625072     1.55   0.120    -.1471208    1.274079
+         ln_matricula |   4.016695   1.020253     3.94   0.000     2.017024    6.016365
+ratio_alumnos_docente |   -.084291   .0785401    -1.07   0.283    -.2382274    .0696454
+           pct_planta |   8.856747   1.660807     5.33   0.000     5.601589     12.1119
+           z_posgrado |   .0568495   .2022107     0.28   0.779     -.339477     .453176
+         dotacion_tic |   1.154645   1.767541     0.65   0.514    -2.311593    4.620883
+                rural |  -5.534161   1.837916    -3.01   0.003    -9.136413   -1.931908
+             ju_unica |   .4114673   .8191221     0.50   0.615    -1.193983    2.016918
+              tecnico |  -1.349026   1.273169    -1.06   0.289    -3.844712    1.146661
+    tecnico_academico |  -7.188185   2.361719    -3.04   0.002    -11.81873   -2.557637
+        cole_femenino |   24.44511   5.440512     4.49   0.000     13.78191    35.10832
+          indice_vuln |   -.918761   .6405128    -1.43   0.151    -2.174143     .336621
+                      |
+                 year |
+                2019  |   -4.73233   .7818574    -6.05   0.000    -6.264743   -3.199918
+                2020  |  -3.280126     .85389    -3.84   0.000     -4.95372   -1.606531
+                2021  |  -7.565889   .8653327    -8.74   0.000    -9.261911   -5.869868
+                2022  |  -3.144761   .9141433    -3.44   0.001    -4.936449   -1.353073
+                2023  |  -.1313654   .9762297    -0.13   0.893    -2.044741    1.782011
+                      |
+                _cons |   325.1813   7.278288    44.68   0.000      310.916    339.4465
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   14.85168   1.839907      11.64996    18.93334
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |   1.774826   .3268901       1.23703    2.546428
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                   sd(_cons) |   10.45803    .456606      9.600318    11.39237
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |   4.644043   .2277439      4.218454    5.112569
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.36294   .0933901      34.18038    34.54646
+------------------------------------------------------------------------------
+.     timer off 3
+.     estimates save "M3cwc_perm_dev.ster", replace
+(note: file M3cwc_perm_dev.ster not found)
+file M3cwc_perm_dev.ster saved
+. 
+.     display _newline "--- Anade la composicion de la cohorte por encima del individuo? ---"
+
+--- Anade la composicion de la cohorte por encima del individuo? ---
+.     test inse_sede_dev = cwc_inse
+
+ ( 1)  - [punt_global]cwc_inse + [punt_global]inse_sede_dev = 0
+
+           chi2(  1) =    6.48
+         Prob > chi2 =    0.0109
+.     lincom inse_sede_dev - cwc_inse
+
+ ( 1)  - [punt_global]cwc_inse + [punt_global]inse_sede_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   -.268565   .1054731    -2.55   0.011    -.4752885   -.0618416
+------------------------------------------------------------------------------
+. 
+.     display _newline "--- Es la componente permanente distinta de la de cohorte? ---"
+
+--- Es la componente permanente distinta de la de cohorte? ---
+.     test inse_sede_perm = inse_sede_dev
+
+ ( 1)  [punt_global]inse_sede_perm - [punt_global]inse_sede_dev = 0
+
+           chi2(  1) =   52.69
+         Prob > chi2 =    0.0000
+.     lincom inse_sede_perm - inse_sede_dev
+
+ ( 1)  [punt_global]inse_sede_perm - [punt_global]inse_sede_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   1.935652   .2666573     7.26   0.000     1.413014    2.458291
+------------------------------------------------------------------------------
+. 
+.     display _newline "--- Componente permanente frente al efecto dentro ---"
+
+--- Componente permanente frente al efecto dentro ---
+.     lincom inse_sede_perm - cwc_inse
+
+ ( 1)  - [punt_global]cwc_inse + [punt_global]inse_sede_perm = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   1.667087   .2477147     6.73   0.000     1.181576    2.152599
+------------------------------------------------------------------------------
+. 
+.     display _newline "Nota: los contrastes son de Wald. Los modelos [1] y [2] NO"
+
+Nota: los contrastes son de Wald. Los modelos [1] y [2] NO
+.     display "son comparables por razon de verosimilitudes, porque REML con"
+son comparables por razon de verosimilitudes, porque REML con
+.     display "distintos efectos fijos no admite esa comparacion."
+distintos efectos fijos no admite esa comparacion.
+. 
+.     display _newline "--- Tiempo del bloque [2] ---"
+
+--- Tiempo del bloque [2] ---
+.     timer list 3
+   3:   2065.88 /        1 =    2065.8750
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [3] EFECTOS FIJOS DE SEDE: LA MEDIA SE IDENTIFICA SOLO ENTRE COHORTES
+. ********************************************************************************
+. * Con efecto fijo de sede, el coeficiente de inse_prom_sede se identifica
+. * exclusivamente con la variacion de la media entre cohortes de una misma sede,
+. * que es lo mismo que mide inse_sede_dev en el bloque [2]. Sirve de
+. * verificacion sin supuestos distribucionales sobre el intercepto de sede.
+. *
+. * `cmdok` se incluye por si areg no esta en la lista de comandos oficialmente
+. * soportados por mi estimate; es inocuo si si lo esta.
+. 
+. if `hacer_fe' == 1 {
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[3] EFECTOS FIJOS DE SEDE"
+[3] EFECTOS FIJOS DE SEDE
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     use "Base_C2.dta", clear
+. 
+.     mi estimate, dots post cmdok: areg punt_global cwc_inse inse_prom_sede ///
+>         $v_n1 $v_n2_fe ib2018.year,                                        ///
+>         absorb(sede_id) vce(cluster sede_id)
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Linear regression, absorbing indicators         Number of obs     =     69,750
+                                                Average RVI       =     0.4456
+                                                Largest FMI       =     0.1152
+                                                Complete DF       =        436
+DF adjustment:   Small sample                   DF:     min       =     305.13
+                                                        avg       =     415.45
+                                                        max       =     433.90
+Model F test:       Equal FMI                   F(  21,  433.5)   =     177.53
+Within VCE type:       Robust                   Prob > F          =     0.0000
+
+                                      (Within VCE adjusted for 437 clusters in sede_id)
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+             cwc_inse |   .2783989   .0390946     7.12   0.000     .2015536    .3552442
+       inse_prom_sede |   .0477858   .1114009     0.43   0.668    -.1711972    .2667688
+                mujer |  -8.142053   .3713544   -21.93   0.000    -8.871932   -7.412173
+                 edad |  -7.466908   .1715498   -43.53   0.000     -7.80408   -7.129735
+            repitente |   5.766247   1.107391     5.21   0.000     3.589729    7.942765
+        lectura_30min |   6.831173    .390586    17.49   0.000     6.063325    7.599021
+        libros_26omas |   5.482495     .40934    13.39   0.000     4.677009    6.287982
+        trabaja_mas20 |  -2.917994   .7266487    -4.02   0.000    -4.346591   -1.489397
+       internet_hogar |   .2772904    .417923     0.66   0.507    -.5443813    1.098962
+     computador_hogar |   .5980289    .382989     1.56   0.119    -.1549154    1.350973
+         ln_matricula |  -.3728234   1.742463    -0.21   0.831    -3.797713    3.052066
+ratio_alumnos_docente |   .0593115   .0891555     0.67   0.506    -.1159205    .2345435
+           pct_planta |   .4195841   2.171425     0.19   0.847    -3.848366    4.687534
+           z_posgrado |  -.0347715   .2231627    -0.16   0.876    -.4733908    .4038478
+         dotacion_tic |  -1.492681   2.400892    -0.62   0.535      -6.2137    3.228337
+             ju_unica |  -.3984082   .9564472    -0.42   0.677    -2.278263    1.481446
+                      |
+                 year |
+                2019  |  -4.682599   .6605862    -7.09   0.000    -5.980947    -3.38425
+                2020  |  -4.042455   .7594512    -5.32   0.000    -5.535122   -2.549788
+                2021  |  -9.117529   .8548545   -10.67   0.000    -10.79771   -7.437351
+                2022  |  -3.818153   .8136914    -4.69   0.000     -5.41743   -2.218876
+                2023  |  -.6794188   .9345648    -0.73   0.468    -2.516265    1.157427
+                      |
+                _cons |   361.1678   12.27625    29.42   0.000     337.0386     385.297
+---------------------------------------------------------------------------------------
+.     estimates save "M3cwc_fe_sede.ster", replace
+(note: file M3cwc_fe_sede.ster not found)
+file M3cwc_fe_sede.ster saved
+. 
+.     display _newline "--- Composicion de cohorte frente a efecto dentro, con EF de sede ---
+> "
+
+--- Composicion de cohorte frente a efecto dentro, con EF de sede ---
+.     lincom inse_prom_sede - cwc_inse
+
+ ( 1)  - cwc_inse + inse_prom_sede = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.2306131   .1069364    -2.16   0.032     -.440788   -.0204382
+------------------------------------------------------------------------------
+. 
+.     display _newline "rural, cole_femenino, tecnico y tecnico_academico quedan"
+
+rural, cole_femenino, tecnico y tecnico_academico quedan
+.     display "fuera a proposito: no varian dentro de la sede y las absorbe el"
+fuera a proposito: no varian dentro de la sede y las absorbe el
+.     display "efecto fijo. inse_prom_sede entra en metrica bruta porque, con"
+efecto fijo. inse_prom_sede entra en metrica bruta porque, con
+.     display "efecto fijo de sede, centrarla solo moveria el intercepto."
+efecto fijo de sede, centrarla solo moveria el intercepto.
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [4] CONFIABILIDAD DE LA MEDIA DE COHORTE
+. ********************************************************************************
+. * ATENCION: este bloque NO entrega la rho del bloque [5]. Lo que `loneway`
+. * reporta es la confiabilidad de la MEDIA del grupo, que es la cantidad que
+. * atenua beta_b y que resulta ser alta. La confiabilidad del INSE INDIVIDUAL,
+. * que es la que atenua beta_w, no se puede estimar con estos datos y entra en
+. * el bloque [5] como supuesto declarado.
+. 
+. if `hacer_conf' == 1 {
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[4] CONFIABILIDAD DE LA MEDIA DE COHORTE"
+[4] CONFIABILIDAD DE LA MEDIA DE COHORTE
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     use "Base_Multinivel_PCA.dta", clear
+.     capture drop sede_anio
+.     egen long sede_anio = group(cole_cod_dane_sede year)
+. 
+.     forvalues a = 2018/2023 {
+  2.         display _newline "--- Confiabilidad de la media de cohorte, `a' ---"
+  3.         capture noisily loneway estu_inse_individual sede_anio if year == `a'
+  4.         if _rc != 0 {
+  5.             display as error "loneway fallo en `a' (codigo " _rc ")."
+  6.             display "Alternativa: mixed estu_inse_individual if year == `a'"
+  7.             display "|| sede_anio: , mle  y lambda = n*icc / (1 + (n-1)*icc)."
+  8.         }
+  9.     }
+
+--- Confiabilidad de la media de cohorte, 2018 ---
+
+One-way analysis of variance for estu_inse_~l: INSE individual (escala original
+
+                                             Number of obs =       10,993
+                                                 R-squared =       0.3458
+
+    Source                SS         df      MS            F     Prob > F
+-------------------------------------------------------------------------
+Between sede_anio      288592.66    387    745.71747     14.49     0.0000
+Within sede_anio       545962.56 10,605    51.481618
+-------------------------------------------------------------------------
+Total                  834555.22 10,992    75.923874
+
+         Intraclass       Asy.        
+         correlation      S.E.       [95% conf. interval]
+         ------------------------------------------------
+            0.32296     0.02251       0.27884     0.36708
+
+         Estimated SD of sede_anio effect         4.95558
+         Estimated SD within sede_anio           7.175069
+         Est. reliability of a sede_anio mean     0.93096
+              (evaluated at n=28.27)
+
+--- Confiabilidad de la media de cohorte, 2019 ---
+
+One-way analysis of variance for estu_inse_~l: INSE individual (escala original
+
+                                             Number of obs =       11,088
+                                                 R-squared =       0.3362
+
+    Source                SS         df      MS            F     Prob > F
+-------------------------------------------------------------------------
+Between sede_anio      286670.18    398    720.27684     13.60     0.0000
+Within sede_anio       565980.25 10,689    52.949785
+-------------------------------------------------------------------------
+Total                  852650.43 11,087    76.905423
+
+         Intraclass       Asy.        
+         correlation      S.E.       [95% conf. interval]
+         ------------------------------------------------
+            0.31248     0.02192       0.26952     0.35544
+
+         Estimated SD of sede_anio effect        4.905726
+         Estimated SD within sede_anio            7.27666
+         Est. reliability of a sede_anio mean     0.92649
+              (evaluated at n=27.73)
+
+--- Confiabilidad de la media de cohorte, 2020 ---
+
+One-way analysis of variance for estu_inse_~l: INSE individual (escala original
+
+                                             Number of obs =       10,620
+                                                 R-squared =       0.3431
+
+    Source                SS         df      MS            F     Prob > F
+-------------------------------------------------------------------------
+Between sede_anio      281795.01    405    695.79015     13.17     0.0000
+Within sede_anio       539603.16 10,214    52.829759
+-------------------------------------------------------------------------
+Total                  821398.17 10,619    77.351744
+
+         Intraclass       Asy.        
+         correlation      S.E.       [95% conf. interval]
+         ------------------------------------------------
+            0.31804     0.02236       0.27422     0.36186
+
+         Estimated SD of sede_anio effect        4.963612
+         Estimated SD within sede_anio           7.268408
+         Est. reliability of a sede_anio mean     0.92407
+              (evaluated at n=26.10)
+
+--- Confiabilidad de la media de cohorte, 2021 ---
+
+One-way analysis of variance for estu_inse_~l: INSE individual (escala original
+
+                                             Number of obs =       11,189
+                                                 R-squared =       0.3336
+
+    Source                SS         df      MS            F     Prob > F
+-------------------------------------------------------------------------
+Between sede_anio      288959.22    415    696.28727     12.99     0.0000
+Within sede_anio        577232.2 10,773    53.581379
+-------------------------------------------------------------------------
+Total                  866191.42 11,188    77.421471
+
+         Intraclass       Asy.        
+         correlation      S.E.       [95% conf. interval]
+         ------------------------------------------------
+            0.30892     0.02186       0.26607     0.35176
+
+         Estimated SD of sede_anio effect        4.893969
+         Estimated SD within sede_anio            7.31993
+         Est. reliability of a sede_anio mean     0.92305
+              (evaluated at n=26.83)
+
+--- Confiabilidad de la media de cohorte, 2022 ---
+
+One-way analysis of variance for estu_inse_~l: INSE individual (escala original
+
+                                             Number of obs =       11,140
+                                                 R-squared =       0.2997
+
+    Source                SS         df      MS            F     Prob > F
+-------------------------------------------------------------------------
+Between sede_anio      240490.57    416    578.10234     11.03     0.0000
+Within sede_anio       561858.18 10,723    52.397481
+-------------------------------------------------------------------------
+Total                  802348.76 11,139    72.030591
+
+         Intraclass       Asy.        
+         correlation      S.E.       [95% conf. interval]
+         ------------------------------------------------
+            0.27345     0.02018       0.23390     0.31301
+
+         Estimated SD of sede_anio effect        4.440828
+         Estimated SD within sede_anio            7.23861
+         Est. reliability of a sede_anio mean     0.90936
+              (evaluated at n=26.66)
+
+--- Confiabilidad de la media de cohorte, 2023 ---
+
+One-way analysis of variance for estu_inse_~l: INSE individual (escala original
+
+                                             Number of obs =       11,471
+                                                 R-squared =       0.2571
+
+    Source                SS         df      MS            F     Prob > F
+-------------------------------------------------------------------------
+Between sede_anio      186371.17    420    443.74088      9.11     0.0000
+Within sede_anio       538526.09 11,050    48.735393
+-------------------------------------------------------------------------
+Total                  724897.26 11,470    63.199412
+
+         Intraclass       Asy.        
+         correlation      S.E.       [95% conf. interval]
+         ------------------------------------------------
+            0.22966     0.01824       0.19390     0.26541
+
+         Estimated SD of sede_anio effect        3.811726
+         Estimated SD within sede_anio           6.981074
+         Est. reliability of a sede_anio mean     0.89017
+              (evaluated at n=27.19)
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [5] COTA POR ERROR DE MEDIDA DEL INSE INDIVIDUAL Y ESTANDARIZACION
+. ********************************************************************************
+. * El error de medida del INSE es individual, de modo que se concentra en la
+. * parte dentro de la sede: la media de la cohorte lo promedia sobre unos 29
+. * estudiantes y queda practicamente limpia. De ahi que beta_w se atenue mucho
+. * mas que beta_b y que beta_c se infle por los dos lados a la vez, que es el
+. * efecto fantasma de Televantou et al. (2015).
+. *
+. *   lambda_w = 1 - (1 - rho) * Var(c_inse) / Var(cwc_inse)
+. *   beta_w corregido = beta_w / lambda_w
+. *
+. * rho es un SUPUESTO. Si el ICFES no publica la confiabilidad del indice, se
+. * reporta como rango declarado y asi se escribe en el documento.
+. 
+. if `hacer_medida' == 1 {
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[5] ERROR DE MEDIDA Y ESTANDARIZACION, POR COHORTE"
+[5] ERROR DE MEDIDA Y ESTANDARIZACION, POR COHORTE
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     use "Base_C2.dta", clear
+. 
+.     forvalues a = 2018/2023 {
+  2. 
+.         quietly summarize c_inse if _mi_m == 1 & year == `a'
+  3.         scalar v_tot = r(Var)
+  4.         quietly summarize cwc_inse if _mi_m == 1 & year == `a'
+  5.         scalar v_w  = r(Var)
+  6.         scalar sd_w = r(sd)
+  7.         quietly summarize c_inse_prom_sede if _mi_m == 1 & year == `a'
+  8.         scalar sd_b = r(sd)
+  9. 
+.         capture quietly estimates use "M3cwc_`a'.ster"
+ 10.         if _rc != 0 {
+ 11.             display as error "Falta M3cwc_`a'.ster. Correr el bloque [3] del 08."
+ 12.             continue
+ 13.         }
+ 14.         scalar bw = _b[cwc_inse]
+ 15.         scalar bb = _b[c_inse_prom_sede]
+ 16. 
+.         display _newline "Cohorte `a'"
+ 17.         display "  beta_w = " %6.4f (bw) "   beta_b = " %6.4f (bb) ///
+>                 "   beta_c = " %6.4f (bb - bw)
+ 18.         display "  Por DE:  beta_w x " %5.3f (sd_w) " = " %6.3f (bw*sd_w) ///
+>                 "    beta_b x " %5.3f (sd_b) " = " %6.3f (bb*sd_b)
+ 19.         display "  Razon por unidad = " %5.2f (bb/bw) ///
+>                 "   Razon por DE = " %5.2f ((bb*sd_b)/(bw*sd_w))
+ 20. 
+.         foreach rho in 0.7 0.8 0.9 {
+ 21.             scalar lam = 1 - (1 - `rho') * v_tot / v_w
+ 22.             display "  rho = `rho': lambda_w = " %5.3f (lam) ///
+>                 "   beta_w corregido = " %6.3f (bw/lam) ///
+>                 "   beta_b = " %6.3f (bb)
+ 23.         }
+ 24.     }
+
+Cohorte 2018
+  beta_w = 0.3967   beta_b = 1.0024   beta_c = 0.6057
+  Por DE:  beta_w x 7.039 =  2.792    beta_b x 5.134 =  5.146
+  Razon por unidad =  2.53   Razon por DE =  1.84
+  rho = 0.7: lambda_w = 0.540   beta_w corregido =  0.734   beta_b =  1.002
+  rho = 0.8: lambda_w = 0.694   beta_w corregido =  0.572   beta_b =  1.002
+  rho = 0.9: lambda_w = 0.847   beta_w corregido =  0.468   beta_b =  1.002
+
+Cohorte 2019
+  beta_w = 0.3665   beta_b = 1.2892   beta_c = 0.9228
+  Por DE:  beta_w x 7.129 =  2.612    beta_b x 5.092 =  6.565
+  Razon por unidad =  3.52   Razon por DE =  2.51
+  rho = 0.7: lambda_w = 0.547   beta_w corregido =  0.670   beta_b =  1.289
+  rho = 0.8: lambda_w = 0.698   beta_w corregido =  0.525   beta_b =  1.289
+  rho = 0.9: lambda_w = 0.849   beta_w corregido =  0.432   beta_b =  1.289
+
+Cohorte 2020
+  beta_w = 0.1041   beta_b = 0.9671   beta_c = 0.8630
+  Por DE:  beta_w x 7.111 =  0.740    beta_b x 5.154 =  4.984
+  Razon por unidad =  9.29   Razon por DE =  6.73
+  rho = 0.7: lambda_w = 0.542   beta_w corregido =  0.192   beta_b =  0.967
+  rho = 0.8: lambda_w = 0.695   beta_w corregido =  0.150   beta_b =  0.967
+  rho = 0.9: lambda_w = 0.847   beta_w corregido =  0.123   beta_b =  0.967
+
+Cohorte 2021
+  beta_w = 0.3005   beta_b = 1.5484   beta_c = 1.2479
+  Por DE:  beta_w x 7.195 =  2.162    beta_b x 5.108 =  7.908
+  Razon por unidad =  5.15   Razon por DE =  3.66
+  rho = 0.7: lambda_w = 0.549   beta_w corregido =  0.548   beta_b =  1.548
+  rho = 0.8: lambda_w = 0.699   beta_w corregido =  0.430   beta_b =  1.548
+  rho = 0.9: lambda_w = 0.850   beta_w corregido =  0.354   beta_b =  1.548
+
+Cohorte 2022
+  beta_w = 0.1181   beta_b = 0.9712   beta_c = 0.8531
+  Por DE:  beta_w x 7.094 =  0.838    beta_b x 4.676 =  4.541
+  Razon por unidad =  8.23   Razon por DE =  5.42
+  rho = 0.7: lambda_w = 0.570   beta_w corregido =  0.207   beta_b =  0.971
+  rho = 0.8: lambda_w = 0.713   beta_w corregido =  0.166   beta_b =  0.971
+  rho = 0.9: lambda_w = 0.857   beta_w corregido =  0.138   beta_b =  0.971
+
+Cohorte 2023
+  beta_w = 0.3480   beta_b = 1.3658   beta_c = 1.0179
+  Por DE:  beta_w x 6.834 =  2.378    beta_b x 4.016 =  5.485
+  Razon por unidad =  3.93   Razon por DE =  2.31
+  rho = 0.7: lambda_w = 0.596   beta_w corregido =  0.583   beta_b =  1.366
+  rho = 0.8: lambda_w = 0.731   beta_w corregido =  0.476   beta_b =  1.366
+  rho = 0.9: lambda_w = 0.865   beta_w corregido =  0.402   beta_b =  1.366
+. 
+.     display _newline "Nota: beta_b tambien esta atenuado, por un factor del orden"
+
+Nota: beta_b tambien esta atenuado, por un factor del orden
+.     display "de 1 - (1-rho)*Var(c_inse) / (n*Var(c_inse_prom_sede)), con n"
+de 1 - (1-rho)*Var(c_inse) / (n*Var(c_inse_prom_sede)), con n
+.     display "cercano a 29. Es del 1 al 2 por ciento y la correccion lo ignora,"
+cercano a 29. Es del 1 al 2 por ciento y la correccion lo ignora,
+.     display "de modo que el ejercicio es conservador respecto de la brecha."
+de modo que el ejercicio es conservador respecto de la brecha.
+. }
+
+. 
+. 
+. ********************************************************************************
+. * CIERRE
+. ********************************************************************************
+. 
+. timer off 1
+
+. display _newline "--- Tiempo total de ejecucion ---"
+
+--- Tiempo total de ejecucion ---
+
+. timer list 1
+   1:   4087.56 /        1 =    4087.5630
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "BLOQUE C2 COMPLETADO."
+BLOQUE C2 COMPLETADO.
+
+. display "Siguiente: 10_blindaje.do bloque [6] y retirada del Anexo F.6."
+Siguiente: 10_blindaje.do bloque [6] y retirada del Anexo F.6.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase12
+      name:  fase12
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_12_composicional.log
+  log type:  text
+ closed on:  12 Oct 2026, 22:41:35
+---------------------------------------------------------------------------------------------

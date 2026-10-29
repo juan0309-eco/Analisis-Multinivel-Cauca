@@ -1,0 +1,1070 @@
+---------------------------------------------------------------------------------------------
+      name:  fase10
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_10_blindaje.log
+  log type:  text
+ opened on:  23 Aug 2026, 13:59:46
+
+. 
+. local hacer_cotas    = 1    // [1] rápido
+
+. local hacer_reml     = 1    // [2] LENTO
+
+. local hacer_robust   = 1    // [3] LENTO
+
+. local hacer_desercion= 1    // [4] rápido
+
+. local hacer_atipicos = 1    // [5] rápido
+
+. local hacer_tost     = 1    // [6] rápido
+
+. local hacer_planta   = 1    // [7] rápido
+
+. 
+. global v_n1 mujer edad repitente lectura_30min libros_26omas ///
+>             trabaja_mas20 internet_hogar computador_hogar
+
+. 
+. global v_n2 ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>             dotacion_tic rural ju_unica tecnico tecnico_academico ///
+>             cole_femenino
+
+. 
+. 
+. ********************************************************************************
+. * [1] COTAS SUSTANTIVAS DE LOS COEFICIENTES NULOS
+. ********************************************************************************
+. * El coeficiente de homicidios está en puntos por unidad de la tasa, una escala
+. * en la que cualquier número parece pequeño. Reescalarlo a puntos por
+. * desviación estándar DENTRO del municipio lo vuelve interpretable y convierte
+. * un resultado nulo en una cota: en lugar de "no encontramos efecto" se puede
+. * afirmar "descartamos efectos mayores que X".
+. *
+. * Las desviaciones within salen del xtsum del script 06. Se recalculan aquí en
+. * vez de copiarse a mano, para que el número del documento no se desactualice.
+. 
+. if `hacer_cotas' == 1 {
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[1] COTAS SUSTANTIVAS DE LOS COEFICIENTES DEL ENTORNO"
+[1] COTAS SUSTANTIVAS DE LOS COEFICIENTES DEL ENTORNO
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     use "N3_Municipios_PCA.dta", clear
+.     xtset cole_cod_mcpio_ubicacion year
+
+Panel variable: cole_cod_mcpio_ubicacion (strongly balanced)
+ Time variable: year, 2018 to 2023
+         Delta: 1 unit
+. 
+.     quietly xtsum tasa_homicidios
+.     scalar sd_w_hom = r(sd_w)
+.     quietly xtsum ln_coca
+.     scalar sd_w_coca = r(sd_w)
+.     quietly xtsum ln_inversion_pc
+.     scalar sd_w_inv = r(sd_w)
+. 
+.     display _newline "--- Desviaciones estándar dentro del municipio ---"
+
+--- Desviaciones estándar dentro del municipio ---
+.     display "Homicidios:  " %8.4f sd_w_hom
+Homicidios:   28.6618
+.     display "Coca:        " %8.4f sd_w_coca
+Coca:          0.8865
+.     display "Inversión:   " %8.4f sd_w_inv
+Inversión:     0.1632
+. 
+.     estimates use "ML3.ster"
+. 
+.     display _newline "--- Efecto por desviación dentro del municipio ---"
+
+--- Efecto por desviación dentro del municipio ---
+.     display "Cada lincom devuelve el cambio en puntos de examen asociado a una"
+Cada lincom devuelve el cambio en puntos de examen asociado a una
+.     display "desviación estándar temporal de la variable, con su intervalo."
+desviación estándar temporal de la variable, con su intervalo.
+. 
+.     display _newline "Homicidios:"
+
+Homicidios:
+.     lincom sd_w_hom * tasa_homicidios_dev
+
+ ( 1)  28.66178*[punt_global]tasa_homicidios_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.1911905   .1808473    -1.06   0.290    -.5456446    .1632637
+------------------------------------------------------------------------------
+.     scalar b_hom = r(estimate)
+.     scalar se_hom = r(se)
+. 
+.     display _newline "Coca:"
+
+Coca:
+.     lincom sd_w_coca * ln_coca_dev
+
+ ( 1)  .8864517*[punt_global]ln_coca_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.1320938   .1365963    -0.97   0.334    -.3998177    .1356301
+------------------------------------------------------------------------------
+.     scalar b_coca = r(estimate)
+.     scalar se_coca = r(se)
+. 
+.     display _newline "Asignación del SGP:"
+
+Asignación del SGP:
+.     lincom sd_w_inv * ln_inversion_pc_dev
+
+ ( 1)  .1632211*[punt_global]ln_inversion_pc_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .5330767   .1690044     3.15   0.002      .201834    .8643193
+------------------------------------------------------------------------------
+.     scalar b_inv = r(estimate)
+.     scalar se_inv = r(se)
+. 
+.     * ----------------------------------------------------------------------
+.     * [1.1] Efecto mínimo detectable
+.     * ----------------------------------------------------------------------
+.     * El EMD es la magnitud más pequeña que el diseño habría detectado con 80%
+.     * de potencia al 5% de significancia: (1,96 + 0,84) por el error estándar.
+.     * Si el EMD es pequeño frente a la escala del examen, el resultado nulo NO
+.     * puede atribuirse a falta de potencia, que es exactamente lo que hay que
+.     * demostrar.
+.     display _newline "--- Efecto mínimo detectable (80% de potencia, 5%) ---"
+
+--- Efecto mínimo detectable (80% de potencia, 5%) ---
+.     display "Variable          EMD (puntos por DE dentro)"
+Variable          EMD (puntos por DE dentro)
+.     display "Homicidios        " %8.3f 2.802*se_hom
+Homicidios           0.507
+.     display "Coca              " %8.3f 2.802*se_coca
+Coca                 0.383
+.     display "Asignación SGP    " %8.3f 2.802*se_inv
+Asignación SGP       0.474
+. 
+.     display _newline "Desviación estándar del puntaje global: 45,98 puntos."
+
+Desviación estándar del puntaje global: 45,98 puntos.
+.     display "Un EMD de medio punto equivale a 0,011 desviaciones del puntaje."
+Un EMD de medio punto equivale a 0,011 desviaciones del puntaje.
+.     display "Si el EMD es de ese orden, el diseño SÍ tenía potencia para"
+Si el EMD es de ese orden, el diseño SÍ tenía potencia para
+.     display "detectar cualquier efecto sustantivamente relevante."
+detectar cualquier efecto sustantivamente relevante.
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [2] REESTIMACIÓN POR MÁXIMA VEROSIMILITUD RESTRINGIDA
+. ********************************************************************************
+. * Con 42 grupos de Nivel 3, la máxima verosimilitud ordinaria subestima el
+. * componente de varianza municipal. REML corrige el sesgo por los grados de
+. * libertad consumidos al estimar los efectos fijos. Si la partición de varianza
+. * apenas se mueve, el hallazgo del 11,8% queda blindado; si sube, el hallazgo
+. * se refuerza. En ningún escenario se debilita.
+. 
+. if `hacer_reml' == 1 {
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[2] REESTIMACIÓN POR REML"
+[2] REESTIMACIÓN POR REML
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     * --- Modelo nulo (rápido: no usa imputación) ---
+.     use "Base_Multinivel_PCA.dta", clear
+.     capture drop sede_id mcpio_id
+.     egen long sede_id  = group(cole_cod_dane_sede)
+.     egen long mcpio_id = group(cole_cod_mcpio_ubicacion)
+. 
+.     display _newline "--- Modelo nulo por REML ---"
+
+--- Modelo nulo por REML ---
+.     mixed punt_global || mcpio_id: || sede_id: , reml
+
+Performing EM optimization ...
+
+Performing gradient-based optimization: 
+Iteration 0:   log restricted-likelihood =  -350512.9  
+Iteration 1:   log restricted-likelihood =  -350512.9  
+
+Computing standard errors ...
+
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+        -------------------------------------------------------------
+
+                                                Wald chi2(0)      =          .
+Log restricted-likelihood =  -350512.9          Prob > chi2       =          .
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       _cons |   217.4512   2.522196    86.22   0.000     212.5078    222.3946
+------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  var(_cons) |   222.9192   57.34761      134.6386    369.0841
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                  var(_cons) |   289.6615   21.83146       249.883    335.7723
+-----------------------------+------------------------------------------------
+               var(Residual) |   1328.317   7.134822      1314.406    1342.375
+------------------------------------------------------------------------------
+LR test vs. linear model: chi2(2) = 30941.72              Prob > chi2 = 0.0000
+
+Note: LR test is conservative and provided only for reference.
+.     estimates save "M0_pool_reml.ster", replace
+(note: file M0_pool_reml.ster not found)
+file M0_pool_reml.ster saved
+.     estat icc
+
+Intraclass correlation
+
+------------------------------------------------------------------------------
+                       Level |        ICC   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+                    mcpio_id |   .1210927   .0274678      .0767065     .185989
+            sede_id|mcpio_id |   .2784406   .0238176      .2342334    .3274238
+------------------------------------------------------------------------------
+. 
+.     display _newline "Comparar con la partición por máxima verosimilitud"
+
+Comparar con la partición por máxima verosimilitud
+.     display "reportada en la Tabla 7: municipio 11,8% y sede 15,8%."
+reportada en la Tabla 7: municipio 11,8% y sede 15,8%.
+. 
+.     * --- ML3 por REML ---
+.     use "Base_Estimacion.dta", clear
+.     display _newline "--- ML3 por REML (varias horas) ---"
+
+--- ML3 por REML (varias horas) ---
+.     mi estimate, dots post: mixed punt_global c_inse $v_n1 $v_n2 ///
+>         tasa_homicidios_bar tasa_homicidios_dev ///
+>         ln_coca_bar ln_coca_dev ///
+>         ln_inversion_pc_bar ln_inversion_pc_dev ///
+>         ib2018.year || mcpio_id: || sede_id: , reml
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0283
+                                                Largest FMI       =     0.1711
+DF adjustment:   Large sample                   DF:     min       =     668.57
+                                                        avg       =   2.01e+08
+                                                        max       =   4.61e+09
+Model F test:       Equal FMI                   F(  30,588229.2)  =     250.99
+                                                Prob > F          =     0.0000
+
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+               c_inse |   .2716928   .0272337     9.98   0.000     .2183092    .3250764
+                mujer |  -8.147265   .2776571   -29.34   0.000    -8.691463   -7.603067
+                 edad |  -7.494887   .1244402   -60.23   0.000    -7.738785   -7.250988
+            repitente |   5.907343   .4177088    14.14   0.000     5.088648    6.726037
+        lectura_30min |   6.844406   .2928772    23.37   0.000     6.270186    7.418626
+        libros_26omas |   5.520634    .400885    13.77   0.000     4.734242    6.307027
+        trabaja_mas20 |  -3.008393   .7108951    -4.23   0.000     -4.40195   -1.614836
+       internet_hogar |   .3485708   .3796902     0.92   0.359    -.3957902    1.092932
+     computador_hogar |   .5679347   .3641421     1.56   0.119    -.1458804     1.28175
+         ln_matricula |   4.102024   .9374596     4.38   0.000      2.26462    5.939428
+ratio_alumnos_docente |  -.0505931   .0624489    -0.81   0.418    -.1729912    .0718051
+           pct_planta |   7.052436   1.435392     4.91   0.000     4.239093    9.865779
+           z_posgrado |   .0706708   .1492032     0.47   0.636    -.2217631    .3631046
+         dotacion_tic |    .251768    1.49522     0.17   0.866    -2.682077    3.185613
+                rural |   -11.9706    1.76741    -6.77   0.000    -15.43466   -8.506537
+             ju_unica |   .1086938   .6257675     0.17   0.862     -1.11779    1.335177
+              tecnico |  -.6697187    1.35388    -0.49   0.621    -3.324459    1.985022
+    tecnico_academico |  -5.918052   2.628128    -2.25   0.025    -11.07843   -.7576738
+        cole_femenino |   36.25752    5.62815     6.44   0.000     25.22655    47.28849
+  tasa_homicidios_bar |   .0066958   .0661876     0.10   0.919    -.1230295    .1364211
+  tasa_homicidios_dev |  -.0066537   .0063108    -1.05   0.292    -.0190226    .0057153
+          ln_coca_bar |  -1.026006   .8135708    -1.26   0.207    -2.620575     .568564
+          ln_coca_dev |  -.1490639   .1541199    -0.97   0.333    -.4511336    .1530058
+  ln_inversion_pc_bar |  -.5770815   3.102575    -0.19   0.852    -6.658017    5.503854
+  ln_inversion_pc_dev |    3.26122   1.035622     3.15   0.002     1.231437    5.291002
+                      |
+                 year |
+                2019  |  -4.530481   .4739636    -9.56   0.000    -5.459433   -3.601529
+                2020  |  -3.859664    .520375    -7.42   0.000    -4.879581   -2.839747
+                2021  |  -8.798513   .5338312   -16.48   0.000    -9.844804   -7.752222
+                2022  |   -3.11716   .5609372    -5.56   0.000    -4.216578   -2.017742
+                2023  |   .5917015   .5976089     0.99   0.322    -.5795922    1.762995
+                      |
+                _cons |   339.5571   36.28604     9.36   0.000     268.4378    410.6765
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   13.70416   1.787265      10.61306    17.69555
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                   sd(_cons) |   11.60883      .4792       10.7066    12.58708
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.66142   .0932314      34.47917    34.84463
+------------------------------------------------------------------------------
+.     estimates save "ML3_reml.ster", replace
+(note: file ML3_reml.ster not found)
+file ML3_reml.ster saved
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [3] ERRORES ESTÁNDAR ROBUSTOS POR CLÚSTER
+. ********************************************************************************
+. * Los errores de máxima verosimilitud suponen correctamente especificada la
+. * estructura de covarianza. La varianza residual crece de 1.237 a 1.395 puntos
+. * entre 2018 y 2023, lo que es heterocedasticidad entre cohortes. El estimador
+. * sándwich no exige esa especificación correcta.
+. *
+. * NOTA: con `vce(robust)` en un modelo de tres niveles, Stata agrupa por la
+. * unidad de nivel más alto, es decir el municipio. Con 42 clústeres el
+. * estimador robusto es él mismo poco preciso, así que se reporta como
+. * verificación y no como especificación principal. Conviene declararlo.
+. 
+. if `hacer_robust' == 1 {
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[3] ERRORES ESTÁNDAR ROBUSTOS"
+[3] ERRORES ESTÁNDAR ROBUSTOS
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     use "Base_Estimacion.dta", clear
+. 
+.     display _newline "--- ML1 con errores robustos ---"
+
+--- ML1 con errores robustos ---
+.     mi estimate, dots post: mixed punt_global c_inse $v_n1 $v_n2 ///
+>         indice_vuln ib2018.year || mcpio_id: || sede_id: , mle vce(robust)
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects regression                        Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.6250
+                                                Largest FMI       =     0.0845
+DF adjustment:   Large sample                   DF:     min       =   2,702.28
+                                                        avg       =   1.03e+09
+                                                        max       =   2.36e+10
+Model F test:       Equal FMI                   F(  25,12401.5)   =  185650.53
+Within VCE type:       Robust                   Prob > F          =     0.0000
+
+                                      (Within VCE adjusted for 42 clusters in mcpio_id)
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+               c_inse |   .2706198   .0674781     4.01   0.000     .1383646    .4028749
+                mujer |  -8.148934    .791989   -10.29   0.000    -9.701204   -6.596664
+                 edad |  -7.499074    .208264   -36.01   0.000    -7.907264   -7.090884
+            repitente |   5.898802   2.312776     2.55   0.011     1.365844    10.43176
+        lectura_30min |   6.837405   .6615798    10.33   0.000     5.540716    8.134095
+        libros_26omas |   5.521781   .4983747    11.08   0.000     4.544632     6.49893
+        trabaja_mas20 |  -3.001662   .7231991    -4.15   0.000    -4.419325   -1.583999
+       internet_hogar |    .350174   .4071051     0.86   0.390    -.4478882    1.148236
+     computador_hogar |   .5721761   .3559888     1.61   0.108    -.1256665    1.270019
+         ln_matricula |   4.080907   1.146824     3.56   0.000     1.833164     6.32865
+ratio_alumnos_docente |   -.049335   .0874432    -0.56   0.573    -.2207207    .1220507
+           pct_planta |   6.921706   2.090683     3.31   0.001     2.824033    11.01938
+           z_posgrado |   .0622861   .2335665     0.27   0.790     -.395496    .5200683
+         dotacion_tic |  -.0479414   2.319577    -0.02   0.984     -4.59517    4.499287
+                rural |  -12.05029    1.79704    -6.71   0.000    -15.57243   -8.528159
+             ju_unica |   .1319074   .8629539     0.15   0.879    -1.559452    1.823267
+              tecnico |  -.6792024   1.323486    -0.51   0.608    -3.274349    1.915944
+    tecnico_academico |  -5.873235   4.549459    -1.29   0.197    -14.79167    3.045198
+        cole_femenino |   36.32195   1.284835    28.27   0.000     33.80365    38.84025
+          indice_vuln |   -.888739   .7632545    -1.16   0.244     -2.38469    .6072125
+                      |
+                 year |
+                2019  |  -4.527428   .8363848    -5.41   0.000    -6.166713   -2.888144
+                2020  |  -3.676051   .7164611    -5.13   0.000    -5.080289   -2.271812
+                2021  |  -8.580477   .8991237    -9.54   0.000    -10.34273   -6.818226
+                2022  |   -3.02601    .757447    -4.00   0.000    -4.510579   -1.541441
+                2023  |   .3438329   1.015765     0.34   0.735     -1.64703    2.334696
+                      |
+                _cons |   331.1531   7.838529    42.25   0.000     315.7898    346.5164
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |    13.2594   1.567519      10.51708    16.71678
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                   sd(_cons) |   11.54062   .7502332      10.16001    13.10884
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.65765   .8657806      33.00162    36.39678
+------------------------------------------------------------------------------
+.     estimates save "ML1_robust.ster", replace
+(note: file ML1_robust.ster not found)
+file ML1_robust.ster saved
+. 
+.     display _newline "--- ML3 con errores robustos ---"
+
+--- ML3 con errores robustos ---
+.     mi estimate, dots post: mixed punt_global c_inse $v_n1 $v_n2 ///
+>         tasa_homicidios_bar tasa_homicidios_dev ///
+>         ln_coca_bar ln_coca_dev ///
+>         ln_inversion_pc_bar ln_inversion_pc_dev ///
+>         ib2018.year || mcpio_id: || sede_id: , mle vce(robust)
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects regression                        Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.5790
+                                                Largest FMI       =     0.0867
+DF adjustment:   Large sample                   DF:     min       =   2,567.60
+                                                        avg       =   1.05e+09
+                                                        max       =   2.34e+10
+Model F test:       Equal FMI                   F(  30,11279.5)   =  203436.77
+Within VCE type:       Robust                   Prob > F          =     0.0000
+
+                                      (Within VCE adjusted for 42 clusters in mcpio_id)
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+               c_inse |   .2716361   .0678462     4.00   0.000     .1386595    .4046127
+                mujer |  -8.147359   .7915291   -10.29   0.000    -9.698728   -6.595991
+                 edad |  -7.495864   .2083466   -35.98   0.000    -7.904216   -7.087512
+            repitente |   5.910753   2.304336     2.57   0.010     1.394338    10.42717
+        lectura_30min |   6.844642   .6631115    10.32   0.000      5.54495    8.144333
+        libros_26omas |   5.521231    .499034    11.06   0.000     4.542793    6.499668
+        trabaja_mas20 |  -3.009832   .7254733    -4.15   0.000    -4.431948   -1.587716
+       internet_hogar |   .3498887   .4089114     0.86   0.392    -.4517084    1.151486
+     computador_hogar |   .5680579   .3563418     1.59   0.111     -.130476    1.266592
+         ln_matricula |   4.104931   1.178483     3.48   0.000     1.795138    6.414724
+ratio_alumnos_docente |  -.0508851   .0889831    -0.57   0.567     -.225289    .1235188
+           pct_planta |   7.122676   2.093876     3.40   0.001     3.018746    11.22661
+           z_posgrado |    .072182   .2425044     0.30   0.766     -.403118    .5474821
+         dotacion_tic |   .2621413   2.322542     0.11   0.910    -4.290825    4.815108
+                rural |  -11.92919    1.83808    -6.49   0.000    -15.53176   -8.326617
+             ju_unica |   .1120118    .879288     0.13   0.899    -1.611362    1.835385
+              tecnico |  -.6706786   1.319433    -0.51   0.611     -3.25794    1.916583
+    tecnico_academico |  -5.941487   4.546559    -1.31   0.191    -14.85429     2.97132
+        cole_femenino |   36.29911   1.275573    28.46   0.000     33.79896    38.79925
+  tasa_homicidios_bar |   .0068098    .075144     0.09   0.928    -.1404697    .1540894
+  tasa_homicidios_dev |  -.0066706   .0080034    -0.83   0.405    -.0223569    .0090157
+          ln_coca_bar |  -1.033954    1.05324    -0.98   0.326    -3.098268    1.030359
+          ln_coca_dev |  -.1490141   .2091129    -0.71   0.476    -.5588679    .2608397
+  ln_inversion_pc_bar |  -.6167536   2.769888    -0.22   0.824    -6.045634    4.812127
+  ln_inversion_pc_dev |   3.265979   1.616809     2.02   0.043     .0970919    6.434866
+                      |
+                 year |
+                2019  |  -4.529933    .831438    -5.45   0.000    -6.159521   -2.900344
+                2020  |  -3.861055   .7853225    -4.92   0.000    -5.400259   -2.321851
+                2021  |   -8.79863   .9756555    -9.02   0.000    -10.71088    -6.88638
+                2022  |  -3.117119   .7511362    -4.15   0.000    -4.589319   -1.644919
+                2023  |    .592444   .9616991     0.62   0.538    -1.292452     2.47734
+                      |
+                _cons |   339.9444   34.97526     9.72   0.000     271.3942    408.4947
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   12.93222     1.3977      10.46348    15.98343
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                   sd(_cons) |   11.52395   .7506281      10.14279     13.0932
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.65599   .8648892      33.00163    36.39328
+------------------------------------------------------------------------------
+.     estimates save "ML3_robust.ster", replace
+(note: file ML3_robust.ster not found)
+file ML3_robust.ster saved
+. 
+.     display _newline "Comparar los errores estándar de ln_inversion_pc_dev,"
+
+Comparar los errores estándar de ln_inversion_pc_dev,
+.     display "tasa_homicidios_dev y ln_coca_dev con los de la Tabla 10."
+tasa_homicidios_dev y ln_coca_dev con los de la Tabla 10.
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [4] HIPÓTESIS DE SELECCIÓN DE SOBREVIVIENTES
+. ********************************************************************************
+. * El capítulo 4 sostiene que el resultado nulo de la violencia puede deberse a
+. * que el conflicto saca a los estudiantes del sistema antes del grado once, de
+. * modo que sus efectos quedan fuera de una muestra construida sobre quienes sí
+. * presentaron el examen. Esa afirmación se puede poner a prueba.
+. *
+. * Si la hipótesis es cierta, los municipios donde más creció la violencia
+. * deberían mostrar una caída relativa en el número de estudiantes presentados.
+. * La prueba no es concluyente —el número de evaluados también depende de la
+. * demografía y de la cobertura— pero es mucho más que una conjetura.
+. 
+. if `hacer_desercion' == 1 {
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[4] PRUEBA DE LA HIPÓTESIS DE SELECCIÓN"
+[4] PRUEBA DE LA HIPÓTESIS DE SELECCIÓN
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     use "Base_Multinivel_PCA.dta", clear
+. 
+.     collapse (count) evaluados = punt_global ///
+>              (mean)  tasa_homicidios ln_coca indice_vuln, ///
+>              by(cole_cod_mcpio_ubicacion year)
+. 
+.     xtset cole_cod_mcpio_ubicacion year
+
+Panel variable: cole_cod_mcpio_ubicacion (strongly balanced)
+ Time variable: year, 2018 to 2023
+         Delta: 1 unit
+. 
+.     * Escala logarítmica: interesa el cambio proporcional, no el absoluto.
+.     generate double ln_eval = ln(evaluados)
+.     label variable ln_eval "Log de estudiantes presentados en el municipio"
+. 
+.     display _newline "--- Evaluados por municipio-año ---"
+
+--- Evaluados por municipio-año ---
+.     xtsum evaluados ln_eval tasa_homicidios
+
+Variable         |      Mean   Std. dev.       Min        Max |    Observations
+-----------------+--------------------------------------------+----------------
+evalua~s overall |  276.7857   353.1268         32       2558 |     N =     252
+         between |              355.572   41.33333       2327 |     n =      42
+         within  |             28.03017   152.7857   507.7857 |     T =       6
+                 |                                            |
+ln_eval  overall |  5.277523   .7731136   3.465736   7.846981 |     N =     252
+         between |             .7738319   3.714375   7.751223 |     n =      42
+         within  |             .1040068   4.898644   5.540497 |     T =       6
+                 |                                            |
+tasa_h~s overall |  43.38911   46.51589          0   293.0238 |     N =     252
+         between |             37.00691   3.054605   158.7145 |     n =      42
+         within  |             28.66178  -107.6048   177.6984 |     T =       6
+. 
+.     * --- (a) Correlación de los cambios entre 2018 y 2023 ---
+.     preserve
+.         keep cole_cod_mcpio_ubicacion year ln_eval tasa_homicidios
+.         quietly reshape wide ln_eval tasa_homicidios, ///
+>             i(cole_cod_mcpio_ubicacion) j(year)
+. 
+.         generate double d_eval = ln_eval2023 - ln_eval2018
+.         generate double d_hom  = tasa_homicidios2023 - tasa_homicidios2018
+.         label variable d_eval "Cambio del log de evaluados, 2018 a 2023"
+.         label variable d_hom  "Cambio de la tasa de homicidios, 2018 a 2023"
+. 
+.         display _newline "--- Cambio en evaluados frente a cambio en homicidios ---"
+
+--- Cambio en evaluados frente a cambio en homicidios ---
+.         display "Si la selección por violencia operara, se esperaría una"
+Si la selección por violencia operara, se esperaría una
+.         display "correlación NEGATIVA: donde más creció la violencia, menos"
+correlación NEGATIVA: donde más creció la violencia, menos
+.         display "estudiantes llegaron a presentar la prueba."
+estudiantes llegaron a presentar la prueba.
+.         correlate d_eval d_hom
+(obs=42)
+
+             |   d_eval    d_hom
+-------------+------------------
+      d_eval |   1.0000
+       d_hom |  -0.0166   1.0000
+
+.         regress d_eval d_hom
+
+      Source |       SS           df       MS      Number of obs   =        42
+-------------+----------------------------------   F(1, 40)        =      0.01
+       Model |  .000301493         1  .000301493   Prob > F        =    0.9170
+    Residual |  1.09644928        40  .027411232   R-squared       =    0.0003
+-------------+----------------------------------   Adj R-squared   =   -0.0247
+       Total |  1.09675078        41  .026750019   Root MSE        =    .16556
+
+------------------------------------------------------------------------------
+      d_eval | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       d_hom |  -.0000727   .0006932    -0.10   0.917    -.0014737    .0013283
+       _cons |   .0506086   .0381091     1.33   0.192    -.0264129      .12763
+------------------------------------------------------------------------------
+. 
+.         display _newline "--- Municipios con mayor caída relativa de evaluados ---"
+
+--- Municipios con mayor caída relativa de evaluados ---
+.         gsort d_eval
+.         list cole_cod_mcpio_ubicacion d_eval d_hom in 1/10, clean noobs
+
+    cole_c~n       d_eval        d_hom  
+       19397   -.34484049    -12.35264  
+       19533   -.34092659    67.412481  
+       19845   -.25327329    33.421633  
+       19585   -.16579225    5.0428018  
+       19760   -.15762894   -7.2801398  
+       19473   -.10398971    31.242101  
+       19290   -.08338161    95.914061  
+       19743   -.08071138    17.869907  
+       19212   -.07020426    96.367387  
+       19418   -.06453852    15.626628  
+.     restore
+. 
+.     * --- (b) Especificación de panel con efectos fijos ---
+.     * Más exigente que la anterior: usa los seis años y compara a cada
+.     * municipio consigo mismo, con efectos fijos de año.
+.     display _newline "--- Panel de evaluados con efectos fijos de municipio y año ---"
+
+--- Panel de evaluados con efectos fijos de municipio y año ---
+.     xtreg ln_eval tasa_homicidios i.year, fe cluster(cole_cod_mcpio_ubicacion)
+
+Fixed-effects (within) regression               Number of obs     =        252
+Group variable: cole_cod_m~n                    Number of groups  =         42
+
+R-squared:                                      Obs per group:
+     Within  = 0.0842                                         min =          6
+     Between = 0.0125                                         avg =        6.0
+     Overall = 0.0009                                         max =          6
+
+                                                F(6,41)           =       2.64
+corr(u_i, Xb) = -0.0101                         Prob > F          =     0.0294
+
+                 (Std. err. adjusted for 42 clusters in cole_cod_mcpio_ubicacion)
+---------------------------------------------------------------------------------
+                |               Robust
+        ln_eval | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------+----------------------------------------------------------------
+tasa_homicidios |  -.0000722   .0002846    -0.25   0.801     -.000647    .0005026
+                |
+           year |
+          2019  |   .0255794   .0240619     1.06   0.294    -.0230147    .0741734
+          2020  |  -.0448167    .031204    -1.44   0.159    -.1078345    .0182011
+          2021  |   .0242178    .027884     0.87   0.390    -.0320952    .0805307
+          2022  |   .0329595   .0320732     1.03   0.310    -.0318135    .0977326
+          2023  |   .0505866    .030306     1.67   0.103    -.0106177    .1117908
+                |
+          _cons |   5.265899   .0168185   313.10   0.000     5.231934    5.299865
+----------------+----------------------------------------------------------------
+        sigma_u |  .77413551
+        sigma_e |    .110402
+            rho |  .98006687   (fraction of variance due to u_i)
+---------------------------------------------------------------------------------
+. 
+.     display _newline "Un coeficiente negativo y significativo respaldaría la"
+
+Un coeficiente negativo y significativo respaldaría la
+.     display "hipótesis de selección. Uno nulo indica que la violencia no se"
+hipótesis de selección. Uno nulo indica que la violencia no se
+.     display "asocia con el tamaño de la cohorte evaluada, lo que DEBILITA esa"
+asocia con el tamaño de la cohorte evaluada, lo que DEBILITA esa
+.     display "explicación del resultado nulo y hay que declararlo así."
+explicación del resultado nulo y hay que declararlo así.
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [5] LOS DOS ATÍPICOS DEL FUT FRENTE A LA VULNERABILIDAD
+. ********************************************************************************
+. * El capítulo trata las dos observaciones anómalas de inversión ejecutada como
+. * errores de reporte. Cabe una lectura alternativa: que sean municipios en
+. * crisis administrativa real, y que esa crisis coincida con alta vulnerabilidad.
+. * Si así fuera, excluirlos no sería depurar sino recortar justamente el
+. * segmento donde la asociación importaría más.
+. 
+. if `hacer_atipicos' == 1 {
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[5] PERFIL DE LOS MUNICIPIO-AÑO ATÍPICOS DEL FUT"
+[5] PERFIL DE LOS MUNICIPIO-AÑO ATÍPICOS DEL FUT
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     use "N3_Municipios_PCA.dta", clear
+. 
+.     capture confirm variable ln_inv_fut_pc
+.     if _rc != 0 {
+.         display "ln_inv_fut_pc no está en N3_Municipios_PCA.dta."
+.         display "Correr el 04 v4 antes de este bloque."
+.     }
+.     else {
+.         generate byte atipico_fut = (ln_inv_fut_pc < 12) if !missing(ln_inv_fut_pc)
+(1 missing value generated)
+. 
+.         display _newline "--- Perfil de los atípicos ---"
+
+--- Perfil de los atípicos ---
+.         list cole_cod_mcpio_ubicacion year ln_inv_fut_pc ///
+>              tasa_homicidios ln_coca indice_vuln vuln_bar ///
+>              if atipico_fut == 1, clean noobs
+
+    cole_c~n   year   ln_inv_~c   tasa_ho~s     ln_coca   indice_v~n     vuln_bar  
+       19397   2022   11.363636   28.556276           0   -.85387667   -.95140211  
+       19532   2022    9.956107   131.70025   6.7648775    2.2013264    1.5579379  
+. 
+.         display _newline "--- Comparación con el resto de la muestra ---"
+
+--- Comparación con el resto de la muestra ---
+.         tabstat tasa_homicidios ln_coca indice_vuln vuln_bar, ///
+>             by(atipico_fut) stat(n mean sd) format(%9.4f)
+
+Summary statistics: N, Mean, SD
+Group variable: atipico_fut 
+
+atipico_fut |  tasa_h~s   ln_coca  indice~n  vuln_bar
+------------+----------------------------------------
+          0 |  249.0000  249.0000  249.0000  249.0000
+            |   43.1978    2.5350   -0.0066   -0.0033
+            |   46.4202    3.0156    0.9946    0.9008
+------------+----------------------------------------
+          1 |    2.0000    2.0000    2.0000    2.0000
+            |   80.1283    3.3824    0.6737    0.3033
+            |   72.9338    4.7835    2.1604    1.7744
+------------+----------------------------------------
+      Total |  251.0000  251.0000  251.0000  251.0000
+            |   43.4920    2.5417   -0.0012   -0.0009
+            |   46.5801    3.0196    1.0018    0.9046
+-----------------------------------------------------
+. 
+.         display _newline "--- Posición de esos municipios en el ranking ---"
+
+--- Posición de esos municipios en el ranking ---
+.         preserve
+.             egen byte _t = tag(cole_cod_mcpio_ubicacion)
+.             keep if _t == 1
+(210 observations deleted)
+.             gsort -vuln_bar
+.             generate int rango_vuln = _n
+.             list rango_vuln cole_cod_mcpio_ubicacion vuln_bar in 1/12, clean noobs
+
+    rango_~n   cole_c~n    vuln_bar  
+           1      19050    2.215632  
+           2      19256   1.8446974  
+           3      19532   1.5579379  
+           4      19698   1.2115875  
+           5      19212   1.1744955  
+           6      19780   1.1711673  
+           7      19110   1.1096462  
+           8      19573   .92855576  
+           9      19473   .71367061  
+          10      19130   .62586823  
+          11      19142   .62504152  
+          12      19075   .57562929  
+.         restore
+. 
+.         display _newline "Si los atípicos están entre los municipios más"
+
+Si los atípicos están entre los municipios más
+.         display "vulnerables, hay que declararlo: la exclusión de R5b no es"
+vulnerables, hay que declararlo: la exclusión de R5b no es
+.         display "neutral y el capítulo debe decirlo en lugar de presentar la"
+neutral y el capítulo debe decirlo en lugar de presentar la
+.         display "depuración como puramente técnica."
+depuración como puramente técnica.
+.     }
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [6] PRUEBA DE EQUIVALENCIA PARA EL CONTRASTE DE CENTRADO
+. ********************************************************************************
+. * El capítulo concluye que no hay efecto composicional distinguible porque el
+. * contraste de igualdad no se rechaza. Un contraste de diferencia nula no
+. * prueba equivalencia: solo no rechaza. La prueba de dos contrastes
+. * unilaterales (TOST) sí permite afirmar equivalencia dentro de un margen
+. * declarado de antemano.
+. *
+. * MARGEN ELEGIDO: 0,10 puntos por unidad del índice socioeconómico. Con una
+. * desviación del índice de 8,60 puntos, eso equivale a 0,86 puntos de examen,
+. * menos de dos centésimas de desviación del puntaje. Es un margen exigente y
+. * hay que justificarlo en el texto como lo que se considera despreciable.
+. 
+. if `hacer_tost' == 1 {
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[6] PRUEBA DE EQUIVALENCIA DEL EFECTO COMPOSICIONAL"
+[6] PRUEBA DE EQUIVALENCIA DEL EFECTO COMPOSICIONAL
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     estimates use "M3_cwc.ster"
+. 
+.     local margen = 0.10
+. 
+.     display _newline "--- Diferencia entre el efecto individual y el composicional ---"
+
+--- Diferencia entre el efecto individual y el composicional ---
+.     lincom cwc_inse - c_inse_prom_sede
+
+ ( 1)  [punt_global]cwc_inse - [punt_global]c_inse_prom_sede = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .0660315   .0816922     0.81   0.419    -.0940823    .2261453
+------------------------------------------------------------------------------
+.     scalar dif  = r(estimate)
+.     scalar sedif = r(se)
+. 
+.     display _newline "Diferencia estimada: " %8.4f dif
+
+Diferencia estimada:   0.0660
+.     display "Error estándar:      " %8.4f sedif
+Error estándar:        0.0817
+.     display "Margen de equivalencia declarado: más o menos " %4.2f `margen'
+Margen de equivalencia declarado: más o menos 0.10
+. 
+.     scalar t_inf = (dif - (-`margen')) / sedif
+.     scalar t_sup = (dif - `margen') / sedif
+.     scalar p_inf = 1 - normal(t_inf)
+.     scalar p_sup = normal(t_sup)
+.     scalar p_tost = max(p_inf, p_sup)
+. 
+.     display _newline "--- Los dos contrastes unilaterales ---"
+
+--- Los dos contrastes unilaterales ---
+.     display "H0 inferior (diferencia <= -margen): p = " %8.4f p_inf
+H0 inferior (diferencia <= -margen): p =   0.0211
+.     display "H0 superior (diferencia >= +margen): p = " %8.4f p_sup
+H0 superior (diferencia >= +margen): p =   0.3388
+.     display "p del TOST (el mayor de los dos):    " %8.4f p_tost
+p del TOST (el mayor de los dos):      0.3388
+. 
+.     if p_tost < 0.05 {
+.         display _newline "Se rechazan ambas hipótesis nulas: la diferencia entre"
+.         display "el efecto individual y el composicional es equivalente a cero"
+.         display "dentro del margen declarado. Esto es una afirmación POSITIVA"
+.         display "de equivalencia, más fuerte que un contraste no rechazado."
+.     }
+.     else {
+.         display _newline "NO se puede afirmar equivalencia con este margen. La"
+
+NO se puede afirmar equivalencia con este margen. La
+.         display "conclusión correcta es que los datos no permiten distinguir un"
+conclusión correcta es que los datos no permiten distinguir un
+.         display "efecto composicional, y tampoco descartarlo. El capítulo debe"
+efecto composicional, y tampoco descartarlo. El capítulo debe
+.         display "decirlo así y no como ausencia de efecto."
+decirlo así y no como ausencia de efecto.
+.     }
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [7] HIPÓTESIS RIVAL SOBRE LOS DOCENTES DE PLANTA
+. ********************************************************************************
+. * La objeción es que la proporción de docentes de planta podría estar
+. * midiendo simplemente sedes urbanas o grandes, con mejores condiciones no
+. * observadas, sin que medie ningún mecanismo de capacidad institucional.
+. *
+. * Dos diagnósticos la acotan. El primero es la correlación de la variable con
+. * ruralidad y tamaño: si fuera un mero proxy, esas correlaciones serían altas.
+. * El segundo es la descomposición de su varianza: si casi toda la variación es
+. * entre sedes y no dentro, el coeficiente se identifica de forma transversal y
+. * la objeción conserva fuerza, cosa que hay que reconocer.
+. 
+. if `hacer_planta' == 1 {
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[7] DIAGNÓSTICO DE LA HIPÓTESIS RIVAL SOBRE LA PLANTA DOCENTE"
+[7] DIAGNÓSTICO DE LA HIPÓTESIS RIVAL SOBRE LA PLANTA DOCENTE
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     use "N2_Sedes_2018_2023.dta", clear
+. 
+.     display _newline "--- Correlación con las variables que sugiere la objeción ---"
+
+--- Correlación con las variables que sugiere la objeción ---
+.     correlate pct_planta rural ln_matricula ju_unica z_posgrado dotacion_tic
+(obs=2,342)
+
+             | pct_pl~a    rural ln_mat~a ju_unica z_posg~o dotaci~c
+-------------+------------------------------------------------------
+  pct_planta |   1.0000
+       rural |  -0.2508   1.0000
+ln_matricula |   0.1236  -0.6180   1.0000
+    ju_unica |   0.2015  -0.1144   0.0828   1.0000
+  z_posgrado |   0.2017  -0.1272   0.0862   0.0007   1.0000
+dotacion_tic |   0.0508   0.0308  -0.2464   0.0557   0.0180   1.0000
+
+. 
+.     display _newline "Correlaciones bajas indican que la planta docente NO es un"
+
+Correlaciones bajas indican que la planta docente NO es un
+.     display "simple sustituto de ruralidad o tamaño, y ambas están además"
+simple sustituto de ruralidad o tamaño, y ambas están además
+.     display "controladas en el modelo."
+controladas en el modelo.
+. 
+.     capture drop sede_id
+.     egen long sede_id = group(cole_cod_dane_sede)
+.     xtset sede_id year
+
+Panel variable: sede_id (unbalanced)
+ Time variable: year, 2018 to 2023, but with gaps
+         Delta: 1 unit
+. 
+.     display _newline "--- Descomposición de la varianza de la planta docente ---"
+
+--- Descomposición de la varianza de la planta docente ---
+.     xtsum pct_planta ln_matricula rural
+
+Variable         |      Mean   Std. dev.       Min        Max |    Observations
+-----------------+--------------------------------------------+----------------
+pct_pl~a overall |  .8230633   .2908867          0          1 |     N =    2436
+         between |             .2862276          0          1 |     n =     436
+         within  |             .0915509  -.0102701   1.600841 | T-bar = 5.58716
+                 |                                            |
+ln_mat~a overall |  5.692169   .7355084   3.178054   7.779885 |     N =    2436
+         between |             .7420764   3.433987   7.681089 |     n =     436
+         within  |             .1419115   4.991943   6.659813 | T-bar = 5.58716
+                 |                                            |
+rural    overall |    .72783   .4451679          0          1 |     N =    2447
+         between |             .4383568          0          1 |     n =     437
+         within  |                    0     .72783     .72783 | T-bar = 5.59954
+. 
+.     display _newline "Si la variación dentro de la sede es pequeña frente a la"
+
+Si la variación dentro de la sede es pequeña frente a la
+.     display "variación entre sedes, el coeficiente se identifica sobre todo de"
+variación entre sedes, el coeficiente se identifica sobre todo de
+.     display "forma transversal. Eso NO invalida el resultado, pero limita la"
+forma transversal. Eso NO invalida el resultado, pero limita la
+.     display "interpretación y debe declararse en el capítulo 5."
+interpretación y debe declararse en el capítulo 5.
+. 
+.     * --- Modelo con efectos fijos de sede, como cota superior de exigencia ---
+.     * Descarta toda diferencia permanente entre sedes y usa solo la variación
+.     * temporal de la planta dentro de cada establecimiento. Es una prueba muy
+.     * exigente y probablemente con poca potencia, pero si el coeficiente
+.     * sobrevive, la objeción queda respondida de forma contundente.
+.     use "Base_Multinivel_PCA.dta", clear
+.     capture drop sede_id
+.     egen long sede_id = group(cole_cod_dane_sede)
+.     xtset sede_id year
+repeated time values within panel
+r(451);
+. 
+.     display _newline "--- Efectos fijos de sede sobre la muestra sin imputar ---"
+.     display "ADVERTENCIA: se estima sobre casos completos, no sobre las veinte"
+.     display "imputaciones, así que el tamaño muestral difiere del principal."
+.     xtreg punt_global c_inse mujer edad repitente ///
+>           ln_matricula ratio_alumnos_docente pct_planta dotacion_tic ///
+>           ju_unica i.year, fe cluster(sede_id)
+. 
+.     display _newline "El coeficiente de pct_planta aquí compara a cada sede"
+.     display "consigo misma. Si conserva signo positivo, el resultado no puede"
+.     display "atribuirse enteramente a diferencias fijas entre establecimientos."
+. }
+r(451);
+
+end of do-file
+
+r(451);
+
+. 
+
+. do "C:\Users\RYZEN5~1\AppData\Local\Temp\STD41a8_000000.tmp"
+
+. ********************************************************************************
+. * PROYECTO : Desempeño Saber 11 en sedes oficiales del Cauca, 2018-2023
+. * SCRIPT   : 10b - CORRECCIÓN DEL BLOQUE [7] DEL BLINDAJE
+. * ENTRADA  : Base_Multinivel_PCA.dta
+. * SALIDA   : log_10b_planta_fe.log
+. * STATA    : 17
+. ********************************************************************************
+. * QUÉ FALLÓ Y POR QUÉ
+. * El bloque [7] del script 10 terminó con el error r(451), "repeated time values
+. * within panel". La causa es un descuido de escritura: `Base_Multinivel_PCA.dta`
+. * está a nivel de ESTUDIANTE, de modo que una misma sede tiene decenas de filas
+. * en el mismo año y la combinación sede-año no identifica las observaciones.
+. *
+. * La corrección es simple. Para una regresión de efectos fijos, `xtreg, fe` solo
+. * necesita saber cuál es la unidad que define los efectos fijos; no requiere una
+. * variable de tiempo. Basta con `xtset sede_id`, sin el segundo argumento.
+. *
+. * Los efectos de año entran igual como indicadoras, así que la especificación
+. * estimada es la misma que se pretendía en el script 10.
+. ********************************************************************************
+. 
+. clear all
+
+. set more off
+
+. set varabbrev off
+
+. version 17
+
+. 
+. cd "C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2"
+C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2
+
+. 
+. capture log close _all

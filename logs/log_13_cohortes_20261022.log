@@ -1,0 +1,1218 @@
+---------------------------------------------------------------------------------------------
+      name:  fase13
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_13_cohortes_20261022.lo
+> g
+  log type:  text
+ opened on:  22 Oct 2026, 18:53:29
+
+. 
+. timer clear
+
+. timer on 1
+
+. 
+. * ---------------------------------------------------------------------------
+. * INTERRUPTORES DE BLOQUE
+. * ---------------------------------------------------------------------------
+. local hacer_prep   = 1    // [0] verificaciones e identificadores. Rapido.
+
+. local hacer_inter  = 1    // [1] LENTO: agrupado con interacciones, 20 imput.
+
+. local hacer_oaxaca = 0    // [2] LENTO: Oaxaca-Blinder, 5 imputaciones
+
+. local hacer_rubin  = 0    // [3] combinacion de Rubin y Holm. Rapido.
+
+. 
+. * ---------------------------------------------------------------------------
+. * BLOQUES DE VARIABLES. Identicos a los del 08_estimacion_v5.do, bloque [2.4]
+. * ---------------------------------------------------------------------------
+. global v_n1 mujer edad repitente lectura_30min libros_26omas ///
+>             trabaja_mas20 internet_hogar computador_hogar
+
+. 
+. global v_n2 ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>             dotacion_tic rural ju_unica tecnico tecnico_academico ///
+>             cole_femenino
+
+. 
+. * $v_n2 SIN rural y SIN pct_planta: esas dos entran por la via de `##`, que ya
+. * incluye sus efectos principales. Repetirlas produce las notas de colinealidad
+. * que C5 documento en el apartado 6.2 y ensucia el log sin cambiar el modelo.
+. global v_n2_int ln_matricula ratio_alumnos_docente z_posgrado ///
+>                 dotacion_tic ju_unica tecnico tecnico_academico ///
+>                 cole_femenino
+
+. 
+. * Lista de la Oaxaca PRINCIPAL: $v_n2 sin z_posgrado. Ver bloque [0.9].
+. global v_n2_oax ln_matricula ratio_alumnos_docente pct_planta ///
+>                 dotacion_tic rural ju_unica tecnico tecnico_academico ///
+>                 cole_femenino
+
+. 
+. * Estructura aleatoria de C1, textual.
+. global RE "|| mcpio_id: || mcpio_id: R.year || sede_id: || sede_anio:"
+
+. 
+. 
+. ********************************************************************************
+. * [0] PREPARACION Y VERIFICACIONES
+. ********************************************************************************
+. 
+. if `hacer_prep' == 1 {
+. 
+.     display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+.     display "[0] PREPARACION"
+[0] PREPARACION
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     timer clear 2
+.     timer on 2
+. 
+.     use "Base_Estimacion.dta", clear
+. 
+.     * Base_Estimacion.dta ya trae sede_id y mcpio_id creados y registrados como
+.     * regulares por el bloque [2.3] del 08. Aqui solo se anade sede_anio.
+.     * Una a una: `drop` es todo o nada, y con datos mi hay que desregistrar
+.     * antes de borrar (misma nota del bloque [1] del 11).
+.     foreach v in sede_anio {
+  2.         capture mi unregister `v'
+  3.         capture drop `v'
+  4.     }
+.     egen long sede_anio = group(cole_cod_dane_sede year)
+.     mi register regular sede_anio
+.     mi update
+. 
+.     display _newline "--- Verificacion de identificadores ---"
+
+--- Verificacion de identificadores ---
+.     quietly count if missing(sede_anio) | missing(sede_id) | missing(mcpio_id)
+.     display "Filas sin identificador: " r(N) " (debe ser 0)"
+Filas sin identificador: 0 (debe ser 0)
+.     assert r(N) == 0
+. 
+.     display _newline "--- Variables que exige este script ---"
+
+--- Variables que exige este script ---
+.     foreach v in punt_global cwc_inse c_inse_prom_sede c_inse ///
+>                  estu_inse_individual indice_vuln year {
+  2.         confirm variable `v'
+  3.     }
+.     foreach v of global v_n1 {
+  2.         confirm variable `v'
+  3.     }
+.     foreach v of global v_n2 {
+  2.         confirm variable `v'
+  3.     }
+.     display "Todas presentes."
+Todas presentes.
+. 
+.     display _newline "--- Tamano de las dos cohortes de la Oaxaca ---"
+
+--- Tamano de las dos cohortes de la Oaxaca ---
+.     quietly count if _mi_m == 1 & year == 2018
+.     local n18 = r(N)
+.     quietly count if _mi_m == 1 & year == 2023
+.     local n23 = r(N)
+.     display "2018: `n18'   2023: `n23'   (esperados 11.456 y 12.366)"
+2018: 11456   2023: 12366   (esperados 11.456 y 12.366)
+. 
+.     display _newline "--- Medias brutas del puntaje, para enmarcar la Oaxaca ---"
+
+--- Medias brutas del puntaje, para enmarcar la Oaxaca ---
+.     tabstat punt_global edad repitente estu_inse_individual ///
+>         if _mi_m == 1 & inlist(year, 2018, 2023), by(year) ///
+>         stat(n mean sd) format(%9.4f)
+
+Summary statistics: N, Mean, SD
+Group variable: year (Año de presentación de la prueba)
+
+    year |  punt_g~l      edad  repite~e  estu_i~l
+---------+----------------------------------------
+    2018 |  1.15e+04  1.15e+04  1.15e+04  1.15e+04
+         |  235.4713   16.9453    0.1623   42.9299
+         |   45.3886    1.1802    0.3687    8.7125
+---------+----------------------------------------
+    2023 |  1.24e+04  1.24e+04  1.24e+04  1.24e+04
+         |  236.3955   16.6994    0.1074   44.5965
+         |   47.0542    1.1046    0.3096    7.9271
+---------+----------------------------------------
+   Total |  2.38e+04  2.38e+04  2.38e+04  2.38e+04
+         |  235.9511   16.8176    0.1338   43.7950
+         |   46.2620    1.1482    0.3404    8.3555
+--------------------------------------------------
+. 
+.     save "C3_Base_Trabajo_`hoy'.dta", replace
+(file C3_Base_Trabajo_20261022.dta not found)
+file C3_Base_Trabajo_20261022.dta saved
+. 
+.     timer off 2
+.     display _newline "--- Tiempo del bloque [0] ---"
+
+--- Tiempo del bloque [0] ---
+.     timer list 2
+   2:    124.96 /        1 =     124.9570
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [0.9] REGLA DE DECISION, IMPRESA ANTES DE ESTIMAR NADA
+. ********************************************************************************
+. * Se imprime dentro del propio log, como hicieron C5 (apartado 4.1) y C7
+. * (bloque 0.9), para que la constancia de su anterioridad no dependa del
+. * registro escrito en el chat.
+. 
+. display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+
+. display "[0.9] FAMILIA DE CONTRASTES Y CORRECCION POR MULTIPLICIDAD"
+[0.9] FAMILIA DE CONTRASTES Y CORRECCION POR MULTIPLICIDAD
+
+. display "      FIJADAS ANTES DE ESTIMAR. NINGUN UMBRAL SE MUEVE DESPUES."
+      FIJADAS ANTES DE ESTIMAR. NINGUN UMBRAL SE MUEVE DESPUES.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. display ""
+
+
+. display "FAMILIA F-C3. Cuatro pruebas CONJUNTAS, una por cada afirmacion de"
+FAMILIA F-C3. Cuatro pruebas CONJUNTAS, una por cada afirmacion de
+
+. display "cambio entre cohortes que el Capitulo 4 sostiene hoy:"
+cambio entre cohortes que el Capitulo 4 sostiene hoy:
+
+. display ""
+
+
+. display "  T1  i(2019/2023).year#c.rural             -> 4.3.2 'se consolido'"
+  T1  i(2019/2023).year#c.rural             -> 4.3.2 'se consolido'
+
+. display "  T2  i(2019/2023).year#c.pct_planta        -> 4.3.2 'crece de 15,3 a 17,4'"
+  T2  i(2019/2023).year#c.pct_planta        -> 4.3.2 'crece de 15,3 a 17,4'
+
+. display "  T3  i(2019/2023).year#c.cwc_inse          -> 4.3.2 vaiven de beta_w"
+  T3  i(2019/2023).year#c.cwc_inse          -> 4.3.2 vaiven de beta_w
+
+. display "  T4  i(2019/2023).year#c.c_inse_prom_sede  -> 4.3.2 'la brecha se ensancha'"
+  T4  i(2019/2023).year#c.c_inse_prom_sede  -> 4.3.2 'la brecha se ensancha'
+
+. display ""
+
+
+. display "Cada T es UN contraste conjunto de cinco coeficientes, no cinco pruebas."
+Cada T es UN contraste conjunto de cinco coeficientes, no cinco pruebas.
+
+. display ""
+
+
+. display "CORRECCION: Holm sobre las cuatro, al 5 %. Umbrales por orden creciente"
+CORRECCION: Holm sobre las cuatro, al 5 %. Umbrales por orden creciente
+
+. display "de p: 0,0125 / 0,0167 / 0,0250 / 0,0500."
+de p: 0,0125 / 0,0167 / 0,0250 / 0,0500.
+
+. display ""
+
+
+. display "PROCEDIMIENTO ANIDADO: solo una T que supere Holm habilita a examinar"
+PROCEDIMIENTO ANIDADO: solo una T que supere Holm habilita a examinar
+
+. display "sus anos por separado, con Holm sobre las cinco comparaciones DENTRO de"
+sus anos por separado, con Holm sobre las cinco comparaciones DENTRO de
+
+. display "esa variable. Si la conjunta no supera Holm, NINGUN ano individual se"
+esa variable. Si la conjunta no supera Holm, NINGUN ano individual se
+
+. display "reporta como significativo y la afirmacion del Capitulo 4 se retira."
+reporta como significativo y la afirmacion del Capitulo 4 se retira.
+
+. display ""
+
+
+. display "NO ENTRAN EN LA FAMILIA: cole_femenino x ano y tecnico_academico x ano."
+NO ENTRAN EN LA FAMILIA: cole_femenino x ano y tecnico_academico x ano.
+
+. display "El Capitulo 4 no afirma tendencia sobre ellas. Ampliar la familia tras"
+El Capitulo 4 no afirma tendencia sobre ellas. Ampliar la familia tras
+
+. display "ver T1-T4 seria lo que C7 rechazo con `minas'."
+ver T1-T4 seria lo que C7 rechazo con .
+
+. display ""
+
+
+. display "OAXACA-BLINDER: NO es confirmatoria. Sin correccion por multiplicidad y"
+OAXACA-BLINDER: NO es confirmatoria. Sin correccion por multiplicidad y
+
+. display "sin promocion de ninguna contribucion individual a hallazgo. Se reporta"
+sin promocion de ninguna contribucion individual a hallazgo. Se reporta
+
+. display "el reparto agregado y SOLO EL SIGNO de las contribuciones de edad y"
+el reparto agregado y SOLO EL SIGNO de las contribuciones de edad y
+
+. display "repitente, que es lo que la fila 4 de C3 necesita."
+repitente, que es lo que la fila 4 de C3 necesita.
+
+. display ""
+
+
+. display "ESPECIFICACION DE LA OAXACA, fijada aqui:"
+ESPECIFICACION DE LA OAXACA, fijada aqui:
+
+. display "  - La principal va SIN z_posgrado. El borrador de C3 sostenia que su"
+  - La principal va SIN z_posgrado. El borrador de C3 sostenia que su
+
+. display "    aporte de composicion es cero por estar estandarizada por ano;"
+    aporte de composicion es cero por estar estandarizada por ano;
+
+. display "    C7 (apartado 4.1) demuestra que es falso: promediada POR ESTUDIANTE"
+    C7 (apartado 4.1) demuestra que es falso: promediada POR ESTUDIANTE
+
+. display "    vale 0,2841 en 2018 y 0,0102 en 2023. Incluirla atribuiria a"
+    vale 0,2841 en 2018 y 0,0102 en 2023. Incluirla atribuiria a
+
+. display "    composicion un cambio de criterio de reporte del DANE."
+    composicion un cambio de criterio de reporte del DANE.
+
+. display "  - Se corre una variante CON z_posgrado solo para medir cuanto mueve."
+  - Se corre una variante CON z_posgrado solo para medir cuanto mueve.
+
+. display "  - Se usa estu_inse_individual SIN centrar: c_inse esta centrado en"
+  - Se usa estu_inse_individual SIN centrar: c_inse esta centrado en
+
+. display "    cada ano y borraria la diferencia de composicion que se busca."
+    cada ano y borraria la diferencia de composicion que se busca.
+
+. display "  - La version sin INSE existe porque el indice salta entre 2019 y 2020"
+  - La version sin INSE existe porque el indice salta entre 2019 y 2020
+
+. display "    por una razon que el diccionario del ICFES no documenta [4.1.2]."
+    por una razon que el diccionario del ICFES no documenta [4.1.2].
+
+. display "  - cole_femenino entra, pero su contribucion detallada NO se interpreta:"
+  - cole_femenino entra, pero su contribucion detallada NO se interpreta:
+
+. display "    30 sede-ano en todo el periodo."
+    30 sede-ano en todo el periodo.
+
+. display "  - Cinco imputaciones, combinadas por las reglas de Rubin, y se reporta"
+  - Cinco imputaciones, combinadas por las reglas de Rubin, y se reporta
+
+. display "    ademas el rango entre imputaciones, como hace C1 (apartado 6)."
+    ademas el rango entre imputaciones, como hace C1 (apartado 6).
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. 
+. ********************************************************************************
+. * [1] AGRUPADO CON INTERACCIONES VARIABLE X ANO
+. ********************************************************************************
+. * Centrado al cluster, igual que el bloque [1] de 12_composicional.do, porque
+. * las afirmaciones que se contrastan son las de las Tablas 10 y 11. Las filas
+. * de rural y pct_planta son identicas bajo los dos esquemas de centrado
+. * (apartado 4.3.1), de modo que T1 y T2 valen igual para la Tabla 8.
+. 
+. if `hacer_inter' == 1 {
+. 
+.     display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+.     display "[1] AGRUPADO CON INTERACCIONES VARIABLE X ANO"
+[1] AGRUPADO CON INTERACCIONES VARIABLE X ANO
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     capture confirm file "C3_Base_Trabajo_`hoy'.dta"
+.     if _rc != 0 {
+.         display as error "No se encuentra C3_Base_Trabajo_`hoy'.dta."
+.         display as error "Correr el bloque [0] o ajustar el local hoy."
+.         exit 601
+.     }
+.     use "C3_Base_Trabajo_`hoy'.dta", clear
+. 
+.     timer clear 3
+.     timer on 3
+. 
+.     mi estimate, dots post: mixed punt_global                            ///
+>         c.cwc_inse##ib2018.year                                          ///
+>         c.c_inse_prom_sede##ib2018.year                                  ///
+>         c.rural##ib2018.year                                             ///
+>         c.pct_planta##ib2018.year                                        ///
+>         $v_n1 $v_n2_int indice_vuln                                      ///
+>         $RE , reml
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0206
+                                                Largest FMI       =     0.1106
+DF adjustment:   Large sample                   DF:     min       =   1,585.48
+                                                        avg       = 8393207.66
+                                                        max       =   3.17e+08
+Model F test:       Equal FMI                   F(  46, 1.7e+06)  =     157.73
+                                                Prob > F          =     0.0000
+
+-----------------------------------------------------------------------------------------
+            punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+------------------------+----------------------------------------------------------------
+               cwc_inse |   .2845163   .0500972     5.68   0.000     .1863225    .3827101
+                        |
+                   year |
+                  2019  |  -3.204208   2.793759    -1.15   0.251    -8.679895    2.271479
+                  2020  |   1.589357   2.950252     0.54   0.590    -4.193072    7.371787
+                  2021  |   -1.53966    2.78434    -0.55   0.580    -6.996878    3.917558
+                  2022  |  -1.635606   2.778069    -0.59   0.556    -7.080535    3.809322
+                  2023  |   2.824343   2.792868     1.01   0.312      -2.6496    8.298286
+                        |
+        year#c.cwc_inse |
+                  2019  |   .0324046   .0650535     0.50   0.618    -.0951061    .1599153
+                  2020  |  -.0386743   .0654845    -0.59   0.555    -.1670251    .0896765
+                  2021  |    .013661   .0643986     0.21   0.832    -.1125623    .1398843
+                  2022  |  -.0488892   .0660432    -0.74   0.459     -.178368    .0805897
+                  2023  |   -.001789   .0654461    -0.03   0.978    -.1300715    .1264934
+                        |
+       c_inse_prom_sede |   .1563422   .1473275     1.06   0.289    -.1324232    .4451076
+                        |
+year#c.c_inse_prom_sede |
+                  2019  |   .2418641   .1713181     1.41   0.158    -.0939137    .5776419
+                  2020  |    .089465   .1757224     0.51   0.611    -.2549449    .4338749
+                  2021  |  -.0402104   .1721368    -0.23   0.815    -.3775929    .2971721
+                  2022  |   .2162155   .1781656     1.21   0.225    -.1329834    .5654143
+                  2023  |   .2895777   .1828624     1.58   0.113    -.0688286     .647984
+                        |
+                  rural |  -9.816369     2.1139    -4.64   0.000    -13.95954   -5.673197
+                        |
+           year#c.rural |
+                  2019  |  -1.912959   1.620555    -1.18   0.238    -5.089188     1.26327
+                  2020  |  -1.079957   1.668108    -0.65   0.517    -4.349389    2.189475
+                  2021  |   -.190676   1.616678    -0.12   0.906    -3.359307    2.977955
+                  2022  |  -.8781146   1.617765    -0.54   0.587    -4.048879     2.29265
+                  2023  |  -1.623437   1.560363    -1.04   0.298    -4.681693     1.43482
+                        |
+             pct_planta |   11.84007   2.545419     4.65   0.000      6.85107    16.82907
+                        |
+      year#c.pct_planta |
+                  2019  |  -.0374941   2.745393    -0.01   0.989    -5.418392    5.343404
+                  2020  |  -4.704995   2.877494    -1.64   0.102    -10.34483    .9348374
+                  2021  |  -6.993568   2.746665    -2.55   0.011    -12.37695    -1.61019
+                  2022  |  -.6740065    2.69488    -0.25   0.803     -5.95589    4.607877
+                  2023  |  -1.705053   2.714197    -0.63   0.530    -7.024803    3.614698
+                        |
+                  mujer |   -8.21078   .2770057   -29.64   0.000    -8.753701   -7.667858
+                   edad |  -7.481078   .1241239   -60.27   0.000    -7.724356     -7.2378
+              repitente |   5.944178   .4167707    14.26   0.000     5.127322    6.761033
+          lectura_30min |   6.790468   .2920945    23.25   0.000     6.217778    7.363158
+          libros_26omas |   5.410751   .3981053    13.59   0.000     4.629883    6.191619
+          trabaja_mas20 |  -2.964488   .7088528    -4.18   0.000    -4.354044   -1.574933
+         internet_hogar |   .3198029   .3792382     0.84   0.399    -.4236654    1.063271
+       computador_hogar |   .5688017   .3626766     1.57   0.117    -.1421318    1.279735
+           ln_matricula |    5.19082   1.044466     4.97   0.000     3.143686    7.237954
+  ratio_alumnos_docente |  -.0832172   .0794573    -1.05   0.295    -.2389512    .0725169
+             z_posgrado |   .0098831   .2118996     0.05   0.963    -.4054336    .4251999
+           dotacion_tic |   1.075238   1.799089     0.60   0.550    -2.452965    4.603441
+               ju_unica |   .4698766   .8361057     0.56   0.574    -1.168861    2.108614
+                tecnico |  -.5963056   1.353406    -0.44   0.660    -3.249444    2.056833
+      tecnico_academico |  -5.755647   2.526382    -2.28   0.023    -10.70972   -.8015729
+          cole_femenino |   35.93124   5.609952     6.40   0.000     24.93594    46.92655
+            indice_vuln |   -1.06585   .6051702    -1.76   0.078    -2.251962    .1202616
+                  _cons |   318.9527   7.703451    41.40   0.000     303.8541    334.0514
+-----------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |    13.4857   1.689481      10.54959    17.23898
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |   1.337001   .4165692      .7259764    2.462299
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                   sd(_cons) |   11.31607   .4868561      10.40098    12.31168
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |   4.701197   .2302713      4.270861    5.174895
+-----------------------------+------------------------------------------------
+                sd(Residual) |    34.3625   .0933926      34.17994    34.54603
+------------------------------------------------------------------------------
+. 
+.     timer off 3
+.     display _newline "--- Tiempo del bloque [1] ---"
+
+--- Tiempo del bloque [1] ---
+.     timer list 3
+   3:   2858.06 /        1 =    2858.0560
+. 
+.     estimates save "MC_cohortes_`hoy'.ster", replace
+(note: file MC_cohortes_20261022.ster not found)
+file MC_cohortes_20261022.ster saved
+. 
+.     * Los nombres REALES antes de tocar nada. Es la leccion del ensayo 11a.
+.     display _newline "--- Nombres reales de los parametros ---"
+
+--- Nombres reales de los parametros ---
+.     matrix list e(b)
+
+e(b)[1,57]
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                         2018b.         2019.         2020.         2021.         2022.
+        cwc_inse          year          year          year          year          year
+y1     .28451631             0    -3.2042083     1.5893574    -1.5396602    -1.6356064
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+            2023.   2018b.year#    2019.year#    2020.year#    2021.year#    2022.year#
+            year   co.cwc_inse    c.cwc_inse    c.cwc_inse    c.cwc_inse    c.cwc_inse
+y1     2.8243427             0     .03240457    -.03867431     .01366099    -.04888915
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+       2023.year#                 2018b.year#    2019.year#    2020.year#    2021.year#
+      c.cwc_inse  c_inse_pro~e  co.c_inse_~e  c.c_inse_p~e  c.c_inse_p~e  c.c_inse_p~e
+y1    -.00178902     .15634216             0      .2418641       .089465    -.04021041
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+       2022.year#    2023.year#                 2018b.year#    2019.year#    2020.year#
+    c.c_inse_p~e  c.c_inse_p~e         rural      co.rural       c.rural       c.rural
+y1     .21621546     .28957769    -9.8163692             0    -1.9129589    -1.0799573
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+       2021.year#    2022.year#    2023.year#                 2018b.year#    2019.year#
+         c.rural       c.rural       c.rural    pct_planta  co.pct_pla~a  c.pct_planta
+y1    -.19067602    -.87811457    -1.6234366     11.840068             0    -.03749405
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+       2020.year#    2021.year#    2022.year#    2023.year#                            
+    c.pct_planta  c.pct_planta  c.pct_planta  c.pct_planta         mujer          edad
+y1    -4.7049951    -6.9935676     -.6740065    -1.7050525    -8.2107797    -7.4810781
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+       repitente  lectura_30~n  libros_26~as  trabaja_m~20  internet_h~r  computador~r
+y1     5.9441776     6.7904683      5.410751    -2.9644884     .31980286     .56880165
+
+     punt_global:  punt_global:  punt_global:  punt_global:  punt_global:  punt_global:
+                                                                                       
+    ln_matricula  ratio_alum~e    z_posgrado  dotacion_tic      ju_unica       tecnico
+y1     5.1908196    -.08321715     .00988312     1.0752383     .46987665    -.59630565
+
+     punt_global:  punt_global:  punt_global:  punt_global:     lns1_1_1:     lns1_2_1:
+                                                                                       
+    tecnico_ac~o  cole_femen~o   indice_vuln         _cons         _cons         _cons
+y1    -5.7556469     35.931242    -1.0658503     318.95274     2.6016301      .2904289
+
+        lns2_1_1:     lns3_1_1:      lnsig_e:
+                                             
+           _cons         _cons         _cons
+y1      2.426224     1.5478172     3.5369658
+. 
+.     * ------------------------------------------------------------------
+.     * [1.1] Las cuatro pruebas conjuntas de la familia F-C3
+.     * ------------------------------------------------------------------
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[1.1] FAMILIA F-C3: CUATRO CONTRASTES CONJUNTOS"
+[1.1] FAMILIA F-C3: CUATRO CONTRASTES CONJUNTOS
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     tempname ph
+.     postfile `ph' str4 prueba str24 variable double chi2 df p ///
+>         using "C3_holm_`hoy'.dta", replace
+(file C3_holm_20261022.dta not found)
+. 
+.     local k = 1
+.     foreach v in rural pct_planta cwc_inse c_inse_prom_sede {
+  2. 
+.         local nom : word `k' of "T1" "T2" "T3" "T4"
+  3. 
+.         display _newline "--- `nom': i(2019/2023).year#c.`v' ---"
+  4. 
+.         * En `mixed` el termino se almacena con el factor delante. Si la
+.         * primera escritura falla con r(111), se intenta la inversa antes de
+.         * rendirse, y se deja constancia.
+.         capture noisily testparm i(2019/2023).year#c.`v'
+  5.         if _rc != 0 {
+  6.             display as error "Fallo la primera escritura (codigo " _rc ")."
+  7.             display as error "Intentando c.`v'#i(2019/2023).year."
+  8.             capture noisily testparm c.`v'#i(2019/2023).year
+  9.         }
+ 10. 
+.         if _rc == 0 {
+ 11.             post `ph' ("`nom'") ("`v'") (r(chi2)) (r(df)) (r(p))
+ 12.         }
+ 13.         else {
+ 14.             display as error "`nom' no se pudo contrastar. Leer los nombres"
+ 15.             display as error "del matrix list e(b) de arriba y corregirlos."
+ 16.             post `ph' ("`nom'") ("`v'") (.) (.) (.)
+ 17.         }
+ 18. 
+.         local ++k
+ 19.     }
+
+--- T1: i(2019/2023).year#c.rural ---
+
+ ( 1)  [punt_global]2019.year#c.rural = 0
+ ( 2)  [punt_global]2020.year#c.rural = 0
+ ( 3)  [punt_global]2021.year#c.rural = 0
+ ( 4)  [punt_global]2022.year#c.rural = 0
+ ( 5)  [punt_global]2023.year#c.rural = 0
+
+           chi2(  5) =    2.29
+         Prob > chi2 =    0.8077
+
+--- T2: i(2019/2023).year#c.pct_planta ---
+
+ ( 1)  [punt_global]2019.year#c.pct_planta = 0
+ ( 2)  [punt_global]2020.year#c.pct_planta = 0
+ ( 3)  [punt_global]2021.year#c.pct_planta = 0
+ ( 4)  [punt_global]2022.year#c.pct_planta = 0
+ ( 5)  [punt_global]2023.year#c.pct_planta = 0
+
+           chi2(  5) =   11.85
+         Prob > chi2 =    0.0368
+
+--- T3: i(2019/2023).year#c.cwc_inse ---
+
+ ( 1)  [punt_global]2019.year#c.cwc_inse = 0
+ ( 2)  [punt_global]2020.year#c.cwc_inse = 0
+ ( 3)  [punt_global]2021.year#c.cwc_inse = 0
+ ( 4)  [punt_global]2022.year#c.cwc_inse = 0
+ ( 5)  [punt_global]2023.year#c.cwc_inse = 0
+
+           chi2(  5) =    2.26
+         Prob > chi2 =    0.8126
+
+--- T4: i(2019/2023).year#c.c_inse_prom_sede ---
+
+ ( 1)  [punt_global]2019.year#c.c_inse_prom_sede = 0
+ ( 2)  [punt_global]2020.year#c.c_inse_prom_sede = 0
+ ( 3)  [punt_global]2021.year#c.c_inse_prom_sede = 0
+ ( 4)  [punt_global]2022.year#c.c_inse_prom_sede = 0
+ ( 5)  [punt_global]2023.year#c.c_inse_prom_sede = 0
+
+           chi2(  5) =    5.86
+         Prob > chi2 =    0.3199
+. 
+.     postclose `ph'
+. 
+.     * ------------------------------------------------------------------
+.     * [1.2] Holm sobre las cuatro pruebas
+.     * ------------------------------------------------------------------
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[1.2] CORRECCION DE HOLM SOBRE LA FAMILIA F-C3"
+[1.2] CORRECCION DE HOLM SOBRE LA FAMILIA F-C3
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     preserve
+.         use "C3_holm_`hoy'.dta", clear
+.         sort p
+.         generate int orden   = _n
+.         generate double umbral = 0.05 / (4 - orden + 1)
+. 
+.         * Holm es secuencial: en cuanto una prueba falla, todas las siguientes
+.         * fallan tambien, aunque su p sea menor que su propio umbral.
+.         generate byte pasa = .
+(4 missing values generated)
+.         local corto = 0
+.         forvalues i = 1/`=_N' {
+  2.             if `corto' == 0 & p[`i'] <= umbral[`i'] {
+  3.                 quietly replace pasa = 1 in `i'
+  4.             }
+  5.             else {
+  6.                 quietly replace pasa = 0 in `i'
+  7.                 local corto = 1
+  8.             }
+  9.         }
+. 
+.         format p umbral %9.4f
+.         format chi2 %9.2f
+.         list prueba variable chi2 df p umbral pasa, clean noobs
+
+    prueba           variable    chi2   df        p   umbral   pasa  
+        T2         pct_planta   11.85    5   0.0368   0.0125      0  
+        T4   c_inse_prom_sede    5.86    5   0.3199   0.0167      0  
+        T1              rural    2.29    5   0.8077   0.0250      0  
+        T3           cwc_inse    2.26    5   0.8126   0.0500      0  
+. 
+.         display _newline "pasa = 1: la afirmacion correspondiente del Capitulo 4"
+
+pasa = 1: la afirmacion correspondiente del Capitulo 4
+.         display "puede sostenerse y se habilita el examen por anos."
+puede sostenerse y se habilita el examen por anos.
+.         display "pasa = 0: la afirmacion SE RETIRA. No se reporta ningun ano"
+pasa = 0: la afirmacion SE RETIRA. No se reporta ningun ano
+.         display "individual como significativo, cualquiera que sea su p."
+individual como significativo, cualquiera que sea su p.
+. 
+.         save "C3_holm_`hoy'.dta", replace
+file C3_holm_20261022.dta saved
+.     restore
+. 
+.     * ------------------------------------------------------------------
+.     * [1.3] Comparaciones por ano: DESCRIPTIVAS mientras Holm no habilite
+.     * ------------------------------------------------------------------
+.     * Se imprimen siempre, porque el texto nuevo necesita la magnitud de la
+.     * diferencia 2023 frente a 2018 aunque no sea significativa. Lo que NO se
+.     * hace es leer su significancia si la conjunta no paso Holm.
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[1.3] DIFERENCIA 2023 FRENTE A 2018, POR VARIABLE"
+[1.3] DIFERENCIA 2023 FRENTE A 2018, POR VARIABLE
+.     display "ATENCION: descriptivas. Su p NO se lee si la conjunta no paso Holm."
+ATENCION: descriptivas. Su p NO se lee si la conjunta no paso Holm.
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     foreach v in rural pct_planta cwc_inse c_inse_prom_sede {
+  2.         display _newline "--- `v': 2023 frente a 2018 ---"
+  3.         capture noisily lincom _b[2023.year#c.`v']
+  4.         if _rc != 0 {
+  5.             display as error "Nombre no encontrado. Probar _b[c.`v'#2023.year]."
+  6.             capture noisily lincom _b[c.`v'#2023.year]
+  7.         }
+  8.     }
+
+--- rural: 2023 frente a 2018 ---
+
+ ( 1)  [punt_global]2023.year#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -1.623437   1.560363    -1.04   0.298    -4.681692    1.434819
+------------------------------------------------------------------------------
+
+--- pct_planta: 2023 frente a 2018 ---
+
+ ( 1)  [punt_global]2023.year#c.pct_planta = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -1.705053   2.714197    -0.63   0.530    -7.024782    3.614677
+------------------------------------------------------------------------------
+
+--- cwc_inse: 2023 frente a 2018 ---
+
+ ( 1)  [punt_global]2023.year#c.cwc_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   -.001789   .0654461    -0.03   0.978     -.130061     .126483
+------------------------------------------------------------------------------
+
+--- c_inse_prom_sede: 2023 frente a 2018 ---
+
+ ( 1)  [punt_global]2023.year#c.c_inse_prom_sede = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .2895777   .1828624     1.58   0.113     -.068826    .6479814
+------------------------------------------------------------------------------
+. 
+.     display _newline "--- Pendiente de cada ano, para las cuatro variables ---"
+
+--- Pendiente de cada ano, para las cuatro variables ---
+.     display "Cada una es la suma del termino principal y su interaccion."
+Cada una es la suma del termino principal y su interaccion.
+.     foreach v in rural pct_planta cwc_inse c_inse_prom_sede {
+  2.         display _newline "=== `v' ==="
+  3.         display "2018 (referencia):"
+  4.         capture noisily lincom _b[`v']
+  5.         forvalues a = 2019/2023 {
+  6.             display "`a':"
+  7.             capture noisily lincom _b[`v'] + _b[`a'.year#c.`v']
+  8.         }
+  9.     }
+
+=== rural ===
+2018 (referencia):
+
+ ( 1)  [punt_global]rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -9.816369     2.1139    -4.64   0.000    -13.95954     -5.6732
+------------------------------------------------------------------------------
+2019:
+
+ ( 1)  [punt_global]rural + [punt_global]2019.year#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -11.72933   2.114463    -5.55   0.000     -15.8736   -7.585056
+------------------------------------------------------------------------------
+2020:
+
+ ( 1)  [punt_global]rural + [punt_global]2020.year#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -10.89633   2.137037    -5.10   0.000    -15.08484   -6.707812
+------------------------------------------------------------------------------
+2021:
+
+ ( 1)  [punt_global]rural + [punt_global]2021.year#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -10.00705   2.076069    -4.82   0.000    -14.07607   -5.938025
+------------------------------------------------------------------------------
+2022:
+
+ ( 1)  [punt_global]rural + [punt_global]2022.year#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -10.69448   2.074733    -5.15   0.000    -14.76089   -6.628081
+------------------------------------------------------------------------------
+2023:
+
+ ( 1)  [punt_global]rural + [punt_global]2023.year#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -11.43981   2.024349    -5.65   0.000    -15.40746   -7.472155
+------------------------------------------------------------------------------
+
+=== pct_planta ===
+2018 (referencia):
+
+ ( 1)  [punt_global]pct_planta = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   11.84007   2.545419     4.65   0.000     6.851139      16.829
+------------------------------------------------------------------------------
+2019:
+
+ ( 1)  [punt_global]pct_planta + [punt_global]2019.year#c.pct_planta = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   11.80257   2.400783     4.92   0.000     7.097127    16.50802
+------------------------------------------------------------------------------
+2020:
+
+ ( 1)  [punt_global]pct_planta + [punt_global]2020.year#c.pct_planta = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   7.135073   2.604764     2.74   0.006     2.029829    12.24032
+------------------------------------------------------------------------------
+2021:
+
+ ( 1)  [punt_global]pct_planta + [punt_global]2021.year#c.pct_planta = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   4.846501   2.337512     2.07   0.038     .2650617     9.42794
+------------------------------------------------------------------------------
+2022:
+
+ ( 1)  [punt_global]pct_planta + [punt_global]2022.year#c.pct_planta = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   11.16606   2.287325     4.88   0.000     6.682986    15.64914
+------------------------------------------------------------------------------
+2023:
+
+ ( 1)  [punt_global]pct_planta + [punt_global]2023.year#c.pct_planta = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   10.13502   2.324561     4.36   0.000     5.578959    14.69107
+------------------------------------------------------------------------------
+
+=== cwc_inse ===
+2018 (referencia):
+
+ ( 1)  [punt_global]cwc_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .2845163   .0500972     5.68   0.000     .1863276     .382705
+------------------------------------------------------------------------------
+2019:
+
+ ( 1)  [punt_global]cwc_inse + [punt_global]2019.year#c.cwc_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .3169209   .0496414     6.38   0.000     .2196256    .4142162
+------------------------------------------------------------------------------
+2020:
+
+ ( 1)  [punt_global]cwc_inse + [punt_global]2020.year#c.cwc_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |    .245842   .0507858     4.84   0.000     .1463036    .3453804
+------------------------------------------------------------------------------
+2021:
+
+ ( 1)  [punt_global]cwc_inse + [punt_global]2021.year#c.cwc_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .2981773   .0490436     6.08   0.000     .2020537     .394301
+------------------------------------------------------------------------------
+2022:
+
+ ( 1)  [punt_global]cwc_inse + [punt_global]2022.year#c.cwc_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .2356272   .0510838     4.61   0.000     .1355048    .3357495
+------------------------------------------------------------------------------
+2023:
+
+ ( 1)  [punt_global]cwc_inse + [punt_global]2023.year#c.cwc_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .2827273   .0505205     5.60   0.000      .183709    .3817456
+------------------------------------------------------------------------------
+
+=== c_inse_prom_sede ===
+2018 (referencia):
+
+ ( 1)  [punt_global]c_inse_prom_sede = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .1563422   .1473275     1.06   0.289    -.1324144    .4450988
+------------------------------------------------------------------------------
+2019:
+
+ ( 1)  [punt_global]c_inse_prom_sede + [punt_global]2019.year#c.c_inse_prom_sede = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .3982063   .1497803     2.66   0.008     .1046422    .6917703
+------------------------------------------------------------------------------
+2020:
+
+ ( 1)  [punt_global]c_inse_prom_sede + [punt_global]2020.year#c.c_inse_prom_sede = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .2458072   .1547697     1.59   0.112    -.0575359    .5491502
+------------------------------------------------------------------------------
+2021:
+
+ ( 1)  [punt_global]c_inse_prom_sede + [punt_global]2021.year#c.c_inse_prom_sede = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .1161318   .1475313     0.79   0.431    -.1730242    .4052877
+------------------------------------------------------------------------------
+2022:
+
+ ( 1)  [punt_global]c_inse_prom_sede + [punt_global]2022.year#c.c_inse_prom_sede = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .3725576   .1562506     2.38   0.017      .066312    .6788033
+------------------------------------------------------------------------------
+2023:
+
+ ( 1)  [punt_global]c_inse_prom_sede + [punt_global]2023.year#c.c_inse_prom_sede = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .4459199   .1636343     2.73   0.006     .1252025    .7666372
+------------------------------------------------------------------------------
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [2] OAXACA-BLINDER, 2018 FRENTE A 2023
+. ********************************************************************************
+. * `oaxaca` no admite mixed ni mi estimate de forma fiable, de modo que se corre
+. * dentro de un bucle sobre imputaciones y se combina por Rubin en el bloque [3].
+. *
+. * ORDEN OBLIGATORIO: mi extract PRIMERO, egen/generate DESPUES. Al reves se
+. * crean variables sin registrar en el conjunto mi, que es el error E4 de C5.
+. *
+. * Cuatro especificaciones por imputacion:
+. *   A  principal       sin z_posgrado, CON estu_inse_individual
+. *   B  sin INSE        sin z_posgrado, sin estu_inse_individual
+. *   C  con z_posgrado  solo para medir cuanto mueve (C7, apartado 4.1)
+. *   D  sin INSE y con z_posgrado
+. 
+. if `hacer_oaxaca' == 1 {
+. 
+.     display _newline(2) "{hline 78}"
+.     display "[2] DESCOMPOSICION DE OAXACA-BLINDER, 2018 FRENTE A 2023"
+.     display "{hline 78}"
+. 
+.     capture which oaxaca
+.     if _rc != 0 {
+.         capture ssc install oaxaca, replace
+.         if _rc != 0 {
+.             display as error "No se pudo instalar oaxaca. Instalarlo a mano y"
+.             display as error "volver a correr SOLO este bloque."
+.             exit 601
+.         }
+.     }
+. 
+.     timer clear 4
+.     timer on 4
+. 
+.     tempname po
+.     postfile `po' int m str12 espec str16 componente ///
+>         double b se using "C3_oaxaca_`hoy'.dta", replace
+. 
+.     forvalues m = 1/5 {
+  2. 
+.         display _newline(2) "{hline 78}"
+  3.         display "IMPUTACION `m'"
+  4.         display "{hline 78}"
+  5. 
+.         use "C3_Base_Trabajo_`hoy'.dta", clear
+  6.         mi extract `m', clear
+  7. 
+.         keep if inlist(year, 2018, 2023)
+  8.         generate byte y2023 = (year == 2023)
+  9. 
+.         quietly count
+ 10.         display "Observaciones de las dos cohortes: " r(N)
+ 11. 
+.         forvalues e = 1/4 {
+ 12. 
+.             if `e' == 1 {
+ 13.                 local nom   "A_principal"
+ 14.                 local lista "estu_inse_individual $v_n1 $v_n2_oax"
+ 15.             }
+ 16.             if `e' == 2 {
+ 17.                 local nom   "B_sinINSE"
+ 18.                 local lista "$v_n1 $v_n2_oax"
+ 19.             }
+ 20.             if `e' == 3 {
+ 21.                 local nom   "C_conposg"
+ 22.                 local lista "estu_inse_individual $v_n1 $v_n2"
+ 23.             }
+ 24.             if `e' == 4 {
+ 25.                 local nom   "D_sinINSE_posg"
+ 26.                 local lista "$v_n1 $v_n2"
+ 27.             }
+ 28. 
+.             display _newline "--- Oaxaca, m = `m', especificacion `nom' ---"
+ 29. 
+.             capture noisily oaxaca punt_global `lista',      ///
+>                 by(y2023) pooled vce(cluster sede_id) detail
+ 30. 
+.             if _rc != 0 {
+ 31.                 display as error "oaxaca fallo (codigo " _rc "). Reintentando"
+ 32.                 display as error "con `relax'. SI ESTE REINTENTO FUNCIONA, hay"
+ 33.                 display as error "una variable omitida en una de las dos"
+ 34.                 display as error "cohortes: identificarla ANTES de interpretar."
+ 35.                 capture noisily oaxaca punt_global `lista',  ///
+>                     by(y2023) pooled vce(cluster sede_id) detail relax
+ 36.             }
+ 37. 
+.             if _rc == 0 {
+ 38.                 foreach c in difference explained unexplained {
+ 39.                     capture post `po' (`m') ("`nom'") ("`c'") ///
+>                         (_b[`c']) (_se[`c'])
+ 40.                 }
+ 41.                 * Contribuciones detalladas que la fila 4 de C3 necesita.
+.                 foreach c in edad repitente estu_inse_individual {
+ 42.                     capture post `po' (`m') ("`nom'") ("exp_`c'") ///
+>                         (_b[explained:`c']) (_se[explained:`c'])
+ 43.                 }
+ 44.             }
+ 45.             else {
+ 46.                 display as error "`nom' no se estimo en m = `m'."
+ 47.             }
+ 48.         }
+ 49.     }
+. 
+.     postclose `po'
+. 
+.     timer off 4
+.     display _newline "--- Tiempo del bloque [2] ---"
+.     timer list 4
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [3] COMBINACION DE RUBIN Y RESUMEN
+. ********************************************************************************
+. * Qbar = media de los Q_m
+. * Ubar = media de las varianzas dentro de cada imputacion (se^2)
+. * B    = varianza muestral de los Q_m, con divisor M-1
+. * T    = Ubar + (1 + 1/M) * B
+. * nu   = (M-1) * (1 + Ubar / ((1 + 1/M) * B))^2
+. *
+. * Con M = 5 los grados de libertad pueden salir muy bajos. Se reportan, y el
+. * rango entre imputaciones se reporta junto a ellos, como hizo C1.
+. 
+. if `hacer_rubin' == 1 {
+. 
+.     display _newline(2) "{hline 78}"
+.     display "[3] COMBINACION DE RUBIN SOBRE LAS CINCO IMPUTACIONES"
+.     display "{hline 78}"
+. 
+.     capture confirm file "C3_oaxaca_`hoy'.dta"
+.     if _rc != 0 {
+.         display as error "No se encuentra C3_oaxaca_`hoy'.dta. Correr el [2]."
+.         exit 601
+.     }
+. 
+.     use "C3_oaxaca_`hoy'.dta", clear
+. 
+.     generate double u = se^2
+. 
+.     display _newline "Espec.        Componente         Qbar       EE(T)" ///
+>         "      t      gl       p     min       max"
+. 
+.     levelsof espec, local(especs)
+.     foreach e of local especs {
+  2.         foreach c in difference explained unexplained ///
+>                      exp_edad exp_repitente exp_estu_inse_individual {
+  3. 
+.             quietly count if espec == "`e'" & componente == "`c'"
+  4.             local M = r(N)
+  5.             if `M' < 2 continue
+  6. 
+.             quietly summarize b if espec == "`e'" & componente == "`c'"
+  7.             scalar qbar = r(mean)
+  8.             scalar Bv   = r(Var)
+  9.             scalar bmin = r(min)
+ 10.             scalar bmax = r(max)
+ 11. 
+.             quietly summarize u if espec == "`e'" & componente == "`c'"
+ 12.             scalar ubar = r(mean)
+ 13. 
+.             scalar Tv = ubar + (1 + 1/`M')*Bv
+ 14.             scalar sev = sqrt(Tv)
+ 15.             scalar tv  = qbar/sev
+ 16. 
+.             scalar nu = .
+ 17.             if Bv > 0 {
+ 18.                 scalar nu = (`M'-1) * (1 + ubar/((1 + 1/`M')*Bv))^2
+ 19.             }
+ 20.             scalar pv = .
+ 21.             if !missing(nu) scalar pv = 2*ttail(nu, abs(tv))
+ 22. 
+.             display %-13s "`e'" %-18s "`c'" ///
+>                 %10.3f qbar %10.3f sev %8.2f tv ///
+>                 %8.1f nu %8.4f pv %8.3f bmin %10.3f bmax
+ 23.         }
+ 24.     }
+. 
+.     display _newline "{hline 78}"
+.     display "LECTURA. La fila 4 de C3 se decide con el SIGNO de exp_repitente:"
+.     display "repetir la prueba SUMA entre 3,9 y 8,5 puntos [Tabla 8], de modo"
+.     display "que la caida de repitentes del 16,2 % al 10,7 % [Tabla 3] debe"
+.     display "aparecer con contribucion NEGATIVA a la diferencia 2023-2018."
+.     display "Si sale positiva, revisar la direccion de by(y2023) antes de"
+.     display "escribir una sola linea del informe."
+.     display ""
+.     display "Ninguna contribucion individual se promueve a hallazgo. La Oaxaca"
+.     display "es descriptiva por la regla impresa en el bloque [0.9]."
+.     display "{hline 78}"
+. }
+
+. 
+. 
+. ********************************************************************************
+. * CIERRE
+. ********************************************************************************
+. 
+. timer off 1
+
+. display _newline "--- Tiempo total de ejecucion ---"
+
+--- Tiempo total de ejecucion ---
+
+. timer list 1
+   1:   3002.16 /        1 =    3002.1570
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "BLOQUE C3 COMPLETADO."
+BLOQUE C3 COMPLETADO.
+
+. display "Siguiente: aplicar Holm del bloque [1.2] a las filas 1 y 2 de C3, y"
+Siguiente: aplicar Holm del bloque [1.2] a las filas 1 y 2 de C3, y
+
+. display "el signo de exp_repitente del bloque [3] a la fila 4."
+el signo de exp_repitente del bloque [3] a la fila 4.
+
+. display "NO rellenar ningun [R-C3] del libro de correcciones sin este log."
+NO rellenar ningun [R-C3] del libro de correcciones sin este log.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase13
+      name:  fase13
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_13_cohortes_20261022.lo
+> g
+  log type:  text
+ closed on:  22 Oct 2026, 19:43:31
+---------------------------------------------------------------------------------------------

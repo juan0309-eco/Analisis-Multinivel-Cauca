@@ -1,0 +1,1208 @@
+--------------------------------------------------------------------------------------------
+      name:  fase3
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_03_panel_tic.log
+  log type:  text
+ opened on:  22 Aug 2026, 14:35:26
+
+. 
+. 
+. ********************************************************************************
+. * [1] LECTURA DE LAS HOJAS ANUALES
+. ********************************************************************************
+. * Las hojas de 2018 a 2020 traen 8 columnas y las de 2021 a 2023 traen 10.
+. * El archivo largo se guarda como .dta permanente para poder inspeccionarlo
+. * después sin volver a leer el Excel ni depender de un tempfile.
+. 
+. local primero = 1
+
+. 
+. foreach y in 2018 2019 2020 2021 2022 2023 {
+  2. 
+.     display _newline "{hline 78}"
+  3.     display "LEYENDO HOJA `y'_tic"
+  4.     display "{hline 78}"
+  5. 
+.     capture noisily import excel "Panel_tic.xlsx", sheet("`y'_tic") firstrow clear
+  6.     if _rc != 0 {
+  7.         display as error "No se pudo leer la hoja `y'_tic. Año omitido."
+  8.         continue
+  9.     }
+ 10. 
+.     quietly count
+ 11.     display "Filas leídas: " r(N)
+ 12. 
+.     rename *, lower
+ 13. 
+.     * Presencia de las columnas de desglose por ubicación.
+.     local tiene_desglose = 0
+ 14.     capture confirm variable sedecom_cant_presta
+ 15.     if _rc == 0 {
+ 16.         capture confirm variable sedecom_cant_sede
+ 17.         if _rc == 0 local tiene_desglose = 1
+ 18.     }
+ 19.     if `tiene_desglose' == 1 {
+ 20.         display "Hoja `y': incluye el desglose PRESTA / SEDE."
+ 21.     }
+ 22.     else {
+ 23.         display "Hoja `y': sin desglose PRESTA / SEDE (esperado en 2018-2020)."
+ 24.         quietly generate double sedecom_cant_presta = .
+ 25.         quietly generate double sedecom_cant_sede   = .
+ 26.     }
+ 27. 
+.     keep sede_codigo periodo_id periodo_anio equipocom_id equipocom_nombre ///
+>          sedecom_cantidad sedecom_cant_sinuso sedecom_cant_presta sedecom_cant_sede
+ 28. 
+.     capture confirm string variable sede_codigo
+ 29.     if _rc != 0 {
+ 30.         quietly tostring sede_codigo, replace format(%20.0f) force
+ 31.     }
+ 32.     quietly replace sede_codigo = trim(sede_codigo)
+ 33.     rename sede_codigo cole_cod_dane_sede
+ 34. 
+.     quietly destring periodo_id periodo_anio equipocom_id sedecom_cantidad   ///
+>         sedecom_cant_sinuso sedecom_cant_presta sedecom_cant_sede,           ///
+>         replace force
+ 35. 
+.     rename periodo_anio year
+ 36. 
+.     * ------------------------------------------------------------------
+.     * Diagnósticos de la hoja
+.     * ------------------------------------------------------------------
+.     display _newline "--- Olas de recolección (periodo_id) y años ---"
+ 37.     tabulate periodo_id year, missing
+ 38. 
+.     display _newline "--- Tipos de equipo ---"
+ 39.     tabulate equipocom_nombre, missing
+ 40. 
+.     quietly duplicates tag cole_cod_dane_sede year equipocom_id, generate(_dup)
+ 41.     quietly count if _dup > 0
+ 42.     display _newline "Filas con sede-año-tipo repetido: " r(N)
+ 43.     drop _dup
+ 44. 
+.     quietly count if sedecom_cant_sinuso > sedecom_cantidad & ///
+>                      !missing(sedecom_cant_sinuso, sedecom_cantidad)
+ 45.     display "Filas donde SIN USO supera a CANTIDAD: " r(N)
+ 46.     quietly count if sedecom_cantidad == 0 & sedecom_cant_sinuso > 0 & ///
+>                      !missing(sedecom_cant_sinuso)
+ 47.     display "Filas con CANTIDAD = 0 y SIN USO > 0: " r(N)
+ 48.     quietly count if sedecom_cantidad == 0 & sedecom_cant_sinuso == 0
+ 49.     display "Filas con CANTIDAD = 0 y SIN USO = 0: " r(N) ///
+>             "  (si es 0, la fuente nunca registra ausencia total)"
+ 50. 
+.     if `tiene_desglose' == 1 {
+ 51.         generate double _chk = sedecom_cant_presta + sedecom_cant_sede
+ 52.         quietly count if abs(_chk - sedecom_cantidad) > 0.001 & !missing(_chk)
+ 53.         display "Filas donde PRESTA + SEDE != CANTIDAD: " r(N) ///
+>                 "  (debe ser 0 si la lectura es correcta)"
+ 54.         drop _chk
+ 55.     }
+ 56. 
+.     quietly drop if missing(cole_cod_dane_sede) | cole_cod_dane_sede == ""
+ 57. 
+.     if `primero' == 1 {
+ 58.         quietly save "TIC_largo_2018_2023.dta", replace
+ 59.         local primero = 0
+ 60.     }
+ 61.     else {
+ 62.         quietly append using "TIC_largo_2018_2023.dta"
+ 63.         quietly save "TIC_largo_2018_2023.dta", replace
+ 64.     }
+ 65. }
+
+------------------------------------------------------------------------------
+LEYENDO HOJA 2018_tic
+------------------------------------------------------------------------------
+(8 vars, 80,872 obs)
+Filas leídas: 80872
+Hoja 2018: sin desglose PRESTA / SEDE (esperado en 2018-2020).
+
+--- Olas de recolección (periodo_id) y años ---
+
+           | PERIODO_AN
+           |     IO
+PERIODO_ID |      2018 |     Total
+-----------+-----------+----------
+         5 |    80,872 |    80,872 
+-----------+-----------+----------
+     Total |    80,872 |    80,872 
+
+--- Tipos de equipo ---
+
+          EQUIPOCOM_NOMBRE |      Freq.     Percent        Cum.
+---------------------------+-----------------------------------
+Computadores de escritorio |     26,058       32.22       32.22
+   Computadores portátiles |     37,958       46.94       79.16
+                  Tabletas |     16,856       20.84      100.00
+---------------------------+-----------------------------------
+                     Total |     80,872      100.00
+
+Filas con sede-año-tipo repetido: 0
+Filas donde SIN USO supera a CANTIDAD: 6688
+Filas con CANTIDAD = 0 y SIN USO > 0: 2370
+Filas con CANTIDAD = 0 y SIN USO = 0: 0  (si es 0, la fuente nunca registra ausencia total)
+
+------------------------------------------------------------------------------
+LEYENDO HOJA 2019_tic
+------------------------------------------------------------------------------
+(8 vars, 83,750 obs)
+Filas leídas: 83750
+Hoja 2019: sin desglose PRESTA / SEDE (esperado en 2018-2020).
+
+--- Olas de recolección (periodo_id) y años ---
+
+           | PERIODO_AN
+           |     IO
+PERIODO_ID |      2019 |     Total
+-----------+-----------+----------
+         6 |    83,750 |    83,750 
+-----------+-----------+----------
+     Total |    83,750 |    83,750 
+
+--- Tipos de equipo ---
+
+          EQUIPOCOM_NOMBRE |      Freq.     Percent        Cum.
+---------------------------+-----------------------------------
+Computadores de escritorio |     26,285       31.39       31.39
+   Computadores portátiles |     38,349       45.79       77.17
+                  Tabletas |     19,116       22.83      100.00
+---------------------------+-----------------------------------
+                     Total |     83,750      100.00
+
+Filas con sede-año-tipo repetido: 0
+Filas donde SIN USO supera a CANTIDAD: 8056
+Filas con CANTIDAD = 0 y SIN USO > 0: 3327
+Filas con CANTIDAD = 0 y SIN USO = 0: 0  (si es 0, la fuente nunca registra ausencia total)
+
+------------------------------------------------------------------------------
+LEYENDO HOJA 2020_tic
+------------------------------------------------------------------------------
+(8 vars, 83,063 obs)
+Filas leídas: 83063
+Hoja 2020: sin desglose PRESTA / SEDE (esperado en 2018-2020).
+
+--- Olas de recolección (periodo_id) y años ---
+
+           | PERIODO_AN
+           |     IO
+PERIODO_ID |      2020 |     Total
+-----------+-----------+----------
+         7 |    83,063 |    83,063 
+-----------+-----------+----------
+     Total |    83,063 |    83,063 
+
+--- Tipos de equipo ---
+
+          EQUIPOCOM_NOMBRE |      Freq.     Percent        Cum.
+---------------------------+-----------------------------------
+Computadores de escritorio |     25,632       30.86       30.86
+   Computadores portátiles |     37,904       45.63       76.49
+                  Tabletas |     19,527       23.51      100.00
+---------------------------+-----------------------------------
+                     Total |     83,063      100.00
+
+Filas con sede-año-tipo repetido: 0
+Filas donde SIN USO supera a CANTIDAD: 11500
+Filas con CANTIDAD = 0 y SIN USO > 0: 5711
+Filas con CANTIDAD = 0 y SIN USO = 0: 0  (si es 0, la fuente nunca registra ausencia total)
+
+------------------------------------------------------------------------------
+LEYENDO HOJA 2021_tic
+------------------------------------------------------------------------------
+(10 vars, 80,058 obs)
+Filas leídas: 80058
+Hoja 2021: incluye el desglose PRESTA / SEDE.
+
+--- Olas de recolección (periodo_id) y años ---
+
+           | PERIODO_AN
+           |     IO
+PERIODO_ID |      2021 |     Total
+-----------+-----------+----------
+         8 |    80,058 |    80,058 
+-----------+-----------+----------
+     Total |    80,058 |    80,058 
+
+--- Tipos de equipo ---
+
+          EQUIPOCOM_NOMBRE |      Freq.     Percent        Cum.
+---------------------------+-----------------------------------
+Computadores de escritorio |     23,697       29.60       29.60
+   Computadores portátiles |     37,169       46.43       76.03
+                  Tabletas |     19,192       23.97      100.00
+---------------------------+-----------------------------------
+                     Total |     80,058      100.00
+
+Filas con sede-año-tipo repetido: 0
+Filas donde SIN USO supera a CANTIDAD: 10544
+Filas con CANTIDAD = 0 y SIN USO > 0: 5091
+Filas con CANTIDAD = 0 y SIN USO = 0: 0  (si es 0, la fuente nunca registra ausencia total)
+Filas donde PRESTA + SEDE != CANTIDAD: 0  (debe ser 0 si la lectura es correcta)
+
+------------------------------------------------------------------------------
+LEYENDO HOJA 2022_tic
+------------------------------------------------------------------------------
+(10 vars, 79,129 obs)
+Filas leídas: 79129
+Hoja 2022: incluye el desglose PRESTA / SEDE.
+
+--- Olas de recolección (periodo_id) y años ---
+
+           | PERIODO_AN
+           |     IO
+PERIODO_ID |      2022 |     Total
+-----------+-----------+----------
+         9 |    79,129 |    79,129 
+-----------+-----------+----------
+     Total |    79,129 |    79,129 
+
+--- Tipos de equipo ---
+
+          EQUIPOCOM_NOMBRE |      Freq.     Percent        Cum.
+---------------------------+-----------------------------------
+Computadores de escritorio |     22,610       28.57       28.57
+   Computadores portátiles |     38,026       48.06       76.63
+                  Tabletas |     18,493       23.37      100.00
+---------------------------+-----------------------------------
+                     Total |     79,129      100.00
+
+Filas con sede-año-tipo repetido: 0
+Filas donde SIN USO supera a CANTIDAD: 10033
+Filas con CANTIDAD = 0 y SIN USO > 0: 4593
+Filas con CANTIDAD = 0 y SIN USO = 0: 0  (si es 0, la fuente nunca registra ausencia total)
+Filas donde PRESTA + SEDE != CANTIDAD: 0  (debe ser 0 si la lectura es correcta)
+
+------------------------------------------------------------------------------
+LEYENDO HOJA 2023_tic
+------------------------------------------------------------------------------
+(10 vars, 77,678 obs)
+Filas leídas: 77678
+Hoja 2023: incluye el desglose PRESTA / SEDE.
+
+--- Olas de recolección (periodo_id) y años ---
+
+           | PERIODO_AN
+           |     IO
+PERIODO_ID |      2023 |     Total
+-----------+-----------+----------
+        10 |    77,678 |    77,678 
+-----------+-----------+----------
+     Total |    77,678 |    77,678 
+
+--- Tipos de equipo ---
+
+          EQUIPOCOM_NOMBRE |      Freq.     Percent        Cum.
+---------------------------+-----------------------------------
+Computadores de escritorio |     21,828       28.10       28.10
+   Computadores portátiles |     38,241       49.23       77.33
+                  Tabletas |     17,609       22.67      100.00
+---------------------------+-----------------------------------
+                     Total |     77,678      100.00
+
+Filas con sede-año-tipo repetido: 0
+Filas donde SIN USO supera a CANTIDAD: 9898
+Filas con CANTIDAD = 0 y SIN USO > 0: 4527
+Filas con CANTIDAD = 0 y SIN USO = 0: 0  (si es 0, la fuente nunca registra ausencia total)
+Filas donde PRESTA + SEDE != CANTIDAD: 0  (debe ser 0 si la lectura es correcta)
+
+. 
+. 
+. ********************************************************************************
+. * [2] DIAGNÓSTICO DEL ARCHIVO LARGO COMPLETO
+. ********************************************************************************
+. 
+. use "TIC_largo_2018_2023.dta", clear
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[2] DIAGNÓSTICO DEL PANEL TIC EN FORMATO LARGO"
+[2] DIAGNÓSTICO DEL PANEL TIC EN FORMATO LARGO
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. quietly count
+
+. display "Filas totales (una por sede-año-tipo de equipo): " r(N)
+Filas totales (una por sede-año-tipo de equipo): 484550
+
+. 
+. display _newline "--- Tipos de equipo por año ---"
+
+--- Tipos de equipo por año ---
+
+. tabulate equipocom_nombre year
+
+                      |                      PERIODO_ANIO
+     EQUIPOCOM_NOMBRE |      2018       2019       2020       2021       2022 |     Total
+----------------------+-------------------------------------------------------+----------
+Computadores de esc.. |    26,058     26,285     25,632     23,697     22,610 |   146,110 
+Computadores portát.. |    37,958     38,349     37,904     37,169     38,026 |   227,647 
+             Tabletas |    16,856     19,116     19,527     19,192     18,493 |   110,793 
+----------------------+-------------------------------------------------------+----------
+                Total |    80,872     83,750     83,063     80,058     79,129 |   484,550 
+
+
+                      | PERIODO_AN
+                      |     IO
+     EQUIPOCOM_NOMBRE |      2023 |     Total
+----------------------+-----------+----------
+Computadores de esc.. |    21,828 |   146,110 
+Computadores portát.. |    38,241 |   227,647 
+             Tabletas |    17,609 |   110,793 
+----------------------+-----------+----------
+                Total |    77,678 |   484,550 
+
+. 
+. display _newline "--- Estadísticos de las cantidades ---"
+
+--- Estadísticos de las cantidades ---
+
+. tabstat sedecom_cantidad sedecom_cant_sinuso, ///
+>         by(year) stat(n mean sd p50 min max) format(%9.2f)
+
+Summary statistics: N, Mean, SD, p50, Min, Max
+Group variable: year (PERIODO_ANIO)
+
+    year |  sedeco~d  sedeco~o
+---------+--------------------
+    2018 |  80872.00  80872.00
+         |     23.86      2.38
+         |     58.83     13.49
+         |      6.00      0.00
+         |      0.00      0.00
+         |   2200.00    899.00
+---------+--------------------
+    2019 |  83750.00  83750.00
+         |     23.68      2.91
+         |     59.50     16.13
+         |      6.00      0.00
+         |      0.00      0.00
+         |   2267.00   1451.00
+---------+--------------------
+    2020 |  83063.00  83063.00
+         |     23.22      4.20
+         |     58.80     19.43
+         |      6.00      0.00
+         |      0.00      0.00
+         |   2297.00   1100.00
+---------+--------------------
+    2021 |  80058.00  80058.00
+         |     23.78      4.85
+         |     57.77     23.29
+         |      6.00      0.00
+         |      0.00      0.00
+         |   2297.00   1033.00
+---------+--------------------
+    2022 |  79129.00  79129.00
+         |     23.04      5.06
+         |     53.78     25.26
+         |      7.00      0.00
+         |      0.00      0.00
+         |   2297.00   1100.00
+---------+--------------------
+    2023 |  77678.00  77678.00
+         |     22.40      5.30
+         |     51.44     26.32
+         |      7.00      0.00
+         |      0.00      0.00
+         |   2300.00   1224.00
+---------+--------------------
+   Total | 484550.00 484550.00
+         |     23.34      4.10
+         |     56.84     21.12
+         |      6.00      0.00
+         |      0.00      0.00
+         |   2300.00   1451.00
+------------------------------
+
+. 
+. * ----------------------------------------------------------------------
+. * [2.1] MAGNITUD DEL ERROR DE LA FÓRMULA ANTERIOR
+. * ----------------------------------------------------------------------
+. * Cifras para el informe metodológico.
+. display _newline "--- Magnitud del problema que generaba negativos ---"
+
+--- Magnitud del problema que generaba negativos ---
+
+. generate double _resta_vieja = sedecom_cantidad - sedecom_cant_sinuso
+
+. quietly count if _resta_vieja < 0 & !missing(_resta_vieja)
+
+. display "Filas que la fórmula anterior habría dejado en negativo: " r(N)
+Filas que la fórmula anterior habría dejado en negativo: 56719
+
+. quietly summarize _resta_vieja if _resta_vieja < 0
+
+. display "Mínimo que producía la resta: " r(min)
+Mínimo que producía la resta: -1451
+
+. display _newline "Filas negativas por año:"
+
+Filas negativas por año:
+
+. tabulate year if _resta_vieja < 0
+
+PERIODO_ANI |
+          O |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       2018 |      6,688       11.79       11.79
+       2019 |      8,056       14.20       25.99
+       2020 |     11,500       20.28       46.27
+       2021 |     10,544       18.59       64.86
+       2022 |     10,033       17.69       82.55
+       2023 |      9,898       17.45      100.00
+------------+-----------------------------------
+      Total |     56,719      100.00
+
+. drop _resta_vieja
+
+. 
+. * ----------------------------------------------------------------------
+. * [2.2] ¿LA FUENTE REGISTRA CEROS EXPLÍCITOS?
+. * ----------------------------------------------------------------------
+. * De esto depende cómo se interpreta la ausencia de una fila. Si toda fila con
+. * cantidad cero tiene equipos sin uso, entonces el archivo solo registra tipos
+. * de equipo que la sede efectivamente posee, y no tener fila equivale a no
+. * tener equipos de ese tipo.
+. display _newline "--- Ceros explícitos en la fuente ---"
+
+--- Ceros explícitos en la fuente ---
+
+. quietly count if sedecom_cantidad == 0
+
+. display "Filas con CANTIDAD = 0: " r(N)
+Filas con CANTIDAD = 0: 25619
+
+. quietly count if sedecom_cantidad == 0 & sedecom_cant_sinuso == 0
+
+. display "De ellas, con SIN USO también en 0: " r(N) ///
+>         "  (si es 0, no hay registro de ausencia total)"
+De ellas, con SIN USO también en 0: 0  (si es 0, no hay registro de ausencia total)
+
+. 
+. bysort cole_cod_dane_sede year: egen byte n_ceros = total(sedecom_cantidad == 0)
+
+. egen byte _tag = tag(cole_cod_dane_sede year)
+
+. display _newline "--- Tipos de equipo en cero por sede-año ---"
+
+--- Tipos de equipo en cero por sede-año ---
+
+. tabulate n_ceros if _tag == 1
+
+    n_ceros |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |    239,409       91.55       91.55
+          1 |     18,945        7.24       98.80
+          2 |      2,761        1.06       99.85
+          3 |        384        0.15      100.00
+------------+-----------------------------------
+      Total |    261,499      100.00
+
+. tabulate n_ceros year if _tag == 1
+
+           |                           PERIODO_ANIO
+   n_ceros |      2018       2019       2020       2021       2022       2023 |     Total
+-----------+------------------------------------------------------------------+----------
+         0 |    42,438     41,974     39,662     38,212     38,643     38,480 |   239,409 
+         1 |     2,138      2,867      3,861      3,386      3,383      3,310 |    18,945 
+         2 |       113        224        709        671        512        532 |     2,761 
+         3 |         2          4        144        121         62         51 |       384 
+-----------+------------------------------------------------------------------+----------
+     Total |    44,691     45,069     44,376     42,390     42,600     42,373 |   261,499 
+
+. drop n_ceros _tag
+
+. 
+. 
+. ********************************************************************************
+. * [3] COLAPSO A SEDE-AÑO
+. ********************************************************************************
+. * Aquí ocurre la suma de los tres tipos de equipo que faltaba en la hoja
+. * consolidada del archivo original.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[3] COLAPSO A SEDE-AÑO SUMANDO LOS TRES TIPOS DE EQUIPO"
+[3] COLAPSO A SEDE-AÑO SUMANDO LOS TRES TIPOS DE EQUIPO
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. collapse (sum)   equipos_funcionales = sedecom_cantidad          ///
+>                  equipos_sinuso      = sedecom_cant_sinuso       ///
+>                  equipos_prestamo    = sedecom_cant_presta       ///
+>          (count) n_tipos_tic         = equipocom_id,             ///
+>          by(cole_cod_dane_sede year)
+
+. 
+. generate double equipos_total = equipos_funcionales + equipos_sinuso
+
+. 
+. label variable equipos_funcionales "Equipos de cómputo en servicio (suma de los 3 tipos)"
+
+. label variable equipos_sinuso      "Equipos de cómputo sin uso (suma de los 3 tipos)"
+
+. label variable equipos_total       "Inventario total de equipos (en servicio + sin uso)"
+
+. label variable n_tipos_tic         "Tipos de equipo que posee la sede (documentación, NO c
+> ontrol)"
+
+. 
+. quietly count
+
+. display "Sede-año en el panel TIC nacional: " r(N)
+Sede-año en el panel TIC nacional: 261499
+
+. 
+. quietly count if equipos_funcionales < 0
+
+. display _newline "Sede-año con equipos funcionales negativos: " r(N) " (debe ser 0)"
+
+Sede-año con equipos funcionales negativos: 0 (debe ser 0)
+
+. assert equipos_funcionales >= 0
+
+. 
+. display _newline "--- Distribución del número de tipos que posee la sede ---"
+
+--- Distribución del número de tipos que posee la sede ---
+
+. tabulate n_tipos_tic year
+
+  Tipos de |
+equipo que |
+  posee la |
+      sede |
+(documenta |
+  ción, NO |                           PERIODO_ANIO
+  control) |      2018       2019       2020       2021       2022       2023 |     Total
+-----------+------------------------------------------------------------------+----------
+         1 |    18,051     16,997     16,435     15,356     16,305     16,786 |    99,930 
+         2 |    17,099     17,463     17,195     16,400     16,061     15,869 |   100,087 
+         3 |     9,541     10,609     10,746     10,634     10,234      9,718 |    61,482 
+-----------+------------------------------------------------------------------+----------
+     Total |    44,691     45,069     44,376     42,390     42,600     42,373 |   261,499 
+
+. 
+. display _newline "--- Equipos por sede-año (nacional) ---"
+
+--- Equipos por sede-año (nacional) ---
+
+. tabstat equipos_funcionales equipos_sinuso equipos_total, ///
+>         by(year) stat(n mean sd p50 max) format(%9.2f)
+
+Summary statistics: N, Mean, SD, p50, Max
+Group variable: year (PERIODO_ANIO)
+
+    year |  equipo~s  equip~so  equipo~l
+---------+------------------------------
+    2018 |  44691.00  44691.00  44691.00
+         |     43.18      4.31     47.49
+         |     97.37     19.87    104.33
+         |     12.00      0.00     14.00
+         |   2584.00    899.00   2692.00
+---------+------------------------------
+    2019 |  45069.00  45069.00  45069.00
+         |     44.01      5.41     49.41
+         |     99.35     23.89    107.74
+         |     12.00      0.00     15.00
+         |   2584.00   1451.00   2692.00
+---------+------------------------------
+    2020 |  44376.00  44376.00  44376.00
+         |     43.47      7.87     51.34
+         |     99.52     30.68    111.15
+         |     12.00      0.00     15.00
+         |   2584.00   1360.00   2692.00
+---------+------------------------------
+    2021 |  42390.00  42390.00  42390.00
+         |     44.92      9.15     54.07
+         |     99.33     36.56    114.46
+         |     13.00      0.00     16.00
+         |   2584.00   1090.00   2692.00
+---------+------------------------------
+    2022 |  42600.00  42600.00  42600.00
+         |     42.80      9.40     52.21
+         |     92.16     39.14    109.44
+         |     13.00      0.00     16.00
+         |   2513.00   1300.00   2513.00
+---------+------------------------------
+    2023 |  42373.00  42373.00  42373.00
+         |     41.07      9.71     50.78
+         |     88.06     40.39    106.00
+         |     13.00      0.00     16.00
+         |   2528.00   1300.00   2528.00
+---------+------------------------------
+   Total | 261499.00 261499.00 261499.00
+         |     43.25      7.59     50.84
+         |     96.14     32.56    108.89
+         |     13.00      0.00     15.00
+         |   2584.00   1451.00   2692.00
+----------------------------------------
+
+. 
+. isid cole_cod_dane_sede year
+
+. tempfile tic_sedeanio
+
+. save `tic_sedeanio', replace
+(file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_5234_000001.tmp not found)
+file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_5234_000001.tmp saved as .dta format
+
+. 
+. 
+. ********************************************************************************
+. * [4] CRUCE SOBRE EL PANEL DE SEDES
+. ********************************************************************************
+. * El panel de sedes manda: sus 2.447 filas se conservan. Una sede ausente del
+. * archivo TIC queda en missing, NO en cero: no responder la encuesta de
+. * dotación no es lo mismo que no tener equipos.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[4] CRUCE CON EL PANEL DE SEDES"
+[4] CRUCE CON EL PANEL DE SEDES
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "N2_Sedes_sinTIC.dta", clear
+
+. 
+. quietly count
+
+. display "Sede-año en el panel de sedes: " r(N)
+Sede-año en el panel de sedes: 2447
+
+. 
+. merge 1:1 cole_cod_dane_sede year using `tic_sedeanio', ///
+>     keep(master match) generate(_m_tic)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                           105
+        from master                       105  (_m_tic==1)
+        from using                          0  (_m_tic==2)
+
+    Matched                             2,342  (_m_tic==3)
+    -----------------------------------------
+
+. 
+. display _newline "--- Resultado del cruce ---"
+
+--- Resultado del cruce ---
+
+. tabulate _m_tic
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+        Master only (1) |        105        4.29        4.29
+            Matched (3) |      2,342       95.71      100.00
+------------------------+-----------------------------------
+                  Total |      2,447      100.00
+
+. 
+. display _newline "--- Sede-año sin datos TIC, por año ---"
+
+--- Sede-año sin datos TIC, por año ---
+
+. tabulate year if _m_tic == 1
+
+     Año de |
+ presentaci |
+   ón de la |
+     prueba |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       2018 |         24       22.86       22.86
+       2019 |         17       16.19       39.05
+       2020 |          8        7.62       46.67
+       2021 |         21       20.00       66.67
+       2022 |         16       15.24       81.90
+       2023 |         19       18.10      100.00
+------------+-----------------------------------
+      Total |        105      100.00
+
+. 
+. generate byte tic_miss = (_m_tic == 1)
+
+. label variable tic_miss "Sede-año sin registro en el panel TIC (1 = sí)"
+
+. drop _m_tic
+
+. 
+. 
+. ********************************************************************************
+. * [5] DOTACIÓN TIC POR ESTUDIANTE
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[5] CONSTRUCCIÓN DE LA DOTACIÓN TIC"
+[5] CONSTRUCCIÓN DE LA DOTACIÓN TIC
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. generate double dotacion_tic = equipos_funcionales / matricula ///
+>     if matricula > 0 & !missing(matricula)
+(105 missing values generated)
+
+. label variable dotacion_tic "Equipos de cómputo en servicio por estudiante"
+
+. 
+. generate double dotacion_tic_total = equipos_total / matricula ///
+>     if matricula > 0 & !missing(matricula)
+(105 missing values generated)
+
+. label variable dotacion_tic_total "Equipos totales por estudiante (incluye sin uso)"
+
+. 
+. assert dotacion_tic >= 0 if !missing(dotacion_tic)
+
+. display "Verificado: ninguna dotación negativa."
+Verificado: ninguna dotación negativa.
+
+. 
+. display _newline "--- Dotación TIC por año ---"
+
+--- Dotación TIC por año ---
+
+. tabstat dotacion_tic dotacion_tic_total, ///
+>         by(year) stat(n mean sd p10 p50 p90 min max) format(%9.4f)
+
+Summary statistics: N, Mean, SD, p10, p50, p90, Min, Max
+Group variable: year (Año de presentación de la prueba)
+
+    year |  dotaci~c  dotaci~l
+---------+--------------------
+    2018 |  364.0000  364.0000
+         |    0.2255    0.2524
+         |    0.2270    0.2400
+         |    0.0453    0.0588
+         |    0.1419    0.1612
+         |    0.4897    0.5235
+         |    0.0047    0.0047
+         |    1.9070    1.9535
+---------+--------------------
+    2019 |  382.0000  382.0000
+         |    0.2068    0.2437
+         |    0.2025    0.2223
+         |    0.0489    0.0621
+         |    0.1367    0.1643
+         |    0.4381    0.5130
+         |    0.0032    0.0049
+         |    1.6763    1.6835
+---------+--------------------
+    2020 |  398.0000  398.0000
+         |    0.2403    0.2927
+         |    0.2303    0.2785
+         |    0.0536    0.0719
+         |    0.1710    0.2143
+         |    0.4844    0.6010
+         |    0.0000    0.0071
+         |    1.8507    3.1111
+---------+--------------------
+    2021 |  395.0000  395.0000
+         |    0.2374    0.3005
+         |    0.2604    0.2876
+         |    0.0536    0.0816
+         |    0.1681    0.2262
+         |    0.4545    0.5571
+         |    0.0000    0.0075
+         |    3.2308    3.2308
+---------+--------------------
+    2022 |  401.0000  401.0000
+         |    0.2258    0.2986
+         |    0.1916    0.2694
+         |    0.0664    0.0849
+         |    0.1745    0.2358
+         |    0.4475    0.6090
+         |    0.0000    0.0062
+         |    1.3625    3.4167
+---------+--------------------
+    2023 |  402.0000  402.0000
+         |    0.2526    0.3226
+         |    0.2161    0.2708
+         |    0.0676    0.0901
+         |    0.1951    0.2617
+         |    0.4948    0.5979
+         |    0.0000    0.0194
+         |    1.6964    2.6452
+---------+--------------------
+   Total | 2342.0000 2342.0000
+         |    0.2317    0.2859
+         |    0.2226    0.2641
+         |    0.0537    0.0719
+         |    0.1627    0.2112
+         |    0.4692    0.5630
+         |    0.0000    0.0047
+         |    3.2308    3.4167
+------------------------------
+
+. 
+. * El gradiente según el número de tipos es real, no sesgo de reporte: una sede
+. * con tres tipos de equipo está efectivamente mejor dotada. Se reporta como
+. * documentación del punto, no como motivo para controlar por n_tipos_tic.
+. display _newline "--- Dotación según cuántos tipos de equipo posee la sede ---"
+
+--- Dotación según cuántos tipos de equipo posee la sede ---
+
+. tabstat dotacion_tic, by(n_tipos_tic) stat(n mean sd p50) format(%9.4f)
+
+Summary for variables: dotacion_tic
+Group variable: n_tipos_tic (Tipos de equipo que posee la sede (documentación, NO control))
+
+n_tipos_tic |         N      Mean        SD       p50
+------------+----------------------------------------
+          1 |  485.0000    0.1169    0.1007    0.0901
+          2 |  925.0000    0.2133    0.1851    0.1556
+          3 |  932.0000    0.3096    0.2685    0.2500
+------------+----------------------------------------
+      Total | 2342.0000    0.2317    0.2226    0.1627
+-----------------------------------------------------
+
+. 
+. 
+. ********************************************************************************
+. * [6] CORRECCIÓN DE LA COMPARABILIDAD INTERTEMPORAL DE pct_posgrado
+. ********************************************************************************
+. * PROBLEMA
+. * pct_posgrado cae de 0,331 en 2018 a 0,141 en 2023, con quiebres bruscos en
+. * 2021 y 2022, y su desviación estándar se desploma de 0,304 a 0,164. El xtsum
+. * arroja varianza within (0,227) mayor que la between (0,140): la proporción de
+. * docentes con posgrado variaría más dentro de una misma sede a lo largo de
+. * seis años que entre sedes distintas. Eso es implausible para una
+. * característica institucional —el cuerpo docente rota lentamente y nadie
+. * pierde un posgrado— y apunta a un cambio en el criterio de reporte del DANE.
+. *
+. * SOLUCIÓN ADOPTADA
+. * Estandarización DENTRO DE CADA AÑO sobre la muestra del Cauca. La variable
+. * resultante mide cuántas desviaciones está una sede por encima del promedio de
+. * las sedes caucanas de su mismo año. Esto neutraliza a la vez el salto de
+. * nivel y el colapso de la dispersión, porque cada año se normaliza contra su
+. * propia escala.
+. *
+. * SUPUESTO QUE ASUME
+. * Que el cambio de criterio afectó de manera similar a todas las sedes, de modo
+. * que el ORDENAMIENTO relativo se conserva aunque los niveles no. Es un
+. * supuesto, pero mucho más débil que asumir que un 0,33 de 2018 y un 0,14 de
+. * 2023 miden lo mismo.
+. *
+. * COSTO
+. * Se pierde toda lectura temporal de la formación docente. Debe declararse en
+. * la metodología: z_posgrado responde a "qué sedes tienen más docentes con
+. * posgrado", nunca a "cómo evolucionó la formación docente en el Cauca".
+. *
+. * NOTA PARA EL SCRIPT DE IMPUTACIÓN
+. * z_posgrado NO debe imputarse directamente. Se imputa pct_posgrado y se
+. * recalcula z_posgrado como variable pasiva dentro de mi passive, para que la
+. * estandarización se rehaga en cada imputación.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[6] ESTANDARIZACIÓN INTRA-ANUAL DE pct_posgrado"
+[6] ESTANDARIZACIÓN INTRA-ANUAL DE pct_posgrado
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. display _newline "--- Serie cruda: el problema de comparabilidad ---"
+
+--- Serie cruda: el problema de comparabilidad ---
+
+. tabstat pct_posgrado, by(year) stat(n mean sd p25 p50 p75) format(%9.4f)
+
+Summary for variables: pct_posgrado
+Group variable: year (Año de presentación de la prueba)
+
+    year |         N      Mean        SD       p25       p50       p75
+---------+------------------------------------------------------------
+    2018 |  385.0000    0.3308    0.3039    0.0000    0.3077    0.5854
+    2019 |  398.0000    0.3331    0.3095    0.0000    0.2727    0.5909
+    2020 |  405.0000    0.3478    0.3284    0.0000    0.2963    0.6250
+    2021 |  415.0000    0.2321    0.1803    0.0909    0.2000    0.3571
+    2022 |  416.0000    0.1533    0.1601    0.0000    0.1176    0.2308
+    2023 |  417.0000    0.1414    0.1636    0.0000    0.1000    0.2188
+---------+------------------------------------------------------------
+   Total | 2436.0000    0.2545    0.2645    0.0000    0.1667    0.4211
+----------------------------------------------------------------------
+
+. 
+. bysort year: egen double _media_pos = mean(pct_posgrado)
+
+. bysort year: egen double _sd_pos    = sd(pct_posgrado)
+
+. 
+. generate double z_posgrado = (pct_posgrado - _media_pos) / _sd_pos
+(11 missing values generated)
+
+. label variable z_posgrado ///
+>     "Docentes con posgrado, estandarizado dentro del año (sin lectura temporal)"
+
+. 
+. drop _media_pos _sd_pos
+
+. 
+. * La variable cruda se conserva solo como documentación de la fuente.
+. label variable pct_posgrado ///
+>     "Proporción de docentes con posgrado (CRUDA - no comparable entre años)"
+
+. 
+. display _newline "--- Serie estandarizada: media 0 y SD 1 en cada año ---"
+
+--- Serie estandarizada: media 0 y SD 1 en cada año ---
+
+. tabstat z_posgrado, by(year) stat(n mean sd min max) format(%9.4f)
+
+Summary for variables: z_posgrado
+Group variable: year (Año de presentación de la prueba)
+
+    year |         N      Mean        SD       Min       Max
+---------+--------------------------------------------------
+    2018 |  385.0000   -0.0000    1.0000   -1.0887    2.2023
+    2019 |  398.0000   -0.0000    1.0000   -1.0763    2.1545
+    2020 |  405.0000   -0.0000    1.0000   -1.0593    1.9860
+    2021 |  415.0000   -0.0000    1.0000   -1.2872    3.7552
+    2022 |  416.0000   -0.0000    1.0000   -0.9572    4.9585
+    2023 |  417.0000    0.0000    1.0000   -0.8648    4.8897
+---------+--------------------------------------------------
+   Total | 2436.0000   -0.0000    0.9990   -1.2872    4.9585
+------------------------------------------------------------
+
+. 
+. display _newline "--- Correlación entre la cruda y la estandarizada, por año ---"
+
+--- Correlación entre la cruda y la estandarizada, por año ---
+
+. * Dentro de cada año la transformación es lineal, así que el ordenamiento se
+. * conserva íntegro: la correlación anual debe ser exactamente 1.
+. foreach y in 2018 2019 2020 2021 2022 2023 {
+  2.     quietly correlate pct_posgrado z_posgrado if year == `y'
+  3.     display "  `y': " %6.4f r(rho)
+  4. }
+  2018: 1.0000
+  2019: 1.0000
+  2020: 1.0000
+  2021: 1.0000
+  2022: 1.0000
+  2023: 1.0000
+
+. 
+. 
+. ********************************************************************************
+. * [7] PANEL DE CONTROL DEL NIVEL 2 COMPLETO
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[7] PANEL DE CONTROL DEL NIVEL 2"
+[7] PANEL DE CONTROL DEL NIVEL 2
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. display _newline "--- Cobertura de todas las variables de sede ---"
+
+--- Cobertura de todas las variables de sede ---
+
+. misstable summarize matricula ln_matricula ratio_alumnos_docente ///
+>     pct_planta pct_posgrado z_posgrado equipos_funcionales dotacion_tic
+                                                               Obs<.
+                                                +------------------------------
+               |                                | Unique
+      Variable |     Obs=.     Obs>.     Obs<.  | values        Min         Max
+  -------------+--------------------------------+------------------------------
+     matricula |        11               2,436  |   >500         24        2392
+  ln_matricula |        11               2,436  |   >500   3.178054    7.779885
+  ratio_alum~e |        11               2,436  |   >500        4.5          63
+    pct_planta |        11               2,436  |    308          0           1
+  pct_posgrado |        11               2,436  |    395          0           1
+    z_posgrado |        11               2,436  |   >500  -1.287188    4.958486
+  equipos_fu~s |       105               2,342  |    296          0         824
+  dotacion_tic |       105               2,342  |   >500          0    3.230769
+  -----------------------------------------------------------------------------
+
+. 
+. display _newline "--- Descriptivos por año ---"
+
+--- Descriptivos por año ---
+
+. tabstat ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>         dotacion_tic rural ju_unica, ///
+>         by(year) stat(n mean sd) format(%9.4f)
+
+Summary statistics: N, Mean, SD
+Group variable: year (Año de presentación de la prueba)
+
+    year |  ln_mat~a  ratio_~e  pct_pl~a  z_posg~o  dotaci~c     rural  ju_unica
+---------+----------------------------------------------------------------------
+    2018 |  385.0000  385.0000  385.0000  385.0000  364.0000  388.0000  388.0000
+         |    5.7647   17.6033    0.8223   -0.0000    0.2255    0.7191    0.0129
+         |    0.7239    5.8161    0.2768    1.0000    0.2270    0.4500    0.1129
+---------+----------------------------------------------------------------------
+    2019 |  398.0000  398.0000  398.0000  398.0000  382.0000  399.0000  399.0000
+         |    5.7657   17.5627    0.8147   -0.0000    0.2068    0.7243    0.0326
+         |    0.7255    5.1145    0.2897    1.0000    0.2025    0.4474    0.1778
+---------+----------------------------------------------------------------------
+    2020 |  405.0000  405.0000  405.0000  405.0000  398.0000  406.0000  406.0000
+         |    5.6759   17.2363    0.8368   -0.0000    0.2403    0.7266    0.2217
+         |    0.7310    4.8145    0.2810    1.0000    0.2303    0.4463    0.4159
+---------+----------------------------------------------------------------------
+    2021 |  415.0000  415.0000  415.0000  415.0000  395.0000  416.0000  416.0000
+         |    5.6718   17.5092    0.8274   -0.0000    0.2374    0.7332    0.2163
+         |    0.7386    4.7884    0.2948    1.0000    0.2604    0.4428    0.4122
+---------+----------------------------------------------------------------------
+    2022 |  416.0000  416.0000  416.0000  416.0000  401.0000  417.0000  417.0000
+         |    5.6568   17.2657    0.8202   -0.0000    0.2258    0.7314    0.2134
+         |    0.7346    4.8620    0.3001    1.0000    0.1916    0.4438    0.4102
+---------+----------------------------------------------------------------------
+    2023 |  417.0000  417.0000  417.0000  417.0000  402.0000  421.0000  421.0000
+         |    5.6265   16.9388    0.8171    0.0000    0.2526    0.7316    0.2233
+         |    0.7511    5.0037    0.3019    1.0000    0.2161    0.4437    0.4169
+---------+----------------------------------------------------------------------
+   Total | 2436.0000 2436.0000 2436.0000 2436.0000 2342.0000 2447.0000 2447.0000
+         |    5.6922   17.3482    0.8231   -0.0000    0.2317    0.7278    0.1557
+         |    0.7355    5.0699    0.2909    0.9990    0.2226    0.4452    0.3626
+--------------------------------------------------------------------------------
+
+. 
+. display _newline "--- Variación within y between ---"
+
+--- Variación within y between ---
+
+. egen long sede_id = group(cole_cod_dane_sede)
+
+. xtset sede_id year
+
+Panel variable: sede_id (unbalanced)
+ Time variable: year, 2018 to 2023, but with gaps
+         Delta: 1 unit
+
+. xtsum dotacion_tic ln_matricula ratio_alumnos_docente pct_planta ///
+>       pct_posgrado z_posgrado
+
+Variable         |      Mean   Std. dev.       Min        Max |    Observations
+-----------------+--------------------------------------------+----------------
+dotaci~c overall |  .2316882   .2226201          0   3.230769 |     N =    2342
+         between |             .1950033    .006993   1.610201 |     n =     430
+         within  |             .1062959  -.8301254   1.852257 | T-bar = 5.44651
+                 |                                            |
+ln_mat~a overall |  5.692169   .7355084   3.178054   7.779885 |     N =    2436
+         between |             .7420764   3.433987   7.681089 |     n =     436
+         within  |             .1419115   4.991943   6.659813 | T-bar = 5.58716
+                 |                                            |
+ratio_~e overall |  17.34822   5.069886        4.5         63 |     N =    2436
+         between |             4.449836   6.044444   39.26667 |     n =     436
+         within  |             2.441952  -4.985118   57.61286 | T-bar = 5.58716
+                 |                                            |
+pct_pl~a overall |  .8230633   .2908867          0          1 |     N =    2436
+         between |             .2862276          0          1 |     n =     436
+         within  |             .0915509  -.0102701   1.600841 | T-bar = 5.58716
+                 |                                            |
+pct_po~o overall |  .2544669   .2644697          0          1 |     N =    2436
+         between |             .1395422          0   .6128205 |     n =     436
+         within  |             .2268635  -.2945527   1.004467 | T-bar = 5.58716
+                 |                                            |
+z_posg~o overall | -5.44e-16   .9989728  -1.287188   4.958486 |     N =    2436
+         between |             .5133737  -1.101218   2.490384 |     n =     436
+         within  |             .8800125  -2.528781   3.764309 | T-bar = 5.58716
+
+. 
+. display _newline "--- Correlación entre las variables de sede ---"
+
+--- Correlación entre las variables de sede ---
+
+. correlate ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>           dotacion_tic rural ju_unica
+(obs=2,342)
+
+             | ln_mat~a ratio_~e pct_pl~a z_posg~o dotaci~c    rural ju_unica
+-------------+---------------------------------------------------------------
+ln_matricula |   1.0000
+ratio_alum~e |   0.6666   1.0000
+  pct_planta |   0.1236   0.1358   1.0000
+  z_posgrado |   0.0862   0.0874   0.2017   1.0000
+dotacion_tic |  -0.2464  -0.2353   0.0508   0.0180   1.0000
+       rural |  -0.6180  -0.4900  -0.2508  -0.1272   0.0308   1.0000
+    ju_unica |   0.0828  -0.0210   0.2015   0.0007   0.0557  -0.1144   1.0000
+
+
+. 
+. isid cole_cod_dane_sede year
+
+. assert inrange(year, 2018, 2023)
+
+. assert !missing(cole_cod_mcpio_ubicacion)
+
+. display _newline "Llaves verificadas."
+
+Llaves verificadas.
+
+. 
+. 
+. ********************************************************************************
+. * [8] GUARDADO
+. ********************************************************************************
+. 
+. drop sede_id
+
+. order cole_cod_dane_sede cole_cod_mcpio_ubicacion year ///
+>       matricula ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>       dotacion_tic equipos_funcionales rural ju_unica
+
+. 
+. compress
+  variable n_tipos_tic was long now byte
+  variable equipos_funcionales was double now int
+  variable equipos_sinuso was double now int
+  variable equipos_prestamo was double now int
+  variable equipos_total was double now int
+  (66,069 bytes saved)
+
+. save "N2_Sedes_2018_2023.dta", replace
+file N2_Sedes_2018_2023.dta saved
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "NIVEL 2 CERRADO: N2_Sedes_2018_2023.dta"
+NIVEL 2 CERRADO: N2_Sedes_2018_2023.dta
+
+. display "Archivo fuente en formato largo: TIC_largo_2018_2023.dta"
+Archivo fuente en formato largo: TIC_largo_2018_2023.dta
+
+. display "Siguiente: Fase 4, panel municipal de Nivel 3 con inversión deflactada."
+Siguiente: Fase 4, panel municipal de Nivel 3 con inversión deflactada.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase3
+      name:  fase3
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_03_panel_tic.log
+  log type:  text
+ closed on:  22 Aug 2026, 14:38:54
+--------------------------------------------------------------------------------------------

@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "Si usa este código, cítelo con los datos de este archivo."
+type: software
+title: "Cadena de procesamiento en Stata de «Análisis multinivel del desempeño escolar: una evaluación de los efectos institucionales y macro-territoriales del Cauca en el sector oficial (2018-2023)»"
+authors:
+  - family-names: "Muñoz Paz"
+    given-names: "Juan Pablo"
+    affiliation: "Universidad del Cauca"
+version: "1.0"
+license: MIT
+abstract: "Do-files de Stata 17 y registros de ejecución de una tesis de pregrado en Economía que estima modelos multinivel de estudiante, sede y municipio sobre las cohortes 2018-2023 de Saber 11 en las sedes oficiales del Cauca (Colombia). No incluye datos; las fuentes se describen en el README."
+keywords:
+  - "Saber 11"
+  - "modelos multinivel"
+  - "Cauca"
+  - "economía de la educación"
+  - "Stata"

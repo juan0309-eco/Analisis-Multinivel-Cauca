@@ -1,0 +1,984 @@
+---------------------------------------------------------------------------------------------
+      name:  fase6
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_06_pca_vulnerabilidad_2
+> 0261019.log
+  log type:  text
+ opened on:  19 Oct 2026, 10:31:56
+
+. 
+. 
+. ********************************************************************************
+. * [1] PREPARACIÓN DE LOS INSUMOS
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[1] INSUMOS DEL ÍNDICE"
+[1] INSUMOS DEL ÍNDICE
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "N3_Municipios_2018_2023.dta", clear
+
+. 
+. quietly count
+
+. display "Observaciones municipio-año: " r(N) " (esperadas: 252)"
+Observaciones municipio-año: 252 (esperadas: 252)
+
+. assert _N == 252
+
+. 
+. * C7: verificación de que el 04 v5 corrió. Si falta, parar aquí y no más
+. * adelante, cuando ya se habría reescrito N3_Municipios_PCA.dta.
+. foreach v in tasa_hom_eb iica minas tasa_hom_td desercion_of cob_neta_media {
+  2.     capture confirm variable `v'
+  3.     if _rc != 0 {
+  4.         display as error "`v' no está en N3_Municipios_2018_2023.dta."
+  5.         display as error "Correr 04_panel_municipal_N3_v5.do antes de este script."
+  6.         exit 111
+  7.     }
+  8. }
+
+. display "Las seis variables de C7 están presentes."
+Las seis variables de C7 están presentes.
+
+. 
+. xtset cole_cod_mcpio_ubicacion year
+
+Panel variable: cole_cod_mcpio_ubicacion (strongly balanced)
+ Time variable: year, 2018 to 2023
+         Delta: 1 unit
+
+. 
+. * Las tres dimensiones entran con la forma funcional en que se usarán después:
+. * la tasa de homicidios en nivel, coca e inversión en logaritmo.
+. display _newline "--- Insumos del índice ---"
+
+--- Insumos del índice ---
+
+. tabstat tasa_homicidios ln_coca ln_inversion_pc, ///
+>         stat(n mean sd min max) format(%9.4f)
+
+   Stats |  tasa_h~s   ln_coca  ln_~n_pc
+---------+------------------------------
+       N |  252.0000  252.0000  252.0000
+    Mean |   43.3891    2.5614   11.1901
+      SD |   46.5159    3.0298    0.7826
+     Min |    0.0000    0.0000    9.6257
+     Max |  293.0238    9.1296   13.1455
+----------------------------------------
+
+. 
+. display _newline "--- Matriz de correlaciones ---"
+
+--- Matriz de correlaciones ---
+
+. correlate tasa_homicidios ln_coca ln_inversion_pc
+(obs=252)
+
+             | tasa_h~s  ln_coca ln_~n_pc
+-------------+---------------------------
+tasa_homic~s |   1.0000
+     ln_coca |   0.2695   1.0000
+ln_inversi~c |  -0.2008  -0.0711   1.0000
+
+
+. 
+. * Estandarización agrupada sobre las 252 observaciones. No se estandariza por
+. * año: eso eliminaría las diferencias de nivel entre años, que son parte de la
+. * variación que el índice debe capturar.
+. foreach v in tasa_homicidios ln_coca ln_inversion_pc {
+  2.     quietly summarize `v'
+  3.     generate double z_`v' = (`v' - r(mean)) / r(sd)
+  4. }
+
+. 
+. label variable z_tasa_homicidios "Tasa de homicidios estandarizada"
+
+. label variable z_ln_coca         "Log de hectáreas de coca estandarizado"
+
+. label variable z_ln_inversion_pc "Log de inversión per cápita estandarizado"
+
+. 
+. 
+. ********************************************************************************
+. * [2] ANÁLISIS DE COMPONENTES PRINCIPALES
+. ********************************************************************************
+. * NO CAMBIA RESPECTO DE LA VERSIÓN 2. Las cifras de salida deben reproducir
+. * exactamente las Tablas 18, 19 y 20 del Anexo B.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[2] ANÁLISIS DE COMPONENTES PRINCIPALES"
+[2] ANÁLISIS DE COMPONENTES PRINCIPALES
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. pca z_tasa_homicidios z_ln_coca z_ln_inversion_pc, components(1)
+
+Principal components/correlation                 Number of obs    =        252
+                                                 Number of comp.  =          1
+                                                 Trace            =          3
+    Rotation: (unrotated = principal)            Rho              =     0.4575
+
+    --------------------------------------------------------------------------
+       Component |   Eigenvalue   Difference         Proportion   Cumulative
+    -------------+------------------------------------------------------------
+           Comp1 |       1.3724       .44022             0.4575       0.4575
+           Comp2 |      .932177      .236749             0.3107       0.7682
+           Comp3 |      .695427            .             0.2318       1.0000
+    --------------------------------------------------------------------------
+
+Principal components (eigenvectors) 
+
+    --------------------------------------
+        Variable |    Comp1 | Unexplained 
+    -------------+----------+-------------
+    z_tasa_hom~s |   0.6696 |       .3846 
+       z_ln_coca |   0.5745 |       .5471 
+    z_ln_inver~c |  -0.4707 |       .6959 
+    --------------------------------------
+
+. 
+. display _newline "--- Autovalores y varianza explicada ---"
+
+--- Autovalores y varianza explicada ---
+
+. estat loadings
+
+Principal component loadings (unrotated)
+    component normalization: sum of squares(column) = 1
+
+    ------------------------
+                 |    Comp1 
+    -------------+----------
+    z_tasa_hom~s |    .6696 
+       z_ln_coca |    .5745 
+    z_ln_inver~c |   -.4707 
+    ------------------------
+
+. matrix ev = e(Ev)
+
+. display "Autovalor 1: " %6.4f ev[1,1]
+Autovalor 1: 1.3724
+
+. display "Autovalor 2: " %6.4f ev[1,2]
+Autovalor 2: 0.9322
+
+. display "Autovalor 3: " %6.4f ev[1,3]
+Autovalor 3: 0.6954
+
+. display "Varianza explicada por el primer componente: " ///
+>         %6.2f 100*ev[1,1]/3 "%"
+Varianza explicada por el primer componente:  45.75%
+
+. display _newline "VERIFICACIÓN: el autovalor 1 debe ser 1,3724 y la varianza"
+
+VERIFICACIÓN: el autovalor 1 debe ser 1,3724 y la varianza
+
+. display "explicada 45,75 %. Si no coinciden, PARAR."
+explicada 45,75 %. Si no coinciden, PARAR.
+
+. 
+. * ----------------------------------------------------------------------
+. * [2.1] ADECUACIÓN MUESTRAL
+. * ----------------------------------------------------------------------
+. * El KMO es el indicador que un lector con formación estadística va a buscar.
+. * Se reporta completo, con el valor global y el de cada variable, y se declara
+. * explícitamente si queda por debajo del umbral convencional de 0,60.
+. display _newline "--- Medida de adecuación muestral de Kaiser-Meyer-Olkin ---"
+
+--- Medida de adecuación muestral de Kaiser-Meyer-Olkin ---
+
+. estat kmo
+
+Kaiser-Meyer-Olkin measure of sampling adequacy
+
+    -----------------------
+        Variable |     kmo 
+    -------------+---------
+    z_tasa_hom~s |  0.5207 
+       z_ln_coca |  0.5312 
+    z_ln_inver~c |  0.5570 
+    -------------+---------
+         Overall |  0.5308 
+    -----------------------
+
+. 
+. quietly estat kmo
+
+. scalar kmo_global = r(kmo)
+
+. display _newline "KMO global: " %6.4f kmo_global
+
+KMO global: 0.5308
+
+. display "VERIFICACIÓN: debe ser 0,5310. Si no, PARAR."
+VERIFICACIÓN: debe ser 0,5310. Si no, PARAR.
+
+. if kmo_global < 0.60 {
+.     display "ADVERTENCIA: el KMO está por debajo de 0,60, el umbral que la"
+ADVERTENCIA: el KMO está por debajo de 0,60, el umbral que la
+.     display "convención considera adecuado para análisis factorial. Debe"
+convención considera adecuado para análisis factorial. Debe
+.     display "declararse en la metodología junto con la varianza explicada."
+declararse en la metodología junto con la varianza explicada.
+. }
+
+. 
+. display _newline "--- Prueba de esfericidad de Bartlett ---"
+
+--- Prueba de esfericidad de Bartlett ---
+
+. * `factortest` no requiere ningún paquete de usuario que falte: el problema es
+. * que la llamada anterior iba precedida de `quietly`, así que Stata calculaba
+. * el estadístico y lo descartaba sin mostrarlo ni guardarlo en ningún r().
+. * Aquí se calcula directamente desde el determinante de la matriz de
+. * correlaciones, sin depender de un comando externo:
+. *     chi2 = -[(n-1) - (2p+5)/6] * ln(det(R))   con  df = p(p-1)/2
+. quietly correlate z_tasa_homicidios z_ln_coca z_ln_inversion_pc
+
+. local n_bartlett = r(N)
+
+. matrix R_bartlett = r(C)
+
+. local p_bartlett = 3
+
+. scalar det_r = det(R_bartlett)
+
+. scalar chi2_bartlett = -((`n_bartlett' - 1) - (2*`p_bartlett' + 5)/6) * ln(det_r)
+
+. local df_bartlett = `p_bartlett' * (`p_bartlett' - 1) / 2
+
+. scalar pval_bartlett = chi2tail(`df_bartlett', chi2_bartlett)
+
+. 
+. display "Determinante de la matriz de correlaciones: " %8.6f det_r
+Determinante de la matriz de correlaciones: 0.889671
+
+. display "Chi2(" `df_bartlett' ") = " %8.3f chi2_bartlett
+Chi2(3) =   29.129
+
+. display "p-valor: " %8.6f pval_bartlett
+p-valor: 0.000002
+
+. if pval_bartlett < 0.05 {
+.     display "Se rechaza la hipótesis de que la matriz de correlaciones es la"
+Se rechaza la hipótesis de que la matriz de correlaciones es la
+.     display "identidad: hay correlación suficiente entre las tres variables"
+identidad: hay correlación suficiente entre las tres variables
+.     display "para justificar el análisis de componentes principales."
+para justificar el análisis de componentes principales.
+. }
+
+. else {
+.     display "ADVERTENCIA: no se rechaza esfericidad. El PCA no está justificado"
+.     display "por la prueba de Bartlett, aunque el KMO pueda ser aceptable."
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [3] CONSTRUCCIÓN DEL ÍNDICE
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[3] CONSTRUCCIÓN DEL ÍNDICE"
+[3] CONSTRUCCIÓN DEL ÍNDICE
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. predict double indice_vuln, score
+
+Scoring coefficients 
+    sum of squares(column-loading) = 1
+
+    ------------------------
+        Variable |    Comp1 
+    -------------+----------
+    z_tasa_hom~s |   0.6696 
+       z_ln_coca |   0.5745 
+    z_ln_inver~c |  -0.4707 
+    ------------------------
+
+. 
+. * ----------------------------------------------------------------------
+. * [3.1] ORIENTACIÓN DEL SIGNO
+. * ----------------------------------------------------------------------
+. * El signo de un componente principal es arbitrario: el algoritmo puede
+. * devolver el vector o su opuesto. El índice debe orientarse de modo que los
+. * valores altos signifiquen MAYOR vulnerabilidad, es decir más homicidios,
+. * más coca y menos inversión. Se verifica contra los homicidios y se invierte
+. * si hace falta.
+. quietly correlate indice_vuln tasa_homicidios
+
+. scalar signo = r(rho)
+
+. display "Correlación entre el índice y la tasa de homicidios: " %6.4f signo
+Correlación entre el índice y la tasa de homicidios: 0.7845
+
+. 
+. if signo < 0 {
+.     quietly replace indice_vuln = -indice_vuln
+.     display "El signo se invirtió para que los valores altos indiquen mayor"
+.     display "vulnerabilidad."
+. }
+
+. else {
+.     display "El signo original ya orienta el índice hacia mayor vulnerabilidad."
+El signo original ya orienta el índice hacia mayor vulnerabilidad.
+. }
+
+. 
+. * Reescalado a media cero y desviación uno, de modo que un punto del índice
+. * equivalga a una desviación estándar y los coeficientes sean interpretables.
+. quietly summarize indice_vuln
+
+. quietly replace indice_vuln = (indice_vuln - r(mean)) / r(sd)
+
+. label variable indice_vuln "Índice de vulnerabilidad macro-territorial (t-1)"
+
+. 
+. display _newline "--- Verificación de la orientación ---"
+
+--- Verificación de la orientación ---
+
+. correlate indice_vuln tasa_homicidios ln_coca ln_inversion_pc
+(obs=252)
+
+             | indice~n tasa_h~s  ln_coca ln_~n_pc
+-------------+------------------------------------
+ indice_vuln |   1.0000
+tasa_homic~s |   0.7845   1.0000
+     ln_coca |   0.6730   0.2695   1.0000
+ln_inversi~c |  -0.5514  -0.2008  -0.0711   1.0000
+
+
+. display "Se espera: positiva con homicidios y coca, negativa con inversión."
+Se espera: positiva con homicidios y coca, negativa con inversión.
+
+. display "VERIFICACIÓN: 0,785 / 0,673 / -0,551. Si no coinciden, PARAR."
+VERIFICACIÓN: 0,785 / 0,673 / -0,551. Si no coinciden, PARAR.
+
+. 
+. display _newline "--- Distribución del índice por año ---"
+
+--- Distribución del índice por año ---
+
+. tabstat indice_vuln, by(year) stat(n mean sd min max) format(%9.4f)
+
+Summary for variables: indice_vuln
+Group variable: year (Año de la cohorte Saber 11 (llave de cruce))
+
+    year |         N      Mean        SD       Min       Max
+---------+--------------------------------------------------
+    2018 |   42.0000   -0.3689    0.6997   -1.7988    1.0826
+    2019 |   42.0000   -0.1430    0.8778   -1.6479    1.8132
+    2020 |   42.0000   -0.0562    0.9478   -1.7281    1.7802
+    2021 |   42.0000   -0.0190    1.1564   -1.7210    3.6998
+    2022 |   42.0000    0.2005    1.1085   -1.3593    3.8412
+    2023 |   42.0000    0.3864    1.0195   -1.2973    2.3341
+---------+--------------------------------------------------
+   Total |  252.0000   -0.0000    1.0000   -1.7988    3.8412
+------------------------------------------------------------
+
+. 
+. 
+. ********************************************************************************
+. * [4] VERSIÓN ALTERNATIVA PARA ROBUSTEZ
+. ********************************************************************************
+. * Estandarización dentro de cada año antes del PCA. Esta versión elimina las
+. * diferencias de nivel entre años y deja solo el ordenamiento relativo de los
+. * municipios dentro de cada corte. Se conserva como prueba de robustez, no
+. * como especificación principal.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[4] VERSIÓN DE ROBUSTEZ CON ESTANDARIZACIÓN INTRA-ANUAL"
+[4] VERSIÓN DE ROBUSTEZ CON ESTANDARIZACIÓN INTRA-ANUAL
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. foreach v in tasa_homicidios ln_coca ln_inversion_pc {
+  2.     bysort year: egen double _m_`v' = mean(`v')
+  3.     bysort year: egen double _s_`v' = sd(`v')
+  4.     generate double za_`v' = (`v' - _m_`v') / _s_`v'
+  5.     drop _m_`v' _s_`v'
+  6. }
+
+. 
+. quietly pca za_tasa_homicidios za_ln_coca za_ln_inversion_pc, components(1)
+
+. matrix ev_a = e(Ev)
+
+. display "Varianza explicada, versión intra-anual: " %6.2f 100*ev_a[1,1]/3 "%"
+Varianza explicada, versión intra-anual:  44.40%
+
+. 
+. predict double indice_vuln_anual, score
+
+Scoring coefficients 
+    sum of squares(column-loading) = 1
+
+    ------------------------
+        Variable |    Comp1 
+    -------------+----------
+    za_tasa_ho~s |   0.6692 
+      za_ln_coca |   0.5514 
+    za_ln_inve~c |  -0.4981 
+    ------------------------
+
+. quietly correlate indice_vuln_anual tasa_homicidios
+
+. if r(rho) < 0 quietly replace indice_vuln_anual = -indice_vuln_anual
+
+. quietly summarize indice_vuln_anual
+
+. quietly replace indice_vuln_anual = (indice_vuln_anual - r(mean)) / r(sd)
+
+. label variable indice_vuln_anual "Índice de vulnerabilidad, estandarización intra-anual"
+
+. 
+. display _newline "--- Correlación entre las dos versiones del índice ---"
+
+--- Correlación entre las dos versiones del índice ---
+
+. correlate indice_vuln indice_vuln_anual
+(obs=252)
+
+             | indice~n indice~l
+-------------+------------------
+ indice_vuln |   1.0000
+indice_vul~l |   0.9571   1.0000
+
+
+. display "VERIFICACIÓN: debe ser 0,957. Si no, PARAR."
+VERIFICACIÓN: debe ser 0,957. Si no, PARAR.
+
+. 
+. drop za_* z_tasa_homicidios z_ln_coca z_ln_inversion_pc
+
+. 
+. 
+. ********************************************************************************
+. * [5] DESCOMPOSICIÓN DE MUNDLAK
+. ********************************************************************************
+. * La descomposición separa dos preguntas que un coeficiente único confunde:
+. *   `_bar` : los municipios más vulnerables EN PROMEDIO, ¿tienen peor
+. *            desempeño? Es comparación entre territorios.
+. *   `_dev` : cuando un municipio se vuelve más vulnerable de lo habitual EN
+. *            ÉL MISMO, ¿cae su desempeño? Es variación temporal dentro del
+. *            territorio, y es la que se acerca a una interpretación causal.
+. * El contraste de igualdad entre ambos coeficientes es el resultado central
+. * del Objetivo 4.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[5] DESCOMPOSICIÓN ENTRE Y DENTRO DE MUNICIPIO"
+[5] DESCOMPOSICIÓN ENTRE Y DENTRO DE MUNICIPIO
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. * --- Índice ---
+. bysort cole_cod_mcpio_ubicacion: egen double vuln_bar = mean(indice_vuln)
+
+. generate double vuln_dev = indice_vuln - vuln_bar
+
+. label variable vuln_bar "Vulnerabilidad promedio del municipio (componente entre)"
+
+. label variable vuln_dev "Desviación de la vulnerabilidad respecto de su promedio (component
+> e dentro)"
+
+. 
+. * --- Las tres variables por separado ---
+. * El Objetivo 4 presenta ambas especificaciones, así que las tres dimensiones
+. * reciben el mismo tratamiento. Se conservan en unidades naturales para que
+. * los coeficientes admitan lectura sustantiva.
+. foreach v in tasa_homicidios ln_coca ln_inversion_pc {
+  2.     bysort cole_cod_mcpio_ubicacion: egen double `v'_bar = mean(`v')
+  3.     generate double `v'_dev = `v' - `v'_bar
+  4. }
+
+. 
+. label variable tasa_homicidios_bar "Tasa de homicidios promedio del municipio (entre)"
+
+. label variable tasa_homicidios_dev "Desviación de la tasa de homicidios (dentro)"
+
+. label variable ln_coca_bar         "Log de coca promedio del municipio (entre)"
+
+. label variable ln_coca_dev         "Desviación del log de coca (dentro)"
+
+. label variable ln_inversion_pc_bar "Log de inversión per cápita promedio (entre)"
+
+. label variable ln_inversion_pc_dev "Desviación del log de inversión per cápita (dentro)"
+
+. 
+. 
+. * ====================== PARCHE 2a DE C7 — INICIO ==============================
+. * [5.1] DESCOMPOSICIÓN DE LAS VARIABLES TERRITORIALES NUEVAS
+. * ------------------------------------------------------------------------------
+. * `iica` y `minas` NO son resultados educativos, de modo que a diferencia de
+. * `desercion_of` y `cob_neta_media` pueden entrar a los modelos como
+. * predictores. `tasa_hom_eb` sustituye a la tasa cruda en el modelo ML3b_eb.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[5.1] DESCOMPOSICIÓN DE LAS VARIABLES NUEVAS (C7)"
+[5.1] DESCOMPOSICIÓN DE LAS VARIABLES NUEVAS (C7)
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. foreach v in tasa_hom_eb iica {
+  2.     bysort cole_cod_mcpio_ubicacion: egen double `v'_bar = mean(`v')
+  3.     generate double `v'_dev = `v' - `v'_bar
+  4. }
+
+. 
+. label variable tasa_hom_eb_bar "Tasa suavizada promedio del municipio (entre)"
+
+. label variable tasa_hom_eb_dev "Desviación de la tasa suavizada (dentro)"
+
+. label variable iica_bar        "IICA promedio del municipio (entre)"
+
+. label variable iica_dev        "Desviación del IICA (dentro)"
+
+. 
+. display _newline "--- Variación entre y dentro: decide P1(i) y P2 ---"
+
+--- Variación entre y dentro: decide P1(i) y P2 ---
+
+. * P1(i) exige DE_dentro(tasa_hom_eb) < 28,66, la de la tasa cruda [Tabla 21].
+. * P2 exige DE_dentro/DE_total >= 0,20 para iica y para minas.
+. xtsum tasa_homicidios tasa_hom_eb iica minas
+
+Variable         |      Mean   Std. dev.       Min        Max |    Observations
+-----------------+--------------------------------------------+----------------
+tasa_h~s overall |  43.38911   46.51589          0   293.0238 |     N =     252
+         between |             37.00691   3.054605   158.7145 |     n =      42
+         within  |             28.66178  -107.6048   177.6984 |     T =       6
+                 |                                            |
+tasa_h~b overall |  43.67175    41.9343   2.508989   275.4351 |     N =     252
+         between |             33.33414   7.949103   149.4452 |     n =      42
+         within  |             25.87383  -95.20677   169.6616 |     T =       6
+                 |                                            |
+iica     overall |  .1565873   .1934862          0       1.72 |     N =     252
+         between |             .1643155   .0116667   .8383333 |     n =      42
+         within  |             .1047624   -.471746   1.038254 |     T =       6
+                 |                                            |
+minas    overall |  .8968254   4.255448          0         43 |     N =     252
+         between |              2.49714          0   13.83333 |     n =      42
+         within  |             3.463718  -12.93651   30.06349 |     T =       6
+
+. 
+. display _newline "--- Razón DE_dentro / DE_total ---"
+
+--- Razón DE_dentro / DE_total ---
+
+. foreach v in tasa_homicidios tasa_hom_eb iica minas {
+  2.     quietly xtsum `v'
+  3.     display "  `v': DE_total " %9.4f r(sd) ///
+>             "  DE_dentro " %9.4f r(sd_w) ///
+>             "  razón " %6.3f r(sd_w)/r(sd)
+  4. }
+  tasa_homicidios: DE_total   46.5159  DE_dentro   28.6618  razón  0.616
+  tasa_hom_eb: DE_total   41.9343  DE_dentro   25.8738  razón  0.617
+  iica: DE_total    0.1935  DE_dentro    0.1048  razón  0.541
+  minas: DE_total    4.2554  DE_dentro    3.4637  razón  0.814
+
+. 
+. display _newline "--- Verificación aritmética de la descomposición ---"
+
+--- Verificación aritmética de la descomposición ---
+
+. foreach v in tasa_hom_eb iica {
+  2.     generate double _chk = `v'_bar + `v'_dev - `v'
+  3.     quietly summarize _chk
+  4.     display "  `v': error máximo " %12.10f max(abs(r(max)), abs(r(min)))
+  5.     drop _chk
+  6. }
+  tasa_hom_eb: error máximo 0.0000000000
+  iica: error máximo 0.0000000000
+
+. * ======================= PARCHE 2a DE C7 — FIN ================================
+. 
+. 
+. display _newline "--- Descomposición de varianza del índice ---"
+
+--- Descomposición de varianza del índice ---
+
+. xtsum indice_vuln vuln_bar vuln_dev
+
+Variable         |      Mean   Std. dev.       Min        Max |    Observations
+-----------------+--------------------------------------------+----------------
+indice~n overall | -1.17e-17          1  -1.798766   3.841173 |     N =     252
+         between |             .9120242  -1.460557   2.215632 |     n =      42
+         within  |              .429862  -1.853106   1.625541 |     T =       6
+                 |                                            |
+vuln_bar overall | -4.79e-18   .9028946  -1.460557   2.215632 |     N =     252
+         between |             .9120242  -1.460557   2.215632 |     n =      42
+         within  |             5.32e-17  -1.16e-16   2.17e-16 |     T =       6
+                 |                                            |
+vuln_dev overall | -7.08e-18    .429862  -1.853106   1.625541 |     N =     252
+         between |             8.75e-17  -2.22e-16   2.59e-16 |     n =      42
+         within  |              .429862  -1.853106   1.625541 |     T =       6
+
+. 
+. display _newline "--- Descomposición de las tres dimensiones ---"
+
+--- Descomposición de las tres dimensiones ---
+
+. xtsum tasa_homicidios ln_coca ln_inversion_pc
+
+Variable         |      Mean   Std. dev.       Min        Max |    Observations
+-----------------+--------------------------------------------+----------------
+tasa_h~s overall |  43.38911   46.51589          0   293.0238 |     N =     252
+         between |             37.00691   3.054605   158.7145 |     n =      42
+         within  |             28.66178  -107.6048   177.6984 |     T =       6
+                 |                                            |
+ln_coca  overall |  2.561449   3.029797          0   9.129625 |     N =     252
+         between |             2.926514          0   8.947691 |     n =      42
+         within  |             .8864517  -.1020045   6.295732 |     T =       6
+                 |                                            |
+ln_~n_pc overall |  11.19005   .7826483   9.625678   13.14554 |     N =     252
+         between |              .773179   9.704599   12.98602 |     n =      42
+         within  |             .1632211   10.66249    11.6158 |     T =       6
+
+. 
+. * Verificación aritmética de la descomposición.
+. generate double _chk = vuln_bar + vuln_dev - indice_vuln
+
+. quietly summarize _chk
+
+. assert abs(r(max)) < 1e-8 & abs(r(min)) < 1e-8
+
+. display _newline "Verificado: el componente entre más el componente dentro"
+
+Verificado: el componente entre más el componente dentro
+
+. display "reconstruye el índice exactamente."
+reconstruye el índice exactamente.
+
+. drop _chk
+
+. 
+. * Los dos componentes son ortogonales por construcción. Se comprueba porque un
+. * valor distinto de cero indicaría un error en el cálculo de las medias.
+. quietly correlate vuln_bar vuln_dev
+
+. display "Correlación entre los dos componentes: " %8.6f r(rho) " (debe ser ~0)"
+Correlación entre los dos componentes: 0.000000 (debe ser ~0)
+
+. 
+. 
+. ********************************************************************************
+. * [6] PANEL DE CONTROL Y GUARDADO DEL NIVEL 3
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[6] PANEL DE CONTROL DEL NIVEL 3"
+[6] PANEL DE CONTROL DEL NIVEL 3
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. display _newline "--- Municipios con mayor vulnerabilidad promedio ---"
+
+--- Municipios con mayor vulnerabilidad promedio ---
+
+. preserve
+
+.     egen byte _t = tag(cole_cod_mcpio_ubicacion)
+
+.     keep if _t == 1
+(210 observations deleted)
+
+.     gsort -vuln_bar
+
+.     list cole_cod_mcpio_ubicacion vuln_bar tasa_homicidios_bar ///
+>          ln_coca_bar ln_inversion_pc_bar iica_bar in 1/10, clean noobs
+
+    cole_c~n    vuln_bar   tas~s_bar   ln_coca~r   ln_inve~r    iica_bar  
+       19050    2.215632   158.71445   7.8246887   11.294081   .83833333  
+       19256   1.8446974   69.532583   8.9476909   10.236025         .43  
+       19532   1.5579379   83.787321   6.2946465   10.299352   .18666667  
+       19698   1.2115875   85.430435   2.1435931   9.7045992        .155  
+       19212   1.1744955   131.86537   1.9882964   10.839346   .61166667  
+       19780   1.1711673   80.953061   6.2985339   10.986115   .24833333  
+       19110   1.1096462   82.745835   5.8110799   10.995178        .235  
+       19573   .92855576   109.66593           0    10.16018   .14833333  
+       19473   .71367061   26.444899   6.0974799   10.509171         .08  
+       19130   .62586823    29.62704   5.8037499    10.66376   .10166667  
+
+. restore
+
+. 
+. display _newline "--- Municipios con mayor aumento de la vulnerabilidad ---"
+
+--- Municipios con mayor aumento de la vulnerabilidad ---
+
+. preserve
+
+.     keep cole_cod_mcpio_ubicacion year indice_vuln
+
+.     quietly reshape wide indice_vuln, i(cole_cod_mcpio_ubicacion) j(year)
+
+.     generate double cambio = indice_vuln2023 - indice_vuln2018
+
+.     gsort -cambio
+
+.     list cole_cod_mcpio_ubicacion indice_vuln2018 indice_vuln2023 cambio ///
+>          in 1/10, clean noobs
+
+    cole_c~n   indic~2018   indic~2023      cambio  
+       19455   -.51619294    1.4675631   1.9837561  
+       19698    .37571692    2.2519168   1.8761998  
+       19050    .36252613     2.195499   1.8329729  
+       19137   -.59892906    1.1834915   1.7824206  
+       19290   -1.7463923   -.20502948   1.5413629  
+       19110    .48080986    1.9781259    1.497316  
+       19212   -.50755679    .98259147   1.4901483  
+       19532    .73471279    2.0009207   1.2662079  
+       19256    1.0826402    2.3340889   1.2514487  
+       19573    .14950141    1.3146364   1.1651349  
+
+. restore
+
+. 
+. isid cole_cod_mcpio_ubicacion year
+
+. compress
+  (0 bytes saved)
+
+. save "N3_Municipios_PCA.dta", replace
+file N3_Municipios_PCA.dta saved
+
+. 
+. 
+. ********************************************************************************
+. * [7] INCORPORACIÓN A LA BASE MULTINIVEL
+. ********************************************************************************
+. * EL `keep` DE ESTE BLOQUE ES EL ESLABÓN CRÍTICO DE C7. Si una variable no
+. * está en esta lista, no llega a la base de estudiantes y el script 16 no la
+. * encuentra, aunque sí exista en N3_Municipios_PCA.dta.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[7] INCORPORACIÓN A LA BASE MULTINIVEL"
+[7] INCORPORACIÓN A LA BASE MULTINIVEL
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. keep cole_cod_mcpio_ubicacion year indice_vuln indice_vuln_anual ///
+>      vuln_bar vuln_dev ///
+>      tasa_homicidios_bar tasa_homicidios_dev ///
+>      ln_coca_bar ln_coca_dev ///
+>      ln_inversion_pc_bar ln_inversion_pc_dev ///
+>      tasa_hom_eb tasa_hom_eb_bar tasa_hom_eb_dev ///
+>      iica iica_bar iica_dev minas tasa_hom_td ///
+>      desercion_of cob_neta_media
+
+. 
+. tempfile n3pca
+
+. save `n3pca', replace
+(file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_4ac0_000003.tmp not found)
+file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_4ac0_000003.tmp saved as .dta format
+
+. 
+. use "Base_Multinivel_2018_2023.dta", clear
+
+. 
+. merge m:1 cole_cod_mcpio_ubicacion year using `n3pca', generate(_m_pca)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                            69,750  (_m_pca==3)
+    -----------------------------------------
+
+. tabulate _m_pca
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+            Matched (3) |     69,750      100.00      100.00
+------------------------+-----------------------------------
+                  Total |     69,750      100.00
+
+. assert _m_pca == 3
+
+. drop _m_pca
+
+. 
+. display _newline "Índice incorporado a las " _N " observaciones de estudiante."
+
+Índice incorporado a las 69750 observaciones de estudiante.
+
+. 
+. * Comprobación de que el índice no tiene faltantes: es la condición que permite
+. * usarlo como variable auxiliar completa en el modelo de imputación.
+. quietly count if missing(indice_vuln)
+
+. display "Estudiantes sin valor del índice: " r(N) " (debe ser 0)"
+Estudiantes sin valor del índice: 0 (debe ser 0)
+
+. assert !missing(indice_vuln)
+
+. 
+. * C7: la misma comprobación para la tasa suavizada.
+. quietly count if missing(tasa_hom_eb)
+
+. display "Estudiantes sin tasa suavizada: " r(N) " (debe ser 0)"
+Estudiantes sin tasa suavizada: 0 (debe ser 0)
+
+. assert !missing(tasa_hom_eb)
+
+. 
+. display _newline "--- Índice en la base de estudiantes, por año ---"
+
+--- Índice en la base de estudiantes, por año ---
+
+. tabstat indice_vuln vuln_bar vuln_dev, by(year) stat(n mean sd) format(%9.4f)
+
+Summary statistics: N, Mean, SD
+Group variable: year (Año de presentación de la prueba)
+
+    year |  indice~n  vuln_bar  vuln_dev
+---------+------------------------------
+    2018 |  1.15e+04  1.15e+04  1.15e+04
+         |   -0.1670    0.1989   -0.3659
+         |    0.5481    0.7787    0.4328
+---------+------------------------------
+    2019 |  1.15e+04  1.15e+04  1.15e+04
+         |    0.0532    0.2043   -0.1511
+         |    0.7469    0.7814    0.2592
+---------+------------------------------
+    2020 |  1.10e+04  1.10e+04  1.10e+04
+         |    0.1514    0.2200   -0.0686
+         |    0.8120    0.7840    0.2548
+---------+------------------------------
+    2021 |  1.17e+04  1.17e+04  1.17e+04
+         |    0.2381    0.2195    0.0186
+         |    0.9549    0.7837    0.3128
+---------+------------------------------
+    2022 |  1.18e+04  1.18e+04  1.18e+04
+         |    0.4027    0.2064    0.1962
+         |    0.9595    0.7735    0.3092
+---------+------------------------------
+    2023 |  1.24e+04  1.24e+04  1.24e+04
+         |    0.5867    0.2192    0.3675
+         |    0.9631    0.7822    0.3616
+---------+------------------------------
+   Total |  6.98e+04  6.98e+04  6.98e+04
+         |    0.2171    0.2114    0.0057
+         |    0.8815    0.7806    0.4059
+----------------------------------------
+
+. 
+. display _newline "--- Variables de C7 en la base de estudiantes, por año ---"
+
+--- Variables de C7 en la base de estudiantes, por año ---
+
+. tabstat tasa_homicidios tasa_hom_eb iica, by(year) ///
+>     stat(n mean sd) format(%9.4f)
+
+Summary statistics: N, Mean, SD
+Group variable: year (Año de presentación de la prueba)
+
+    year |  tasa_h~s  tasa_h~b      iica
+---------+------------------------------
+    2018 |  1.15e+04  1.15e+04  1.15e+04
+         |   20.9380   21.0501    0.1076
+         |   19.5737   15.7729    0.1064
+---------+------------------------------
+    2019 |  1.15e+04  1.15e+04  1.15e+04
+         |   36.8503   36.7823    0.1475
+         |   35.3715   32.2032    0.1559
+---------+------------------------------
+    2020 |  1.10e+04  1.10e+04  1.10e+04
+         |   42.3756   42.3990    0.1400
+         |   40.3752   37.3655    0.1749
+---------+------------------------------
+    2021 |  1.17e+04  1.17e+04  1.17e+04
+         |   49.7119   49.6886    0.1505
+         |   49.8687   46.6111    0.1856
+---------+------------------------------
+    2022 |  1.18e+04  1.18e+04  1.18e+04
+         |   50.2332   50.0126    0.1321
+         |   48.7979   45.3233    0.2182
+---------+------------------------------
+    2023 |  1.24e+04  1.24e+04  1.24e+04
+         |   59.5834   59.3986    0.1471
+         |   43.7991   40.5187    0.1646
+---------+------------------------------
+   Total |  6.98e+04  6.98e+04  6.98e+04
+         |   43.5500   43.4869    0.1376
+         |   42.8382   39.7719    0.1718
+----------------------------------------
+
+. 
+. compress
+  (0 bytes saved)
+
+. save "Base_Multinivel_PCA.dta", replace
+file Base_Multinivel_PCA.dta saved
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "ÍNDICE CONSTRUIDO: Base_Multinivel_PCA.dta"
+ÍNDICE CONSTRUIDO: Base_Multinivel_PCA.dta
+
+. display "NUEVO EN v3: tasa_hom_eb e iica, con su descomposición de Mundlak."
+NUEVO EN v3: tasa_hom_eb e iica, con su descomposición de Mundlak.
+
+. display "Siguiente: 07c_actualizar_nivel3.do"
+Siguiente: 07c_actualizar_nivel3.do
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase6
+      name:  fase6
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_06_pca_vulnerabilidad_2
+> 0261019.log
+  log type:  text
+ closed on:  19 Oct 2026, 10:31:57
+---------------------------------------------------------------------------------------------

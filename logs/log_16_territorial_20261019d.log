@@ -1,0 +1,2034 @@
+---------------------------------------------------------------------------------------------
+      name:  fase16
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_16_territorial_20261019
+> d.log
+  log type:  text
+ opened on:  19 Oct 2026, 11:02:37
+
+. 
+. * ----------------------------------------------------------------------
+. * INTERRUPTORES DE BLOQUE
+. * ----------------------------------------------------------------------
+. * ESTADO AL 19/10/2026, 10:55
+. *   [1]   corrio a las 10:32 [log_16_territorial_20261019b.log]. HECHO.
+. *   [1.8] corrio a las 10:52 [log_16_territorial_20261019c.log]. HECHO.
+. *   [2]   corrio a las 10:52 [log_16_territorial_20261019c.log]. HECHO.
+. *   [3]   ABORTO con r(111): el 16 se lanzo 18 segundos ANTES del 16a, de modo
+. *         que Base_Estimacion.dta todavia no tenia iica_bar. El 16a termino a
+. *         las 10:54:44 y la base ya las tiene [log_16a_rehacer_base_20261019c,
+. *         bloque 4: iica_bar e iica_dev sin faltantes y constantes dentro de
+. *         cada municipio-ano].
+. *   [4] y [5] no llegaron a correr.
+. *
+. * Esta corrida hace SOLO lo que falta. Los bloques [1.8] y [2] quedan en 0
+. * porque sus resultados son validos: leen N3_Municipios_PCA.dta y
+. * N2_Sedes_2018_2023.dta, que estaban correctos desde las 10:31:57 y no
+. * dependen de Base_Estimacion.dta. Volver a correrlos solo duplicaria salida.
+. * ----------------------------------------------------------------------
+. local hacer_valid  = 0    // [1.8] HECHO en log_16_territorial_20261019c
+
+. local hacer_deser  = 0    // [2]   HECHO en log_16_territorial_20261019c
+
+. local hacer_ml     = 1    // [3] ML3b_iica, un solo modelo: 30-50 min
+
+. local hacer_posg   = 1    // [4] posgrado entre sedes: 8-15 min
+
+. local hacer_tres   = 1    // [5] tres procedimientos para iica: 15-25 min
+
+. 
+. timer clear
+
+. timer on 1
+
+. 
+. global v_n1 mujer edad repitente lectura_30min libros_26omas ///
+>             trabaja_mas20 internet_hogar computador_hogar
+
+. 
+. global v_n2 ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>             dotacion_tic rural ju_unica tecnico tecnico_academico ///
+>             cole_femenino
+
+. 
+. global RE "|| mcpio_id: || mcpio_id: R.year || sede_id: || sede_anio:"
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "ESTRUCTURA ALEATORIA: $RE"
+ESTRUCTURA ALEATORIA: || mcpio_id: || mcpio_id: R.year || sede_id: || sede_anio:
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. 
+. ********************************************************************************
+. * [0.9] LA REGLA, ACTUALIZADA TRAS LA CORRIDA DEL BLOQUE [1]
+. ********************************************************************************
+. 
+. display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+
+. display "[0.9] CRITERIO VIGENTE"
+[0.9] CRITERIO VIGENTE
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. display "ESTADO DE LAS PRECONDICIONES, evaluadas el 19/10/2026 a las 10:32"
+ESTADO DE LAS PRECONDICIONES, evaluadas el 19/10/2026 a las 10:32
+
+. display "[log_16_territorial_20261019b.log, bloque 1.3 y 1.4]:"
+[log_16_territorial_20261019b.log, bloque 1.3 y 1.4]:
+
+. display "   P1(i)  25,8738 < 28,66                      SI"
+   P1(i)  25,8738 < 28,66                      SI
+
+. display "   P1(ii) 0,8959 frente a 0,8976               NO"
+   P1(ii) 0,8959 frente a 0,8976               NO
+
+. display "   P2     razon de iica 0,541 >= 0,20          SI"
+   P2     razon de iica 0,541 >= 0,20          SI
+
+. display ""
+
+
+. display "CONSECUENCIA. P1 exigia las dos y falla: el suavizado se declara NO"
+CONSECUENCIA. P1 exigia las dos y falla: el suavizado se declara NO
+
+. display "   INFORMATIVO. ML3b_eb se retira y ningun coeficiente de"
+   INFORMATIVO. ML3b_eb se retira y ningun coeficiente de
+
+. display "   tasa_hom_eb se lee. El margen de P1(ii) es 0,0017, una septima"
+   tasa_hom_eb se lee. El margen de P1(ii) es 0,0017, una septima
+
+. display "   parte del error estandar de una correlacion de 0,90 sobre 238"
+   parte del error estandar de una correlacion de 0,90 sobre 238
+
+. display "   observaciones (derivado), de modo que la cifra no admite mas"
+   observaciones (derivado), de modo que la cifra no admite mas
+
+. display "   precision de la que tiene; pero el argumento que cierra el punto"
+   precision de la que tiene; pero el argumento que cierra el punto
+
+. display "   no es ese, sino que las dos series son la misma variable:"
+   no es ese, sino que las dos series son la misma variable:
+
+. display "   razon dentro/total 0,616 frente a 0,617, correlacion 0,9968 en"
+   razon dentro/total 0,616 frente a 0,617, correlacion 0,9968 en
+
+. display "   niveles y 0,9940 en desviaciones dentro del municipio."
+   niveles y 0,9940 en desviaciones dentro del municipio.
+
+. display ""
+
+
+. display "FAMILIAS VIGENTES."
+FAMILIAS VIGENTES.
+
+. display "   F1 = {iica_dev}. UMBRAL 0,025, NO 0,05: la familia se declaro con"
+   F1 = {iica_dev}. UMBRAL 0,025, NO 0,05: la familia se declaro con
+
+. display "        dos miembros y uno se retiro por una precondicion fijada de"
+        dos miembros y uno se retiro por una precondicion fijada de
+
+. display "        antemano. Relajar el umbral seria ganar potencia por haber"
+        antemano. Relajar el umbral seria ganar potencia por haber
+
+. display "        mirado el bloque [1]."
+        mirado el bloque [1].
+
+. display "   F2 = canal de desercion, una prueba confirmatoria al 5%."
+   F2 = canal de desercion, una prueba confirmatoria al 5%.
+
+. display "   F3 = z_posgrado_bar, una prueba al 5%."
+   F3 = z_posgrado_bar, una prueba al 5%.
+
+. display "   Los componentes _bar NO son confirmatorios (apartado 3.6.3)."
+   Los componentes _bar NO son confirmatorios (apartado 3.6.3).
+
+. display "   Todo lo demas es EXPLORATORIO, incluido ln_ing_trib_pc_bar y"
+   Todo lo demas es EXPLORATORIO, incluido ln_ing_trib_pc_bar y
+
+. display "   cualquier coeficiente de minas."
+   cualquier coeficiente de minas.
+
+. display ""
+
+
+. display "PROMOCION. iica_dev se declara robusto solo si p <= 0,025 en los TRES"
+PROMOCION. iica_dev se declara robusto solo si p <= 0,025 en los TRES
+
+. display "   procedimientos del apartado 3.6.1. En uno o dos: evidencia"
+   procedimientos del apartado 3.6.1. En uno o dos: evidencia
+
+. display "   parcial. En ninguno: nulo, con su EMD como cota."
+   parcial. En ninguno: nulo, con su EMD como cota.
+
+. display ""
+
+
+. display "SI iica_dev SOBREVIVE Y LOS HOMICIDIOS NO, no se concluye que el"
+SI iica_dev SOBREVIVE Y LOS HOMICIDIOS NO, no se concluye que el
+
+. display "   conflicto importe y la violencia letal no, sin contrastarlo: en"
+   conflicto importe y la violencia letal no, sin contrastarlo: en
+
+. display "   desviaciones dentro del municipio las dos comparten el 23% de su"
+   desviaciones dentro del municipio las dos comparten el 23% de su
+
+. display "   varianza (0,4832 al cuadrado, derivado). El bloque [3] las estima"
+   varianza (0,4832 al cuadrado, derivado). El bloque [3] las estima
+
+. display "   juntas para que el contraste sea posible."
+   juntas para que el contraste sea posible.
+
+. display ""
+
+
+. display "DESERCION. YA RESUELTO en el bloque [2]: NO SE DETECTA, con cota de"
+DESERCION. YA RESUELTO en el bloque [2]: NO SE DETECTA, con cota de
+
+. display "   0,001543 por DE dentro. Conforme a lo decidido antes de correr, la"
+   0,001543 por DE dentro. Conforme a lo decidido antes de correr, la
+
+. display "   frase de 4.4.3 que declara la via descartada se retira igual, y"
+   frase de 4.4.3 que declara la via descartada se retira igual, y
+
+. display "   con ella su eco en 5.4: el diseno de F.4 estaba mal planteado y un"
+   con ella su eco en 5.4: el diseno de F.4 estaba mal planteado y un
+
+. display "   diseno mal planteado no descarta nada. Lo que la sustituye es mas"
+   diseno mal planteado no descarta nada. Lo que la sustituye es mas
+
+. display "   fuerte que lo que habia, porque acota."
+   fuerte que lo que habia, porque acota.
+
+. display ""
+
+
+. display "TASA DE TERRIDATA. Entra SOLO como validacion descriptiva de 4.1.4 y"
+TASA DE TERRIDATA. Entra SOLO como validacion descriptiva de 4.1.4 y
+
+. display "   de las limitaciones. No se estima ningun modelo con ella: fue"
+   de las limitaciones. No se estima ningun modelo con ella: fue
+
+. display "   examinada despues de ver datos y un canal elegido asi no puede"
+   examinada despues de ver datos y un canal elegido asi no puede
+
+. display "   ser confirmatorio."
+   ser confirmatorio.
+
+. display ""
+
+
+. display "ALCANCE DEL HALLAZGO DE FUENTES, precisado por el bloque [1.8]."
+ALCANCE DEL HALLAZGO DE FUENTES, precisado por el bloque [1.8].
+
+. display "   Sobre el panel balanceado de 35 municipios, la razon de medias"
+   Sobre el panel balanceado de 35 municipios, la razon de medias
+
+. display "   Policia/TerriData sube de 0,486 a 1,025 de forma monotona y el"
+   Policia/TerriData sube de 0,486 a 1,025 de forma monotona y el
+
+. display "   crecimiento es x2,980 frente a x1,411. PERO la concordancia en"
+   crecimiento es x2,980 frente a x1,411. PERO la concordancia en
+
+. display "   DESVIACIONES dentro del municipio es ESTABLE, no creciente:"
+   DESVIACIONES dentro del municipio es ESTABLE, no creciente:
+
+. display "   0,8309 / 0,7237 / 0,8179 / 0,8219 / 0,8834 / 0,8296, con 0,7781 en"
+   0,8309 / 0,7237 / 0,8179 / 0,8219 / 0,8834 / 0,8296, con 0,7781 en
+
+. display "   el conjunto. La discrepancia esta por tanto en el NIVEL y no en la"
+   el conjunto. La discrepancia esta por tanto en el NIVEL y no en la
+
+. display "   variacion temporal relativa, y los efectos fijos de ano de ML3b"
+   variacion temporal relativa, y los efectos fijos de ano de ML3b
+
+. display "   absorben la parte comun a todos los municipios. Se declara como"
+   absorben la parte comun a todos los municipios. Se declara como
+
+. display "   limitacion de validez descriptiva (Tabla 6, 4.1.4, 1.6) y como"
+   limitacion de validez descriptiva (Tabla 6, 4.1.4, 1.6) y como
+
+. display "   cuarta explicacion POSIBLE del nulo, NO como amenaza establecida"
+   cuarta explicacion POSIBLE del nulo, NO como amenaza establecida
+
+. display "   al coeficiente. Lo que no absorben los efectos de ano es una"
+   al coeficiente. Lo que no absorben los efectos de ano es una
+
+. display "   mejora heterogenea entre municipios; la estabilidad de las"
+   mejora heterogenea entre municipios; la estabilidad de las
+
+. display "   desviaciones sugiere que no domina, pero no lo prueba, y asi se"
+   desviaciones sugiere que no domina, pero no lo prueba, y asi se
+
+. display "   escribe."
+   escribe.
+
+. display ""
+
+
+. display "POSGRADO. Relevante solo si cambia de signo o cruza el 5% en"
+POSGRADO. Relevante solo si cambia de signo o cruza el 5% en
+
+. display "   direccion contraria. Si no, acotacion (Regla 3 de C5)."
+   direccion contraria. Si no, acotacion (Regla 3 de C5).
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. 
+. ********************************************************************************
+. * [1.8] VALIDACION DE FUENTES SOBRE EL PANEL BALANCEADO
+. ********************************************************************************
+. * El bloque [1] de la corrida anterior comparo las dos series sobre 238 de las
+. * 252 observaciones, con entre 38 y 41 municipios segun el ano. Esa comparacion
+. * mezcla el nivel con la composicion: un ano con menos municipios reportados
+. * puede dar una media distinta sin que cambie nada.
+. *
+. * Aqui se repite sobre el subconjunto de municipios con los SEIS anos de
+. * TerriData, que es la unica comparacion que admite lectura temporal.
+. 
+. if `hacer_valid' == 1 {
+. 
+.     display _newline(2) "{hline 78}"
+.     display "[1.8] VALIDACION DE FUENTES, PANEL BALANCEADO"
+.     display "{hline 78}"
+. 
+.     use "N3_Municipios_PCA.dta", clear
+.     xtset cole_cod_mcpio_ubicacion year
+. 
+.     bysort cole_cod_mcpio_ubicacion: egen byte _nd = total(!missing(tasa_hom_td))
+. 
+.     quietly levelsof cole_cod_mcpio_ubicacion if _nd == 6, local(mb)
+.     display "Municipios con los seis anos de TerriData: " wordcount("`mb'") ///
+>             " de 42"
+.     quietly levelsof cole_cod_mcpio_ubicacion if _nd < 6, local(mi)
+.     display "Municipios con algun ano faltante: " wordcount("`mi'")
+.     if wordcount("`mi'") > 0 {
+.         display "  Codigos: `mi'"
+.     }
+. 
+.     display _newline "--- Cuantos anos faltan, por municipio incompleto ---"
+.     preserve
+.         keep if _nd < 6
+.         egen byte _t = tag(cole_cod_mcpio_ubicacion)
+.         keep if _t == 1
+.         list cole_cod_mcpio_ubicacion _nd, clean noobs
+.     restore
+. 
+.     preserve
+.         keep if _nd == 6
+. 
+.         display _newline "--- Las dos series sobre el panel balanceado ---"
+.         tabstat tasa_homicidios tasa_hom_eb tasa_hom_td, ///
+>             by(year) stat(n mean sd p50 min max) format(%9.3f)
+. 
+.         display _newline "--- Razon Policia / TerriData, por ano ---"
+.         display "    (si la serie de la Policia estuviera completa desde el"
+.         display "     principio, esta razon deberia ser estable)"
+.         generate double _ratio = tasa_homicidios / tasa_hom_td if tasa_hom_td > 0
+.         forvalues y = 2018/2023 {
+  2.             quietly summarize tasa_homicidios if year == `y', meanonly
+  3.             local mp = r(mean)
+  4.             quietly summarize tasa_hom_td if year == `y', meanonly
+  5.             local mt = r(mean)
+  6.             display "  `y': Policia " %8.3f `mp' "   TerriData " %8.3f `mt' ///
+>                     "   razon de medias " %6.3f `mp'/`mt'
+  7.         }
+.         drop _ratio
+. 
+.         display _newline "--- Crecimiento 2018-2023 de cada serie ---"
+.         foreach v in tasa_homicidios tasa_hom_td {
+  2.             quietly summarize `v' if year == 2018, meanonly
+  3.             local v0 = r(mean)
+  4.             quietly summarize `v' if year == 2023, meanonly
+  5.             display "  `v': " %8.3f `v0' " -> " %8.3f r(mean) ///
+>                     "   factor " %6.3f r(mean)/`v0'
+  6.         }
+. 
+.         display _newline "--- Concordancia por ano, panel balanceado ---"
+.         forvalues y = 2018/2023 {
+  2.             quietly correlate tasa_homicidios tasa_hom_td if year == `y'
+  3.             display "  `y': r = " %7.4f r(rho) "   (N = " r(N) ")"
+  4.         }
+. 
+.         display _newline "--- Variacion entre y dentro, las dos fuentes ---"
+.         xtset cole_cod_mcpio_ubicacion year
+.         xtsum tasa_homicidios tasa_hom_td
+. 
+.         display _newline "--- Concordancia en desviaciones dentro del municipio ---"
+.         bysort cole_cod_mcpio_ubicacion: egen double _tdb = mean(tasa_hom_td)
+.         generate double _tdd = tasa_hom_td - _tdb
+.         bysort cole_cod_mcpio_ubicacion: egen double _thb = mean(tasa_homicidios)
+.         generate double _thd = tasa_homicidios - _thb
+.         correlate _thd _tdd
+.         forvalues y = 2018/2023 {
+  2.             quietly correlate _thd _tdd if year == `y'
+  3.             display "  `y': r de las desviaciones = " %7.4f r(rho)
+  4.         }
+.         drop _tdb _tdd _thb _thd
+.     restore
+. 
+.     display _newline "{hline 78}"
+.     display "LECTURA. Si la razon de medias sube de forma monotona y la"
+.     display "concordancia tambien, el patron es el de una fuente que completa"
+.     display "su cobertura. Eso NO invalida el Objetivo 4, pero anade una"
+.     display "cuarta explicacion al nulo de 4.4.3 que hay que declarar: parte"
+.     display "de la variacion dentro del municipio puede ser mejora de"
+.     display "registro y no cambio real. Va a 4.1.4, Tabla 6 y 1.6."
+.     display "{hline 78}"
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [2] CANAL DE DESERCION Y SELECCION: EL SUSTITUTO DE F.4
+. ********************************************************************************
+. * F.4 correlacionaba el cambio en homicidios con el cambio en el NUMERO BRUTO
+. * de evaluados, que confunde seleccion con demografia.
+. *
+. *   [2.A] principal: razon de evaluados sobre matricula de la sede
+. *   [2.B] corroboracion: tasa de desercion intraanual del municipio
+. *
+. * NINGUNA ES LA TASA DE SUPERVIVENCIA DE GRADO NOVENO. La matricula por grado
+. * no existe en las fuentes empleadas [02_panel_sedes_N2_v2.do, bloque 1]. Va
+. * declarado como limitacion.
+. *
+. * TIMING: desercion_of y tasa_homicidios estan ambas en year_dato, de modo que
+. * la asociacion es CONTEMPORANEA en tiempo real, no rezagada.
+. *
+. * tasa_hom_eb NO aparece en este bloque: retirada por P1.
+. 
+. if `hacer_deser' == 1 {
+. 
+.     display _newline(2) "{hline 78}"
+.     display "[2] CANAL DE DESERCION Y SELECCION"
+.     display "{hline 78}"
+. 
+.     capture which boottest
+.     if _rc != 0 {
+.         capture ssc install boottest, replace
+.         if _rc != 0 {
+.             display as error "No se pudo instalar boottest. Sin bootstrap"
+.             display as error "salvaje no se aplica la regla de 3.6.1."
+.         }
+.     }
+. 
+.     * ------------------------------------------------------------------
+.     * [2.A] PRINCIPAL: razon de supervivencia aproximada, por sede
+.     * ------------------------------------------------------------------
+.     capture confirm file "N2_Sedes_2018_2023.dta"
+.     if _rc != 0 {
+.         display as error "No encuentro N2_Sedes_2018_2023.dta."
+.         display as error "Es la salida del 03_panel_tic_N2_v2.do. Ajustar el"
+.         display as error "nombre del archivo en esta linea."
+.         exit 601
+.     }
+. 
+.     use "N2_Sedes_2018_2023.dta", clear
+. 
+.     display _newline "--- Insumos de la razon ---"
+.     misstable summarize evaluados_sede matricula, all
+. 
+.     generate double superv = evaluados_sede / matricula ///
+>         if matricula > 0 & !missing(matricula)
+.     label variable superv "Evaluados en once sobre matricula total de la sede"
+. 
+.     quietly count if missing(superv)
+.     display "Sede-ano sin razon calculable: " r(N) " de " _N
+. 
+.     display _newline "--- Distribucion de la razon, por ano ---"
+.     tabstat superv, by(year) stat(n mean sd p10 p50 p90 min max) format(%9.4f)
+. 
+.     merge m:1 cole_cod_mcpio_ubicacion year using "N3_Municipios_PCA.dta", ///
+>         keep(master match) keepusing(tasa_homicidios iica ///
+>         desercion_of cob_neta_media) generate(_m_n3)
+.     tabulate _m_n3
+.     assert _m_n3 == 3
+.     drop _m_n3
+. 
+.     egen long sede_id = group(cole_cod_dane_sede)
+.     xtset sede_id year
+. 
+.     display _newline "--- Variacion de la razon entre y dentro de la sede ---"
+.     xtsum superv
+. 
+.     * DE dentro del municipio de la variable explicativa, para el EMD.
+.     preserve
+.         keep cole_cod_mcpio_ubicacion year tasa_homicidios
+.         duplicates drop
+.         xtset cole_cod_mcpio_ubicacion year
+.         quietly xtsum tasa_homicidios
+.         scalar sdw_h = r(sd_w)
+.     restore
+.     display _newline "DE dentro del municipio, tasa cruda: " %8.4f sdw_h
+. 
+.     display _newline "--- [2.A.1] PRUEBA CONFIRMATORIA DE F2 ---"
+.     display "Efectos fijos de sede y de ano, errores agrupados por municipio."
+.     xtreg superv tasa_homicidios i.year, fe ///
+>         vce(cluster cole_cod_mcpio_ubicacion)
+.     estimates save "C7_superv_fe_`hoy'.ster", replace
+. 
+.     scalar b_superv   = _b[tasa_homicidios]
+.     scalar se_superv  = _se[tasa_homicidios]
+.     quietly test tasa_homicidios
+.     scalar p_superv   = r(p)
+.     scalar emd_superv = 2.802 * se_superv * sdw_h
+.     display _newline "  beta por DE dentro: " %10.6f b_superv*sdw_h
+.     display "  p agrupado:         " %6.4f p_superv
+.     display "  EMD por DE dentro:  " %10.6f emd_superv
+. 
+.     capture noisily boottest tasa_homicidios, weighttype(webb) reps(9999) ///
+>         seed(2026) nograph
+.     if _rc == 0 {
+.         display "  p bootstrap salvaje: " %6.4f r(p)
+.     }
+. 
+.     display _newline "--- [2.A.2] Verificacion con el denominador rezagado ---"
+.     * Solo cubre las cohortes 2020-2023: la matricula arranca en 2018.
+.     generate double superv_l2 = evaluados_sede / L2.matricula ///
+>         if L2.matricula > 0 & !missing(L2.matricula)
+.     quietly count if !missing(superv_l2)
+.     display "  Sede-ano con razon rezagada: " r(N)
+.     capture noisily xtreg superv_l2 tasa_homicidios i.year, fe ///
+>         vce(cluster cole_cod_mcpio_ubicacion)
+. 
+.     * ------------------------------------------------------------------
+.     * [2.B] CORROBORACION: desercion intraanual del municipio
+.     * ------------------------------------------------------------------
+.     display _newline(2) "--- [2.B] DESERCION MUNICIPAL ---"
+. 
+.     use "N3_Municipios_PCA.dta", clear
+.     xtset cole_cod_mcpio_ubicacion year
+. 
+.     * ADVERTENCIA DE SERIE: repitencia_of pasa de ~1% a ~6% entre 2019 y 2020
+.     * [log_04, bloque 5], lo que delata un cambio de criterio de reporte en la
+.     * serie educativa de TerriData. desercion_of cae a 1,73 ese mismo ano,
+.     * compatible con las politicas de promocion de la pandemia. Los efectos de
+.     * ano absorben el nivel, no un cambio en lo que mide el indicador.
+.     display _newline "--- Desercion y repitencia por ano: quiebre de reporte ---"
+.     tabstat desercion_of repitencia_of cob_neta_media, ///
+>         by(year) stat(n mean sd min max) format(%9.3f)
+. 
+.     quietly xtsum tasa_homicidios
+.     scalar sdw_h2 = r(sd_w)
+. 
+.     display _newline "--- Desercion sobre homicidios, efectos fijos ---"
+.     xtreg desercion_of tasa_homicidios i.year, fe ///
+>         vce(cluster cole_cod_mcpio_ubicacion)
+.     estimates save "C7_deser_mcpio_`hoy'.ster", replace
+.     display "  beta por DE dentro: " %10.6f _b[tasa_homicidios]*sdw_h2
+.     display "  EMD por DE dentro:  " %10.6f ///
+>         2.802*_se[tasa_homicidios]*sdw_h2
+.     capture noisily boottest tasa_homicidios, weighttype(webb) reps(9999) ///
+>         seed(2026) nograph
+. 
+.     * ------------------------------------------------------------------
+.     * [2.C] SECUNDARIO Y EXPLORATORIO: cobertura en media
+.     * ------------------------------------------------------------------
+.     * El profesor pide cuantificar la seleccion con la cobertura en media.
+.     * No esta en ninguna familia declarada: se reporta, no se promueve.
+.     display _newline "--- [2.C] EXPLORATORIO: cobertura neta en media ---"
+.     xtreg cob_neta_media tasa_homicidios i.year, fe ///
+>         vce(cluster cole_cod_mcpio_ubicacion)
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [3] ML3b CON EL IICA
+. ********************************************************************************
+. * UN SOLO MODELO. ML3b_eb retirado por P1.
+. *
+. * Se conserva la tasa CRUDA junto al IICA para que el unico cambio frente a la
+. * Tabla 13 sea la incorporacion del indicador adicional de conflicto, y para
+. * que el contraste entre ambas medidas sea posible dentro del mismo modelo:
+. * en desviaciones dentro del municipio comparten el 23% de su varianza.
+. 
+. if `hacer_ml' == 1 {
+. 
+.     display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+.     display "[3] ML3b_iica"
+[3] ML3b_iica
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     use "Base_Estimacion.dta", clear
+. 
+.     foreach v in iica_bar iica_dev {
+  2.         capture confirm variable `v'
+  3.         if _rc != 0 {
+  4.             display as error "`v' no esta en Base_Estimacion.dta."
+  5.             display as error "Correr 07c y 16a_rehacer_base.do antes."
+  6.             exit 111
+  7.         }
+  8.     }
+. 
+.     foreach v in mcpio_anio sede_anio {
+  2.         capture mi unregister `v'
+  3.         capture drop `v'
+  4.     }
+.     egen long mcpio_anio = group(cole_cod_mcpio_ubicacion year)
+.     egen long sede_anio  = group(cole_cod_dane_sede year)
+.     mi register regular mcpio_anio sede_anio
+.     mi update
+. 
+.     quietly count if missing(sede_anio)
+.     display "Filas sin sede_anio: " r(N) " (debe ser 0)"
+Filas sin sede_anio: 0 (debe ser 0)
+.     assert r(N) == 0
+. 
+.     timer clear 2
+.     timer on 2
+. 
+.     display _newline "--- ML3b_iica ---"
+
+--- ML3b_iica ---
+.     mi estimate, dots post: mixed punt_global c_inse $v_n1 $v_n2      ///
+>         tasa_homicidios_bar tasa_homicidios_dev                       ///
+>         iica_bar iica_dev                                             ///
+>         ln_coca_bar ln_coca_dev                                       ///
+>         ln_inversion_pc_bar ln_inversion_pc_dev ib2018.year $RE , reml
+
+Imputations (20):
+  .........10.........20 done
+
+Multiple-imputation estimates                   Imputations       =         20
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0187
+                                                Largest FMI       =     0.1105
+DF adjustment:   Large sample                   DF:     min       =   1,588.67
+                                                        avg       =   1.89e+08
+                                                        max       =   2.77e+09
+Model F test:       Equal FMI                   F(  32, 1.3e+06)  =     224.94
+                                                Prob > F          =     0.0000
+
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+               c_inse |    .278168   .0271681    10.24   0.000     .2249134    .3314227
+                mujer |  -8.215346   .2769351   -29.67   0.000    -8.758129   -7.672563
+                 edad |  -7.477744   .1241264   -60.24   0.000    -7.721028   -7.234461
+            repitente |   5.933877   .4167022    14.24   0.000     5.117155    6.750598
+        lectura_30min |   6.795794   .2922607    23.25   0.000     6.222772    7.368817
+        libros_26omas |    5.41823   .3978146    13.62   0.000     4.637933    6.198527
+        trabaja_mas20 |  -2.956405   .7084717    -4.17   0.000     -4.34521     -1.5676
+       internet_hogar |   .2902924   .3784745     0.77   0.443    -.4516707    1.032256
+     computador_hogar |   .5606646    .362616     1.55   0.122    -.1501499    1.271479
+         ln_matricula |   5.161966   1.040918     4.96   0.000     3.121788    7.202145
+ratio_alumnos_docente |   -.090788   .0795725    -1.14   0.254    -.2467479    .0651719
+           pct_planta |   9.839047   1.702658     5.78   0.000     6.501865    13.17623
+           z_posgrado |   .0513866   .2026448     0.25   0.800    -.3457909     .448564
+         dotacion_tic |   1.471655   1.795821     0.82   0.413     -2.05017    4.993479
+                rural |  -10.83038   1.795154    -6.03   0.000    -14.34882   -7.311943
+             ju_unica |   .2473821   .8284381     0.30   0.765    -1.376328    1.871092
+              tecnico |  -.5930984   1.349741    -0.44   0.660    -3.239003    2.052806
+    tecnico_academico |  -5.849561   2.503891    -2.34   0.020    -10.75881   -.9403082
+        cole_femenino |   36.00397   5.565135     6.47   0.000     25.09651    46.91144
+  tasa_homicidios_bar |  -.0897286   .1123585    -0.80   0.425    -.3099472    .1304899
+  tasa_homicidios_dev |  -.0110021   .0115112    -0.96   0.339    -.0335636    .0115595
+             iica_bar |   28.64535   28.29117     1.01   0.311    -26.80432    84.09503
+             iica_dev |   .9955418   2.754708     0.36   0.718    -4.403587    6.394671
+          ln_coca_bar |  -1.611765   .9846724    -1.64   0.102    -3.541688    .3181574
+          ln_coca_dev |  -.0622355   .2648612    -0.23   0.814     -.581354    .4568831
+  ln_inversion_pc_bar |  -1.291657   3.195611    -0.40   0.686     -7.55494    4.971625
+  ln_inversion_pc_dev |    2.85376   1.618968     1.76   0.078    -.3193591    6.026879
+                      |
+                 year |
+                2019  |  -4.738609   .7876894    -6.02   0.000    -6.282452   -3.194766
+                2020  |  -3.312567   .8518469    -3.89   0.000    -4.982157   -1.642978
+                2021  |  -7.586055    .869556    -8.72   0.000    -9.290353   -5.881756
+                2022  |  -3.111416   .9265846    -3.36   0.001    -4.927489   -1.295343
+                2023  |   .2546389   1.014961     0.25   0.802    -1.734649    2.243927
+                      |
+                _cons |   339.5734   37.69066     9.01   0.000     265.7011    413.4458
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   13.69973   1.811769      10.57163    17.75342
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |     1.7871   .3310715      1.242964    2.569445
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                   sd(_cons) |   11.29936   .4785919      10.39922    12.27742
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |   4.658866   .2285034       4.23186    5.128957
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.36277   .0933895      34.18022     34.5463
+------------------------------------------------------------------------------
+.     estimates save "ML3b_iica_`hoy'.ster", replace
+(note: file ML3b_iica_20261019d.ster not found)
+file ML3b_iica_20261019d.ster saved
+. 
+.     display _newline "--- Contrastes de ML3b_iica ---"
+
+--- Contrastes de ML3b_iica ---
+.     display "El coeficiente confirmatorio es iica_dev, umbral 0,025."
+El coeficiente confirmatorio es iica_dev, umbral 0,025.
+.     lincom iica_dev
+
+ ( 1)  [punt_global]iica_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .9955418   2.754708     0.36   0.718    -4.403587    6.394671
+------------------------------------------------------------------------------
+.     test iica_bar = iica_dev
+
+ ( 1)  [punt_global]iica_bar - [punt_global]iica_dev = 0
+
+           chi2(  1) =    0.95
+         Prob > chi2 =    0.3307
+.     testparm iica_bar iica_dev
+
+ ( 1)  [punt_global]iica_bar = 0
+ ( 2)  [punt_global]iica_dev = 0
+
+           chi2(  2) =    1.16
+         Prob > chi2 =    0.5610
+. 
+.     display _newline "--- Las dos medidas de conflicto, contrastadas ---"
+
+--- Las dos medidas de conflicto, contrastadas ---
+.     * Esto es lo que impide concluir que el conflicto importa y la violencia
+.     * letal no, por el solo hecho de que una cruce el umbral y la otra no.
+.     test iica_dev = tasa_homicidios_dev
+
+ ( 1)  - [punt_global]tasa_homicidios_dev + [punt_global]iica_dev = 0
+
+           chi2(  1) =    0.13
+         Prob > chi2 =    0.7154
+.     testparm iica_dev tasa_homicidios_dev
+
+ ( 1)  [punt_global]tasa_homicidios_dev = 0
+ ( 2)  [punt_global]iica_dev = 0
+
+           chi2(  2) =    0.94
+         Prob > chi2 =    0.6238
+. 
+.     display _newline "--- Conjunto de los componentes temporales ---"
+
+--- Conjunto de los componentes temporales ---
+.     * Comparable con el chi2(3) = 3,79, p = 0,285 de ML3b [log_11, bloque 2].
+.     test tasa_homicidios_dev iica_dev ln_coca_dev ln_inversion_pc_dev
+
+ ( 1)  [punt_global]tasa_homicidios_dev = 0
+ ( 2)  [punt_global]iica_dev = 0
+ ( 3)  [punt_global]ln_coca_dev = 0
+ ( 4)  [punt_global]ln_inversion_pc_dev = 0
+
+           chi2(  4) =    3.91
+         Prob > chi2 =    0.4185
+. 
+.     display _newline "--- Comparacion con la Tabla 13 ---"
+
+--- Comparacion con la Tabla 13 ---
+.     display "tasa_homicidios_dev en ML3b: -0,009 (0,010)."
+tasa_homicidios_dev en ML3b: -0,009 (0,010).
+.     lincom tasa_homicidios_dev
+
+ ( 1)  [punt_global]tasa_homicidios_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.0110021   .0115112    -0.96   0.339    -.0335636    .0115595
+------------------------------------------------------------------------------
+. 
+.     timer off 2
+.     display _newline "--- Tiempo del modelo ---"
+
+--- Tiempo del modelo ---
+.     timer list 2
+   2:   2099.51 /        1 =    2099.5140
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "RECORDATORIO: lo de arriba es UN procedimiento de los tres."
+RECORDATORIO: lo de arriba es UN procedimiento de los tres.
+.     display "Nada se promueve sin el bloque [5], y con p <= 0,025."
+Nada se promueve sin el bloque [5], y con p <= 0,025.
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [4] POSGRADO: SOLO LA VARIACION ENTRE SEDES
+. ********************************************************************************
+. * SOBRE EL ORDEN DE egen Y mi: el egen va sobre el mi flong completo, con
+. * bysort _mi_m, y la derivada se registra como IMPUTADA para que Stata no la
+. * sincronice entre imputaciones. Es el patron del bloque [2.1] del 08 y es
+. * deliberado. NO convertirlo en `mi passive` ni mover el egen detras de un
+. * `mi extract`.
+. 
+. if `hacer_posg' == 1 {
+. 
+.     display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+.     display "[4] POSGRADO: PROMEDIO DEL PERIODO POR SEDE"
+[4] POSGRADO: PROMEDIO DEL PERIODO POR SEDE
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     use "Base_Estimacion.dta", clear
+. 
+.     foreach v in mcpio_anio sede_anio z_posgrado_bar {
+  2.         capture mi unregister `v'
+  3.         capture drop `v'
+  4.     }
+.     egen long mcpio_anio = group(cole_cod_mcpio_ubicacion year)
+.     egen long sede_anio  = group(cole_cod_dane_sede year)
+.     mi register regular mcpio_anio sede_anio
+.     mi update
+. 
+.     * Un valor por sede-ano, no uno por estudiante.
+.     egen byte _ts = tag(_mi_m cole_cod_dane_sede year)
+.     bysort _mi_m cole_cod_dane_sede: egen double _sz = ///
+>         total(z_posgrado * _ts)
+.     bysort _mi_m cole_cod_dane_sede: egen double _ns = ///
+>         total(_ts * (!missing(z_posgrado)))
+.     generate double z_posgrado_bar = _sz / _ns if _mi_m > 0 & _ns > 0
+(69,750 missing values generated)
+.     label variable z_posgrado_bar "Posgrado estandarizado, promedio del periodo de la sede"
+.     drop _ts _sz _ns
+. 
+.     mi register imputed z_posgrado_bar
+.     mi update
+. 
+.     quietly count if _mi_m > 0 & missing(z_posgrado_bar)
+.     display "Filas sin promedio de posgrado en m>0: " r(N)
+Filas sin promedio de posgrado en m>0: 0
+. 
+.     display _newline "--- z_posgrado frente a su promedio de sede ---"
+
+--- z_posgrado frente a su promedio de sede ---
+.     tabstat z_posgrado z_posgrado_bar if _mi_m == 1, ///
+>         by(year) stat(n mean sd) format(%9.4f)
+
+Summary statistics: N, Mean, SD
+Group variable: year (Año de presentación de la prueba)
+
+    year |  z_posg~o  z_posg~r
+---------+--------------------
+    2018 |  1.15e+04  1.15e+04
+         |    0.2841    0.1217
+         |    1.0238    0.4328
+---------+--------------------
+    2019 |  1.15e+04  1.15e+04
+         |    0.3413    0.1200
+         |    1.0157    0.4349
+---------+--------------------
+    2020 |  1.10e+04  1.10e+04
+         |    0.3067    0.1332
+         |    1.0059    0.4361
+---------+--------------------
+    2021 |  1.17e+04  1.17e+04
+         |   -0.1219    0.1254
+         |    0.9523    0.4427
+---------+--------------------
+    2022 |  1.18e+04  1.18e+04
+         |    0.0082    0.1319
+         |    0.9816    0.4616
+---------+--------------------
+    2023 |  1.24e+04  1.24e+04
+         |    0.0102    0.1369
+         |    0.9868    0.4519
+---------+--------------------
+   Total |  6.98e+04  6.98e+04
+         |    0.1340    0.1283
+         |    1.0101    0.4437
+------------------------------
+. 
+.     local v_n2_alt : subinstr global v_n2 "z_posgrado" "z_posgrado_bar", word
+.     display _newline "Bloque de Nivel 2 empleado:"
+
+Bloque de Nivel 2 empleado:
+.     display "  `v_n2_alt'"
+  ln_matricula ratio_alumnos_docente pct_planta z_posgrado_bar             dotacion_tic rural
+>  ju_unica tecnico tecnico_academico             cole_femenino
+. 
+.     display _newline "--- ML1b con el promedio de posgrado (m = 1 a 5) ---"
+
+--- ML1b con el promedio de posgrado (m = 1 a 5) ---
+.     mi estimate, imputations(1/5) dots post: mixed punt_global c_inse ///
+>         $v_n1 `v_n2_alt' indice_vuln ib2018.year $RE , reml
+
+Imputations (5):
+  ..... done
+
+Multiple-imputation estimates                   Imputations       =          5
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0274
+                                                Largest FMI       =     0.2388
+DF adjustment:   Large sample                   DF:     min       =      82.25
+                                                        avg       = 2871201.03
+                                                        max       =   2.70e+07
+Model F test:       Equal FMI                   F(  25,87143.4)   =     285.91
+                                                Prob > F          =     0.0000
+
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+               c_inse |   .2786407   .0276169    10.09   0.000     .2244236    .3328577
+                mujer |  -8.207174   .2768168   -29.65   0.000    -8.749726   -7.664622
+                 edad |   -7.47427   .1240819   -60.24   0.000    -7.717467   -7.231074
+            repitente |   5.932126   .4169052    14.23   0.000     5.115005    6.749247
+        lectura_30min |   6.771562   .3184138    21.27   0.000     6.138165    7.404959
+        libros_26omas |   5.383861   .4128445    13.04   0.000     4.567176    6.200546
+        trabaja_mas20 |  -3.023709   .7204019    -4.20   0.000    -4.438589    -1.60883
+       internet_hogar |   .2829536   .3755592     0.75   0.451    -.4535568    1.019464
+     computador_hogar |   .5676575   .3578965     1.59   0.113    -.1339032    1.269218
+         ln_matricula |   4.656838    1.03016     4.52   0.000     2.637686    6.675989
+ratio_alumnos_docente |  -.0780238   .0789614    -0.99   0.323    -.2327857     .076738
+           pct_planta |   8.164485   1.703684     4.79   0.000     4.825257    11.50371
+       z_posgrado_bar |   6.792601   1.396614     4.86   0.000     4.055195    9.530007
+         dotacion_tic |   1.008135   1.708946     0.59   0.555    -2.342062    4.358333
+                rural |  -10.07088   1.766819    -5.70   0.000    -13.53379   -6.607972
+             ju_unica |   .2803301   .8230553     0.34   0.733    -1.332836    1.893496
+              tecnico |  -.3380935   1.349785    -0.25   0.802    -2.988633    2.312446
+    tecnico_academico |  -5.371375   2.447412    -2.19   0.028    -10.17097   -.5717845
+        cole_femenino |   35.87377   5.461287     6.57   0.000     25.16984    46.57769
+          indice_vuln |  -.8272021   .6358154    -1.30   0.193    -2.073378    .4189737
+                      |
+                 year |
+                2019  |  -4.743712   .7842255    -6.05   0.000    -6.280768   -3.206656
+                2020  |  -3.195324   .8428937    -3.79   0.000    -4.847365   -1.543282
+                2021  |  -7.525216    .854947    -8.80   0.000    -9.200883   -5.849549
+                2022  |  -3.173464    .899629    -3.53   0.000    -4.936705   -1.410223
+                2023  |  -.1839435   .9585551    -0.19   0.848    -2.062682    1.694795
+                      |
+                _cons |   325.1659   7.327333    44.38   0.000     310.8041    339.5277
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   12.68859   1.615717      9.886091    16.28554
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |   1.802346   .3207385      1.271632    2.554552
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                   sd(_cons) |   11.08138    .468415      10.20031    12.03856
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |   4.623675   .2274953      4.198616    5.091765
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.36416   .0934551      34.18147    34.54781
+------------------------------------------------------------------------------
+.     estimates save "ML1b_posgrado_bar_`hoy'.ster", replace
+(note: file ML1b_posgrado_bar_20261019d.ster not found)
+file ML1b_posgrado_bar_20261019d.ster saved
+.     lincom z_posgrado_bar
+
+ ( 1)  [punt_global]z_posgrado_bar = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   6.792601   1.396614     4.86   0.000     4.055287    9.529914
+------------------------------------------------------------------------------
+. 
+.     display _newline "--- Control: ML1b original con m = 1 a 5 ---"
+
+--- Control: ML1b original con m = 1 a 5 ---
+.     * Para que la comparacion no mezcle el cambio de variable con el cambio
+.     * de numero de imputaciones.
+.     mi estimate, imputations(1/5) dots post: mixed punt_global c_inse ///
+>         $v_n1 $v_n2 indice_vuln ib2018.year $RE , reml
+
+Imputations (5):
+  ..... done
+
+Multiple-imputation estimates                   Imputations       =          5
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0277
+                                                Largest FMI       =     0.2387
+DF adjustment:   Large sample                   DF:     min       =      82.33
+                                                        avg       = 2479356.90
+                                                        max       =   3.26e+07
+Model F test:       Equal FMI                   F(  25,85215.7)   =     284.16
+                                                Prob > F          =     0.0000
+
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+               c_inse |   .2794037   .0276205    10.12   0.000     .2251796    .3336279
+                mujer |  -8.209783   .2768359   -29.66   0.000    -8.752372   -7.667194
+                 edad |  -7.477894   .1240868   -60.26   0.000      -7.7211   -7.234688
+            repitente |    5.93198   .4169517    14.23   0.000     5.114767    6.749192
+        lectura_30min |   6.769674   .3184086    21.26   0.000     6.136296    7.403052
+        libros_26omas |   5.382329   .4127226    13.04   0.000     4.565932    6.198726
+        trabaja_mas20 |  -3.036689    .719895    -4.22   0.000    -4.450479     -1.6229
+       internet_hogar |   .2821244   .3754213     0.75   0.452    -.4540996    1.018348
+     computador_hogar |   .5612418   .3579249     1.57   0.117    -.1403751    1.262859
+         ln_matricula |   5.099424   1.038175     4.91   0.000     3.064563    7.134284
+ratio_alumnos_docente |  -.0914054   .0792467    -1.15   0.249    -.2467264    .0639156
+           pct_planta |   9.614013   1.687191     5.70   0.000     6.307097    12.92093
+           z_posgrado |   .0474682   .2027165     0.23   0.815    -.3498563    .4447927
+         dotacion_tic |   1.070162   1.728425     0.62   0.536    -2.318853    4.459176
+                rural |  -10.93713   1.793222    -6.10   0.000    -14.45181   -7.422458
+             ju_unica |   .2752993   .8261026     0.33   0.739    -1.343839    1.894438
+              tecnico |  -.6056113    1.37143    -0.44   0.659    -3.298642    2.087419
+    tecnico_academico |  -5.820252   2.494848    -2.33   0.020    -10.71323   -.9272745
+        cole_femenino |   36.07528   5.570125     6.48   0.000     25.15804    46.99253
+          indice_vuln |  -.8579539   .6402367    -1.34   0.180    -2.112795    .3968877
+                      |
+                 year |
+                2019  |  -4.749467   .7854424    -6.05   0.000    -6.288908   -3.210025
+                2020  |  -3.187931   .8444357    -3.78   0.000    -4.842995   -1.532867
+                2021  |  -7.474276   .8575384    -8.72   0.000    -9.155022    -5.79353
+                2022  |  -3.109065   .9025037    -3.44   0.001    -4.877941    -1.34019
+                2023  |  -.1106731   .9622673    -0.12   0.908     -1.99669    1.775343
+                      |
+                _cons |   322.4016   7.416347    43.47   0.000     307.8653     336.938
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   13.44686   1.687349      10.51501    17.19618
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |   1.803186   .3210691      1.271975    2.556246
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                   sd(_cons) |   11.31283   .4788902      10.41211    12.29148
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |   4.646976    .227784      4.221302    5.115574
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.36401    .093449      34.18134    34.54766
+------------------------------------------------------------------------------
+.     estimates save "ML1b_control_m5_`hoy'.ster", replace
+(note: file ML1b_control_m5_20261019d.ster not found)
+file ML1b_control_m5_20261019d.ster saved
+.     lincom z_posgrado
+
+ ( 1)  [punt_global]z_posgrado = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .0474682   .2027165     0.23   0.815    -.3498488    .4447852
+------------------------------------------------------------------------------
+. 
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "COMPARAR las dos lineas anteriores entre si, y la segunda contra"
+COMPARAR las dos lineas anteriores entre si, y la segunda contra
+.     display "el z_posgrado de ML1b en la Tabla 13 (veinte imputaciones)."
+el z_posgrado de ML1b en la Tabla 13 (veinte imputaciones).
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [5] LOS TRES PROCEDIMIENTOS PARA EL IICA
+. ********************************************************************************
+. * Sin este bloque iica_dev no puede promoverse. Calcado del bloque [4] del
+. * 11_estructura_aleatoria.do para que los numeros sean comparables con la
+. * Tabla 30. Solo iica: tasa_hom_eb retirada por P1.
+. 
+. if `hacer_tres' == 1 {
+. 
+.     display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+.     display "[5] EFECTOS FIJOS, BOOTSTRAP SALVAJE Y DOS ETAPAS"
+[5] EFECTOS FIJOS, BOOTSTRAP SALVAJE Y DOS ETAPAS
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     capture which boottest
+.     if _rc != 0 {
+.         capture ssc install boottest, replace
+.         if _rc != 0 {
+.             display as error "No se pudo instalar boottest. Sin este bloque,"
+.             display as error "iica_dev no puede promoverse. Declararlo."
+.             exit 601
+.         }
+.     }
+. 
+.     use "N3_Municipios_PCA.dta", clear
+.     xtset cole_cod_mcpio_ubicacion year
+
+Panel variable: cole_cod_mcpio_ubicacion (strongly balanced)
+ Time variable: year, 2018 to 2023
+         Delta: 1 unit
+.     quietly xtsum iica
+.     scalar sdw_iica = r(sd_w)
+.     display "DE dentro del municipio, iica: " %10.6f sdw_iica
+DE dentro del municipio, iica:   0.104762
+. 
+.     tempname pi
+.     postfile `pi' int m str20 variable str12 procedimiento ///
+>         double b p_cluster p_salvaje emd ///
+>         using "Inferencia_C7_`hoy'.dta", replace
+(file Inferencia_C7_20261019d.dta not found)
+. 
+.     forvalues m = 1/5 {
+  2. 
+.         display _newline(2) "--- IMPUTACION `m' ---"
+  3. 
+.         * --- (a) Efectos fijos de municipio y ano ---
+.         use "Base_Estimacion.dta", clear
+  4.         mi extract `m', clear
+  5. 
+.         capture drop mcpio_anio
+  6.         egen long mcpio_anio = group(cole_cod_mcpio_ubicacion year)
+  7. 
+.         areg punt_global c_inse $v_n1 $v_n2                           ///
+>             tasa_homicidios iica ln_coca ln_inversion_pc ib2018.year,  ///
+>             absorb(mcpio_id) vce(cluster mcpio_id)
+  8. 
+.         scalar b_v = _b[iica]
+  9.         quietly test iica
+ 10.         scalar p_cl = r(p)
+ 11. 
+.         scalar p_wb  = .
+ 12.         scalar emd_v = .
+ 13.         capture noisily boottest iica, weighttype(webb) reps(9999) ///
+>             seed(2026) nograph
+ 14.         if _rc == 0 {
+ 15.             scalar p_wb = r(p)
+ 16.             matrix CI = r(CI)
+ 17.             if rowsof(CI) == 1 {
+ 18.                 scalar se_b  = (CI[1,2] - CI[1,1]) / (2*1.96)
+ 19.                 scalar emd_v = 2.802*se_b*sdw_iica
+ 20.             }
+ 21.             else {
+ 22.                 display as error "iica (m=`m'): intervalo disjunto en " ///
+>                     rowsof(CI) " tramos. EMD a mano."
+ 23.             }
+ 24.         }
+ 25. 
+.         display "iica (m=`m'): b = " %10.6f b_v                       ///
+>             "   p cluster = " %6.4f p_cl                              ///
+>             "   p salvaje = " %6.4f p_wb                              ///
+>             "   EMD = " %10.6f emd_v
+ 26. 
+.         post `pi' (`m') ("iica") ("efectos fijos") (b_v) (p_cl) (p_wb) (emd_v)
+ 27. 
+.         * --- (b) Dos etapas: cada municipio-ano cuenta una vez ---
+.         display _newline "--- Dos etapas, m = `m' ---"
+ 28. 
+.         quietly areg punt_global c_inse $v_n1 $v_n2, absorb(mcpio_anio)
+ 29.         predict double d_ma, d
+ 30. 
+.         collapse (mean) d_ma tasa_homicidios iica ln_coca ln_inversion_pc ///
+>             (count) n_est = punt_global, by(mcpio_id year)
+ 31. 
+.         quietly count
+ 32.         display "Observaciones de la segunda etapa: " r(N) " (esperadas: 252)"
+ 33. 
+.         capture noisily regress d_ma tasa_homicidios iica ln_coca ///
+>             ln_inversion_pc i.year i.mcpio_id [aw = n_est], vce(cluster mcpio_id)
+ 34.         if _rc != 0 {
+ 35.             display as error "La segunda etapa fallo en m = `m'. Codigo: " _rc
+ 36.             continue
+ 37.         }
+ 38. 
+.         scalar b_v = _b[iica]
+ 39.         quietly test iica
+ 40.         scalar p_cl = r(p)
+ 41. 
+.         scalar p_wb  = .
+ 42.         scalar emd_v = .
+ 43.         capture noisily boottest iica, weighttype(webb) reps(9999) ///
+>             seed(2026) nograph
+ 44.         if _rc == 0 {
+ 45.             scalar p_wb = r(p)
+ 46.             matrix CI = r(CI)
+ 47.             if rowsof(CI) == 1 {
+ 48.                 scalar se_b  = (CI[1,2] - CI[1,1]) / (2*1.96)
+ 49.                 scalar emd_v = 2.802*se_b*sdw_iica
+ 50.             }
+ 51.         }
+ 52. 
+.         display "iica (m=`m', dos etapas): b = " %10.6f b_v           ///
+>             "   p cluster = " %6.4f p_cl                              ///
+>             "   p salvaje = " %6.4f p_wb                              ///
+>             "   EMD = " %10.6f emd_v
+ 53. 
+.         post `pi' (`m') ("iica") ("dos etapas") (b_v) (p_cl) (p_wb) (emd_v)
+ 54.     }
+
+
+--- IMPUTACION 1 ---
+
+Linear regression, absorbing indicators            Number of obs     =  69,750
+Absorbed variable: mcpio_id                        No. of categories =      42
+                                                   F(27, 41)         =       .
+                                                   Prob > F          =       .
+                                                   R-squared         =  0.3810
+                                                   Adj R-squared     =  0.3804
+                                                   Root MSE          = 36.1914
+
+                                       (Std. err. adjusted for 42 clusters in mcpio_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+               c_inse |   .4180499   .1160381     3.60   0.001     .1837062    .6523936
+                mujer |  -8.119629   .9233712    -8.79   0.000    -9.984415   -6.254843
+                 edad |  -7.751866   .2637395   -29.39   0.000    -8.284499   -7.219233
+            repitente |   7.536286   2.313409     3.26   0.002     2.864262    12.20831
+        lectura_30min |   7.528082    .746408    10.09   0.000     6.020681    9.035484
+        libros_26omas |   5.986645   .5399974    11.09   0.000     4.896098    7.077192
+        trabaja_mas20 |  -3.850728   .7240773    -5.32   0.000    -5.313032   -2.388424
+       internet_hogar |    .701143   .5362968     1.31   0.198    -.3819304    1.784216
+     computador_hogar |   .4555281   .4965144     0.92   0.364     -.547203    1.458259
+         ln_matricula |   9.150788   1.270547     7.20   0.000     6.584866    11.71671
+ratio_alumnos_docente |   .1650223   .2851156     0.58   0.566    -.4107803    .7408249
+           pct_planta |   14.46243   3.218472     4.49   0.000     7.962589    20.96226
+           z_posgrado |   .5635727   .2797193     2.01   0.051    -.0013318    1.128477
+         dotacion_tic |   11.50631   3.742224     3.07   0.004     3.948736    19.06389
+                rural |  -5.547846   2.134619    -2.60   0.013    -9.858796   -1.236895
+             ju_unica |   2.141872   1.454809     1.47   0.149    -.7961733    5.079918
+              tecnico |  -1.615308   1.553332    -1.04   0.304    -4.752325     1.52171
+    tecnico_academico |  -6.508927   2.877099    -2.26   0.029    -12.31935   -.6985078
+        cole_femenino |   30.91986   1.794243    17.23   0.000     27.29631    34.54341
+      tasa_homicidios |  -.0123292   .0095138    -1.30   0.202    -.0315426    .0068843
+                 iica |   1.954231   3.024497     0.65   0.522    -4.153865    8.062327
+              ln_coca |  -.0767921   .2423668    -0.32   0.753    -.5662618    .4126776
+      ln_inversion_pc |   4.384859    1.99945     2.19   0.034     .3468873     8.42283
+                      |
+                 year |
+                2019  |  -4.421552   .8027703    -5.51   0.000    -6.042779   -2.800324
+                2020  |  -4.059144    .822406    -4.94   0.000    -5.720026   -2.398261
+                2021  |    -8.4329   1.028682    -8.20   0.000    -10.51037   -6.355434
+                2022  |    -2.6508   .9517884    -2.79   0.008    -4.572976   -.7286241
+                2023  |   1.256551   1.246784     1.01   0.319     -1.26138    3.774481
+                      |
+                _cons |   246.3208   22.49555    10.95   0.000     200.8901    291.7514
+---------------------------------------------------------------------------------------
+
+Wild bootstrap-t, null imposed, 9999 replications, Wald test, bootstrap clustering by mcpio_i
+> d, Webb weights:
+  iica
+
+                           t(41) =     0.6461
+                        Prob>|t| =     0.5226
+
+95% confidence set for null hypothesis expression: [−4.046, 9.989]
+iica (m=1): b =   1.954231   p cluster = 0.5218   p salvaje = 0.5226   EMD =   1.050999
+
+--- Dos etapas, m = 1 ---
+Observaciones de la segunda etapa: 252 (esperadas: 252)
+(sum of wgt is 69,750)
+
+Linear regression                               Number of obs     =        252
+                                                F(8, 41)          =          .
+                                                Prob > F          =          .
+                                                R-squared         =     0.9619
+                                                Root MSE          =     3.5047
+
+                                 (Std. err. adjusted for 42 clusters in mcpio_id)
+---------------------------------------------------------------------------------
+                |               Robust
+           d_ma | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------+----------------------------------------------------------------
+tasa_homicidios |  -.0128418   .0105288    -1.22   0.230    -.0341051    .0084215
+           iica |   1.954442   3.243156     0.60   0.550    -4.595244    8.504129
+        ln_coca |  -.0743425   .2702194    -0.28   0.785    -.6200616    .4713767
+ln_inversion_pc |   4.461018   2.199376     2.03   0.049     .0192882    8.902747
+                |
+           year |
+          2019  |  -4.421912   .9938667    -4.45   0.000    -6.429067   -2.414758
+          2020  |   -4.20789   .7709729    -5.46   0.000    -5.764901   -2.650879
+          2021  |  -8.530206   .8111414   -10.52   0.000    -10.16834   -6.892072
+          2022  |  -2.748006   1.140744    -2.41   0.021    -5.051785   -.4442274
+          2023  |   1.161241   1.530414     0.76   0.452    -1.929492    4.251975
+                |
+       mcpio_id |
+             2  |  -27.38382    4.20145    -6.52   0.000    -35.86882   -18.89882
+             3  |  -18.46858   3.067915    -6.02   0.000    -24.66436    -12.2728
+             4  |  -13.02987   2.256301    -5.77   0.000    -17.58656   -8.473172
+             5  |  -15.94249   1.198224   -13.31   0.000    -18.36235   -13.52263
+             6  |  -36.77117   2.095754   -17.55   0.000    -41.00363   -32.53871
+             7  |  -18.91227   1.673179   -11.30   0.000    -22.29132   -15.53322
+             8  |  -25.42325   .9224875   -27.56   0.000    -27.28625   -23.56025
+             9  |  -27.99567   1.436253   -19.49   0.000    -30.89625    -25.0951
+            10  |  -21.19367   1.882514   -11.26   0.000    -24.99549   -17.39186
+            11  |  -15.93659   2.502504    -6.37   0.000     -20.9905   -10.88268
+            12  |  -30.06508   5.427408    -5.54   0.000    -41.02596   -19.10421
+            13  |  -51.14502   2.718338   -18.81   0.000    -56.63481   -45.65523
+            14  |  -61.37156   2.984263   -20.57   0.000     -67.3984   -55.34472
+            15  |  -3.907104   1.723556    -2.27   0.029    -7.387896   -.4263109
+            16  |   -34.2052   3.636851    -9.41   0.000    -41.54997   -26.86043
+            17  |  -13.41623   4.406862    -3.04   0.004    -22.31607   -4.516394
+            18  |  -18.07682    3.30279    -5.47   0.000    -24.74694    -11.4067
+            19  |   -63.0765   3.638933   -17.33   0.000    -70.42547   -55.72752
+            20  |  -22.85016   2.881948    -7.93   0.000    -28.67037   -17.02995
+            21  |  -9.308158    1.27898    -7.28   0.000    -11.89111   -6.725206
+            22  |  -16.94357   1.626512   -10.42   0.000    -20.22838   -13.65877
+            23  |  -55.19099   2.814951   -19.61   0.000     -60.8759   -49.50608
+            24  |  -17.85314   1.301396   -13.72   0.000    -20.48137   -15.22492
+            25  |  -23.64588   1.772748   -13.34   0.000    -27.22602   -20.06574
+            26  |  -28.08936   5.019796    -5.60   0.000    -38.22705   -17.95168
+            27  |  -10.79079   .7324734   -14.73   0.000    -12.27005   -9.311528
+            28  |  -51.45676   .8146774   -63.16   0.000    -53.10203   -49.81148
+            29  |  -23.93787   3.434566    -6.97   0.000    -30.87411   -17.00162
+            30  |  -15.59176   4.311682    -3.62   0.001    -24.29938    -6.88414
+            31  |  -20.73295   4.944909    -4.19   0.000     -30.7194   -10.74651
+            32  |  -7.606522   1.442112    -5.27   0.000    -10.51893   -4.694118
+            33  |   -5.34457   6.411806    -0.83   0.409    -18.29347    7.604334
+            34  |   -28.5326   1.586413   -17.99   0.000    -31.73642   -25.32877
+            35  |  -11.59746    4.06726    -2.85   0.007    -19.81145   -3.383458
+            36  |  -36.77913   2.111128   -17.42   0.000    -41.04264   -32.51562
+            37  |  -33.64533   5.262458    -6.39   0.000    -44.27308   -23.01758
+            38  |   -6.94114   .6763237   -10.26   0.000    -8.307004   -5.575277
+            39  |  -59.84012   2.898384   -20.65   0.000    -65.69353   -53.98672
+            40  |  -34.46341   1.626449   -21.19   0.000    -37.74809   -31.17873
+            41  |  -24.74052   2.263084   -10.93   0.000    -29.31091   -20.17013
+            42  |  -48.35772   2.610723   -18.52   0.000    -53.63018   -43.08526
+                |
+          _cons |  -24.70612   22.25641    -1.11   0.273    -69.65386    20.24162
+---------------------------------------------------------------------------------
+
+Wild bootstrap-t, null imposed, 9999 replications, Wald test, bootstrap clustering by mcpio_i
+> d, Webb weights:
+  iica
+
+                           t(41) =     0.6026
+                        Prob>|t| =     0.5050
+
+95% confidence set for null hypothesis expression: [−3.835, 9.946]
+iica (m=1, dos etapas): b =   1.954442   p cluster = 0.5501   p salvaje = 0.5050   EMD =   1.
+> 031974
+
+
+--- IMPUTACION 2 ---
+
+Linear regression, absorbing indicators            Number of obs     =  69,750
+Absorbed variable: mcpio_id                        No. of categories =      42
+                                                   F(27, 41)         =       .
+                                                   Prob > F          =       .
+                                                   R-squared         =  0.3804
+                                                   Adj R-squared     =  0.3798
+                                                   Root MSE          = 36.2079
+
+                                       (Std. err. adjusted for 42 clusters in mcpio_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+               c_inse |   .4193691   .1130268     3.71   0.001      .191107    .6476313
+                mujer |  -8.078547   .9136174    -8.84   0.000    -9.923635   -6.233459
+                 edad |   -7.75681   .2697001   -28.76   0.000    -8.301481    -7.21214
+            repitente |   7.568679   2.304773     3.28   0.002     2.914096    12.22326
+        lectura_30min |   7.272811   .7100827    10.24   0.000     5.838769    8.706852
+        libros_26omas |   6.042282   .5335402    11.32   0.000     4.964776    7.119789
+        trabaja_mas20 |  -3.454658   .7150104    -4.83   0.000     -4.89865   -2.010665
+       internet_hogar |   .6045233   .5220969     1.16   0.254    -.4498729    1.658919
+     computador_hogar |   .5028029    .500271     1.01   0.321    -.5075148    1.513121
+         ln_matricula |   9.107766   1.272325     7.16   0.000     6.538253    11.67728
+ratio_alumnos_docente |    .165025   .2862826     0.58   0.567    -.4131344    .7431845
+           pct_planta |   14.44708   3.279011     4.41   0.000     7.824982    21.06918
+           z_posgrado |   .5751989    .282004     2.04   0.048     .0056803    1.144717
+         dotacion_tic |   11.30789   3.864288     2.93   0.006     3.503803    19.11198
+                rural |  -5.567436   2.130021    -2.61   0.012      -9.8691   -1.265773
+             ju_unica |   2.120317    1.44593     1.47   0.150    -.7997982    5.040433
+              tecnico |  -1.596122   1.573605    -1.01   0.316    -4.774082    1.581837
+    tecnico_academico |  -6.522151   2.923331    -2.23   0.031    -12.42594   -.6183646
+        cole_femenino |   30.95884   1.786989    17.32   0.000     27.34994    34.56774
+      tasa_homicidios |  -.0110307   .0101764    -1.08   0.285    -.0315823    .0095209
+                 iica |    1.88707   3.070217     0.61   0.542    -4.313359    8.087499
+              ln_coca |  -.0681609   .2414308    -0.28   0.779    -.5557404    .4194185
+      ln_inversion_pc |   4.587019   2.005201     2.29   0.027     .5374347    8.636604
+                      |
+                 year |
+                2019  |  -4.421518   .8268138    -5.35   0.000    -6.091302   -2.751733
+                2020  |   -4.08519   .8135281    -5.02   0.000    -5.728143   -2.442236
+                2021  |  -8.465159   1.009435    -8.39   0.000    -10.50375   -6.426564
+                2022  |  -2.699446   .9539447    -2.83   0.007    -4.625977   -.7729159
+                2023  |   1.229199   1.264785     0.97   0.337    -1.325086    3.783484
+                      |
+                _cons |   244.6147   22.41461    10.91   0.000     199.3475    289.8819
+---------------------------------------------------------------------------------------
+
+Wild bootstrap-t, null imposed, 9999 replications, Wald test, bootstrap clustering by mcpio_i
+> d, Webb weights:
+  iica
+
+                           t(41) =     0.6146
+                        Prob>|t| =     0.5432
+
+95% confidence set for null hypothesis expression: [−4.065, 10.13]
+iica (m=2): b =   1.887070   p cluster = 0.5422   p salvaje = 0.5432   EMD =   1.062718
+
+--- Dos etapas, m = 2 ---
+Observaciones de la segunda etapa: 252 (esperadas: 252)
+(sum of wgt is 69,750)
+
+Linear regression                               Number of obs     =        252
+                                                F(8, 41)          =          .
+                                                Prob > F          =          .
+                                                R-squared         =     0.9614
+                                                Root MSE          =      3.518
+
+                                 (Std. err. adjusted for 42 clusters in mcpio_id)
+---------------------------------------------------------------------------------
+                |               Robust
+           d_ma | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------+----------------------------------------------------------------
+tasa_homicidios |  -.0115146   .0110799    -1.04   0.305    -.0338909    .0108618
+           iica |   1.894504   3.288885     0.58   0.568    -4.747535    8.536542
+        ln_coca |  -.0664702   .2694646    -0.25   0.806    -.6106651    .4777246
+ln_inversion_pc |   4.680051   2.189445     2.14   0.039     .2583778    9.101724
+                |
+           year |
+          2019  |  -4.423321   1.026838    -4.31   0.000    -6.497062   -2.349579
+          2020  |  -4.239803    .768004    -5.52   0.000    -5.790819   -2.688788
+          2021  |  -8.559753   .7811202   -10.96   0.000    -10.13726   -6.982249
+          2022  |  -2.793588   1.152274    -2.42   0.020    -5.120653   -.4665232
+          2023  |    1.13807   1.556658     0.73   0.469    -2.005666    4.281805
+                |
+       mcpio_id |
+             2  |  -27.74034   4.179806    -6.64   0.000    -36.18163   -19.29905
+             3  |  -18.92093   3.200182    -5.91   0.000    -25.38383   -12.45803
+             4  |  -13.49149   2.256902    -5.98   0.000     -18.0494   -8.933583
+             5  |  -16.22589   1.196699   -13.56   0.000    -18.64268   -13.80911
+             6  |  -37.09131   2.118681   -17.51   0.000    -41.37007   -32.81255
+             7  |  -19.08422   1.672498   -11.41   0.000     -22.4619   -15.70654
+             8  |  -25.40728   .9176778   -27.69   0.000    -27.26057     -23.554
+             9  |  -28.25414   1.472519   -19.19   0.000    -31.22795   -25.28033
+            10  |  -21.77307   1.981574   -10.99   0.000    -25.77494    -17.7712
+            11  |  -16.06078   2.557622    -6.28   0.000      -21.226   -10.89556
+            12  |  -30.55863    5.39293    -5.67   0.000    -41.44987   -19.66739
+            13  |  -51.36165   2.703033   -19.00   0.000    -56.82053   -45.90276
+            14  |  -61.59619   2.970503   -20.74   0.000    -67.59524   -55.59714
+            15  |  -4.179317   1.715416    -2.44   0.019     -7.64367   -.7149638
+            16  |  -34.54032   3.621752    -9.54   0.000    -41.85459   -27.22604
+            17  |  -13.63909    4.38615    -3.11   0.003    -22.49709   -4.781076
+            18  |  -18.43872   3.288479    -5.61   0.000    -25.07994    -11.7975
+            19  |   -63.6682   3.622037   -17.58   0.000    -70.98305   -56.35335
+            20  |  -23.22729   2.867502    -8.10   0.000    -29.01833   -17.43626
+            21  |  -9.536581   1.294307    -7.37   0.000    -12.15049   -6.922676
+            22  |  -17.04687   1.625606   -10.49   0.000    -20.32985   -13.76389
+            23  |  -55.62486   2.796554   -19.89   0.000    -61.27262   -49.97711
+            24  |  -17.90606   1.294352   -13.83   0.000    -20.52005   -15.29206
+            25  |  -23.77634   1.814013   -13.11   0.000    -27.43982   -20.11287
+            26  |  -28.73828   4.996175    -5.75   0.000    -38.82826    -18.6483
+            27  |  -10.90309   .7294887   -14.95   0.000    -12.37632   -9.429857
+            28  |  -51.56433   .8944152   -57.65   0.000    -53.37064   -49.75803
+            29  |   -24.4835   3.419072    -7.16   0.000    -31.38845   -17.57854
+            30  |  -16.16615   4.288364    -3.77   0.001    -24.82667   -7.505622
+            31  |  -21.25271   4.925699    -4.31   0.000    -31.20036   -11.30506
+            32  |  -7.720319    1.48595    -5.20   0.000    -10.72126   -4.719383
+            33  |   -6.22685   6.382383    -0.98   0.335    -19.11633    6.662634
+            34  |  -28.68384   1.582613   -18.12   0.000       -31.88   -25.48769
+            35  |  -12.02571   4.048219    -2.97   0.005    -20.20126   -3.850171
+            36  |  -37.07584   2.134711   -17.37   0.000    -41.38698   -32.76471
+            37  |  -34.23296   5.239968    -6.53   0.000    -44.81529   -23.65063
+            38  |  -7.027787   .6710314   -10.47   0.000    -8.382962   -5.672611
+            39  |  -59.64816   2.887953   -20.65   0.000     -65.4805   -53.81582
+            40  |  -34.70353   1.614087   -21.50   0.000    -37.96324   -31.44381
+            41  |  -24.96492   2.252168   -11.08   0.000    -29.51327   -20.41658
+            42  |   -48.5461   2.596673   -18.70   0.000    -53.79019   -43.30202
+                |
+          _cons |  -26.90216   22.16623    -1.21   0.232    -71.66777    17.86344
+---------------------------------------------------------------------------------
+
+Wild bootstrap-t, null imposed, 9999 replications, Wald test, bootstrap clustering by mcpio_i
+> d, Webb weights:
+  iica
+
+                           t(41) =     0.5760
+                        Prob>|t| =     0.5245
+
+95% confidence set for null hypothesis expression: [−3.819, 10.07]
+iica (m=2, dos etapas): b =   1.894504   p cluster = 0.5677   p salvaje = 0.5245   EMD =   1.
+> 039929
+
+
+--- IMPUTACION 3 ---
+
+Linear regression, absorbing indicators            Number of obs     =  69,750
+Absorbed variable: mcpio_id                        No. of categories =      42
+                                                   F(27, 41)         =       .
+                                                   Prob > F          =       .
+                                                   R-squared         =  0.3806
+                                                   Adj R-squared     =  0.3800
+                                                   Root MSE          = 36.2031
+
+                                       (Std. err. adjusted for 42 clusters in mcpio_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+               c_inse |    .406059   .1144171     3.55   0.001     .1749889    .6371291
+                mujer |  -8.094678     .91174    -8.88   0.000    -9.935974   -6.253382
+                 edad |  -7.748872   .2612375   -29.66   0.000    -8.276452   -7.221292
+            repitente |   7.547015   2.326232     3.24   0.002     2.849094    12.24494
+        lectura_30min |   7.441274   .7213331    10.32   0.000     5.984512    8.898036
+        libros_26omas |   6.090209   .5783298    10.53   0.000     4.922249     7.25817
+        trabaja_mas20 |  -3.556976   .7449139    -4.78   0.000     -5.06136   -2.052592
+       internet_hogar |   .7831145   .4967067     1.58   0.123     -.220005    1.786234
+     computador_hogar |   .5446586   .4797521     1.14   0.263    -.4242205    1.513538
+         ln_matricula |   9.149514   1.273382     7.19   0.000     6.577866    11.72116
+ratio_alumnos_docente |   .1680551   .2853548     0.59   0.559    -.4082305    .7443408
+           pct_planta |   14.40297   3.355877     4.29   0.000     7.625638     21.1803
+           z_posgrado |   .5655142   .2796411     2.02   0.050     .0007676    1.130261
+         dotacion_tic |   11.66124   3.842456     3.03   0.004     3.901244    19.42124
+                rural |  -5.597991   2.128341    -2.63   0.012    -9.896264   -1.299719
+             ju_unica |   2.137907   1.466662     1.46   0.153    -.8240762    5.099891
+              tecnico |  -1.557016   1.546137    -1.01   0.320    -4.679503    1.565472
+    tecnico_academico |  -6.490752   2.913685    -2.23   0.031    -12.37506   -.6064451
+        cole_femenino |    31.0038   1.807533    17.15   0.000     27.35341    34.65419
+      tasa_homicidios |  -.0124168   .0100017    -1.24   0.221    -.0326156    .0077819
+                 iica |   1.830982   3.073793     0.60   0.555    -4.376669    8.038634
+              ln_coca |  -.0602465   .2426092    -0.25   0.805    -.5502057    .4297127
+      ln_inversion_pc |   4.680601   1.991176     2.35   0.024     .6593393    8.701863
+                      |
+                 year |
+                2019  |  -4.349563   .8111885    -5.36   0.000    -5.987791   -2.711334
+                2020  |  -4.086561   .8380652    -4.88   0.000    -5.779068   -2.394054
+                2021  |  -8.406003   1.027512    -8.18   0.000    -10.48111     -6.3309
+                2022  |  -2.680341   .9557483    -2.80   0.008    -4.610514   -.7501683
+                2023  |   1.324261   1.244356     1.06   0.293    -1.188766    3.837289
+                      |
+                _cons |   242.9703   22.45733    10.82   0.000     197.6168    288.3238
+---------------------------------------------------------------------------------------
+
+Wild bootstrap-t, null imposed, 9999 replications, Wald test, bootstrap clustering by mcpio_i
+> d, Webb weights:
+  iica
+
+                           t(41) =     0.5957
+                        Prob>|t| =     0.5552
+
+95% confidence set for null hypothesis expression: [−4.221, 10.08]
+iica (m=3): b =   1.830982   p cluster = 0.5547   p salvaje = 0.5552   EMD =   1.070965
+
+--- Dos etapas, m = 3 ---
+Observaciones de la segunda etapa: 252 (esperadas: 252)
+(sum of wgt is 69,750)
+
+Linear regression                               Number of obs     =        252
+                                                F(8, 41)          =          .
+                                                Prob > F          =          .
+                                                R-squared         =     0.9617
+                                                Root MSE          =      3.512
+
+                                 (Std. err. adjusted for 42 clusters in mcpio_id)
+---------------------------------------------------------------------------------
+                |               Robust
+           d_ma | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------+----------------------------------------------------------------
+tasa_homicidios |  -.0129328    .010954    -1.18   0.245    -.0350548    .0091892
+           iica |    1.83128   3.298495     0.56   0.582    -4.830166    8.492727
+        ln_coca |  -.0580322   .2723587    -0.21   0.832    -.6080717    .4920074
+ln_inversion_pc |   4.770548   2.180914     2.19   0.034     .3661035    9.174993
+                |
+           year |
+          2019  |  -4.351022   1.005216    -4.33   0.000    -6.381097   -2.320947
+          2020  |  -4.239018    .776658    -5.46   0.000    -5.807511   -2.670526
+          2021  |   -8.50142   .8023936   -10.60   0.000    -10.12189   -6.880954
+          2022  |  -2.775772   1.141294    -2.43   0.019    -5.080662   -.4708819
+          2023  |   1.232021   1.534399     0.80   0.427    -1.866761    4.330803
+                |
+       mcpio_id |
+             2  |  -28.05216   4.162214    -6.74   0.000    -36.45792    -19.6464
+             3  |  -18.78227   3.198037    -5.87   0.000    -25.24084   -12.32371
+             4  |  -13.40084   2.262548    -5.92   0.000    -17.97015   -8.831533
+             5  |  -16.21223    1.20194   -13.49   0.000    -18.63959   -13.78486
+             6  |  -37.02273    2.12595   -17.41   0.000    -41.31617   -32.72928
+             7  |  -19.20836   1.684961   -11.40   0.000    -22.61121   -15.80552
+             8  |  -25.49272   .9167068   -27.81   0.000    -27.34405   -23.64139
+             9  |  -28.19567   1.467694   -19.21   0.000    -31.15973    -25.2316
+            10  |  -21.64892   1.966575   -11.01   0.000     -25.6205   -17.67734
+            11  |  -16.08235   2.577903    -6.24   0.000    -21.28854   -10.87617
+            12  |  -30.69037    5.37719    -5.71   0.000    -41.54983   -19.83092
+            13  |  -51.44865   2.698075   -19.07   0.000    -56.89752   -45.99978
+            14  |  -61.92449   2.972547   -20.83   0.000    -67.92767   -55.92131
+            15  |  -4.170713    1.70811    -2.44   0.019    -7.620312   -.7211145
+            16  |  -34.78572   3.606097    -9.65   0.000    -42.06838   -27.50306
+            17  |  -13.57653   4.370577    -3.11   0.003    -22.40309   -4.749971
+            18  |  -18.54742   3.275584    -5.66   0.000    -25.16259   -11.93224
+            19  |  -63.83562   3.619114   -17.64   0.000    -71.14457   -56.52667
+            20  |  -23.29407    2.85989    -8.15   0.000    -29.06973    -17.5184
+            21  |  -9.532271   1.294884    -7.36   0.000    -12.14734   -6.917199
+            22  |  -17.19563   1.641696   -10.47   0.000    -20.51111   -13.88016
+            23  |  -55.64482   2.790402   -19.94   0.000    -61.28015   -50.00948
+            24  |  -17.93663   1.288472   -13.92   0.000    -20.53875   -15.33451
+            25  |   -23.7512    1.82387   -13.02   0.000    -27.43458   -20.06782
+            26  |  -28.87601   4.989626    -5.79   0.000    -38.95277   -18.79926
+            27  |  -10.87124   .7266347   -14.96   0.000    -12.33871   -9.403769
+            28  |   -51.4719   .8762087   -58.74   0.000    -53.24144   -49.70236
+            29  |   -24.5151   3.404159    -7.20   0.000    -31.38994   -17.64026
+            30  |  -16.00572   4.273883    -3.75   0.001      -24.637   -7.374438
+            31  |  -21.35716    4.90381    -4.36   0.000    -31.26061   -11.45372
+            32  |  -7.555879   1.471665    -5.13   0.000    -10.52797   -4.583791
+            33  |  -6.724976   6.357571    -1.06   0.296    -19.56435    6.114399
+            34  |  -28.79934   1.574551   -18.29   0.000    -31.97921   -25.61947
+            35  |  -12.20405   4.030994    -3.03   0.004    -20.34481    -4.06329
+            36  |  -37.11944   2.144353   -17.31   0.000    -41.45004   -32.78883
+            37  |  -34.55262   5.216498    -6.62   0.000    -45.08755   -24.01769
+            38  |  -7.094541   .6690952   -10.60   0.000    -8.445806   -5.743276
+            39  |  -60.23947   2.892562   -20.83   0.000    -66.08111   -54.39782
+            40  |  -34.69416   1.609888   -21.55   0.000    -37.94539   -31.44293
+            41  |  -25.00458   2.241486   -11.16   0.000    -29.53135   -20.47781
+            42  |  -48.63389   2.593581   -18.75   0.000    -53.87173   -43.39604
+                |
+          _cons |  -27.82909   22.06308    -1.26   0.214    -72.38639     16.7282
+---------------------------------------------------------------------------------
+
+Wild bootstrap-t, null imposed, 9999 replications, Wald test, bootstrap clustering by mcpio_i
+> d, Webb weights:
+  iica
+
+                           t(41) =     0.5552
+                        Prob>|t| =     0.5432
+
+95% confidence set for null hypothesis expression: [−3.975, 10.02]
+iica (m=3, dos etapas): b =   1.831280   p cluster = 0.5818   p salvaje = 0.5432   EMD =   1.
+> 047965
+
+
+--- IMPUTACION 4 ---
+
+Linear regression, absorbing indicators            Number of obs     =  69,750
+Absorbed variable: mcpio_id                        No. of categories =      42
+                                                   F(27, 41)         =       .
+                                                   Prob > F          =       .
+                                                   R-squared         =  0.3809
+                                                   Adj R-squared     =  0.3802
+                                                   Root MSE          = 36.1949
+
+                                       (Std. err. adjusted for 42 clusters in mcpio_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+               c_inse |   .4077967   .1149066     3.55   0.001     .1757381    .6398553
+                mujer |  -8.095353   .9063464    -8.93   0.000    -9.925757    -6.26495
+                 edad |  -7.751942   .2617523   -29.62   0.000    -8.280561   -7.223323
+            repitente |   7.531481    2.34898     3.21   0.003      2.78762    12.27534
+        lectura_30min |   7.632798   .7198004    10.60   0.000     6.179132    9.086464
+        libros_26omas |   5.960296   .6433159     9.26   0.000     4.661093    7.259498
+        trabaja_mas20 |  -3.923645   .6965906    -5.63   0.000    -5.330438   -2.516851
+       internet_hogar |   .8829708   .5426184     1.63   0.111    -.2128693    1.978811
+     computador_hogar |    .513036   .4313875     1.19   0.241    -.3581686    1.384241
+         ln_matricula |   9.156872   1.265612     7.24   0.000     6.600916    11.71283
+ratio_alumnos_docente |   .1739104   .2861061     0.61   0.547    -.4038927    .7517134
+           pct_planta |   14.43832   3.352075     4.31   0.000      7.66867    21.20798
+           z_posgrado |   .5547121    .284202     1.95   0.058    -.0192454     1.12867
+         dotacion_tic |   11.44242   3.832921     2.99   0.005     3.701675    19.18316
+                rural |  -5.579077   2.121537    -2.63   0.012    -9.863608   -1.294547
+             ju_unica |    2.08354   1.473492     1.41   0.165    -.8922372    5.059317
+              tecnico |   -1.50394   1.547885    -0.97   0.337    -4.629957    1.622077
+    tecnico_academico |  -6.409215   2.912832    -2.20   0.033     -12.2918   -.5266319
+        cole_femenino |   31.01041   1.804505    17.18   0.000     27.36613    34.65468
+      tasa_homicidios |  -.0119441   .0097233    -1.23   0.226    -.0315806    .0076924
+                 iica |   1.938318   3.102594     0.62   0.536    -4.327497    8.204133
+              ln_coca |  -.0685918   .2431274    -0.28   0.779    -.5595976     .422414
+      ln_inversion_pc |   4.625105   2.012811     2.30   0.027     .5601504     8.69006
+                      |
+                 year |
+                2019  |  -4.351565   .8256511    -5.27   0.000    -6.019001   -2.684129
+                2020  |  -4.100386   .8338085    -4.92   0.000    -5.784297   -2.416476
+                2021  |  -8.441293   1.028157    -8.21   0.000     -10.5177   -6.364888
+                2022  |  -2.735544   .9651299    -2.83   0.007    -4.684663   -.7864242
+                2023  |   1.251416    1.26716     0.99   0.329    -1.307665    3.810497
+                      |
+                _cons |   243.3905   22.57047    10.78   0.000     197.8085    288.9725
+---------------------------------------------------------------------------------------
+
+Wild bootstrap-t, null imposed, 9999 replications, Wald test, bootstrap clustering by mcpio_i
+> d, Webb weights:
+  iica
+
+                           t(41) =     0.6247
+                        Prob>|t| =     0.5366
+
+95% confidence set for null hypothesis expression: [−4.223, 10.25]
+iica (m=4): b =   1.938318   p cluster = 0.5356   p salvaje = 0.5366   EMD =   1.083980
+
+--- Dos etapas, m = 4 ---
+Observaciones de la segunda etapa: 252 (esperadas: 252)
+(sum of wgt is 69,750)
+
+Linear regression                               Number of obs     =        252
+                                                F(8, 41)          =          .
+                                                Prob > F          =          .
+                                                R-squared         =     0.9611
+                                                Root MSE          =     3.5304
+
+                                 (Std. err. adjusted for 42 clusters in mcpio_id)
+---------------------------------------------------------------------------------
+                |               Robust
+           d_ma | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------+----------------------------------------------------------------
+tasa_homicidios |  -.0125143   .0107291    -1.17   0.250    -.0341821    .0091535
+           iica |   1.952611   3.346822     0.58   0.563    -4.806433    8.711656
+        ln_coca |  -.0671148   .2709731    -0.25   0.806    -.6143562    .4801266
+ln_inversion_pc |   4.717287   2.208473     2.14   0.039     .2571852    9.177389
+                |
+           year |
+          2019  |  -4.351434   1.022788    -4.25   0.000    -6.416997   -2.285871
+          2020  |  -4.252827   .7744303    -5.49   0.000    -5.816821   -2.688833
+          2021  |   -8.52903   .7940933   -10.74   0.000    -10.13273   -6.925326
+          2022  |   -2.82504   1.178622    -2.40   0.021    -5.205316   -.4447637
+          2023  |   1.167438   1.562052     0.75   0.459    -1.987191    4.322066
+                |
+       mcpio_id |
+             2  |  -27.70447   4.218986    -6.57   0.000    -36.22489   -19.18406
+             3  |  -18.68071   3.145082    -5.94   0.000    -25.03233   -12.32909
+             4  |   -13.2447   2.250011    -5.89   0.000    -17.78869   -8.700708
+             5  |  -16.07087   1.192863   -13.47   0.000     -18.4799   -13.66183
+             6  |  -36.82889   2.092888   -17.60   0.000    -41.05557   -32.60222
+             7  |   -18.9892   1.665676   -11.40   0.000     -22.3531    -15.6253
+             8  |  -25.28796   .9196327   -27.50   0.000     -27.1452   -23.43073
+             9  |  -28.15322   1.454236   -19.36   0.000    -31.09011   -25.21634
+            10  |  -21.48801    1.94087   -11.07   0.000    -25.40768   -17.56835
+            11  |  -15.89851   2.556326    -6.22   0.000    -21.06111    -10.7359
+            12  |  -30.67601    5.43803    -5.64   0.000    -41.65833   -19.69368
+            13  |  -51.27265   2.717932   -18.86   0.000    -56.76162   -45.78367
+            14  |  -61.71232   2.975539   -20.74   0.000    -67.72154    -55.7031
+            15  |  -4.051561   1.732105    -2.34   0.024    -7.549618   -.5535045
+            16  |  -34.46065   3.645414    -9.45   0.000    -41.82271   -27.09858
+            17  |  -13.33185   4.423642    -3.01   0.004    -22.26558   -4.398125
+            18  |  -18.28462   3.317199    -5.51   0.000    -24.98384    -11.5854
+            19  |   -63.3847    3.62853   -17.47   0.000    -70.71266   -56.05673
+            20  |  -23.04846    2.88023    -8.00   0.000     -28.8652   -17.23172
+            21  |  -9.389911   1.280217    -7.33   0.000    -11.97536   -6.804461
+            22  |  -17.00675   1.620943   -10.49   0.000    -20.28031   -13.73319
+            23  |  -55.47201   2.817857   -19.69   0.000    -61.16279   -49.78123
+            24  |  -17.93479   1.306648   -13.73   0.000    -20.57362   -15.29596
+            25  |   -23.6143   1.794683   -13.16   0.000    -27.23874   -19.98987
+            26  |  -28.61509   5.007916    -5.71   0.000    -38.72878    -18.5014
+            27  |  -10.82692    .733298   -14.76   0.000    -12.30785   -9.345999
+            28  |  -51.36747   .8420106   -61.01   0.000    -53.06795     -49.667
+            29  |  -24.37478   3.449882    -7.07   0.000    -31.34196    -17.4076
+            30  |  -16.15204   4.319814    -3.74   0.001    -24.87609   -7.428003
+            31  |  -21.06732   4.968993    -4.24   0.000     -31.1024   -11.03223
+            32  |  -7.560443   1.479786    -5.11   0.000    -10.54893   -4.571955
+            33  |  -5.396309   6.432448    -0.84   0.406     -18.3869    7.594282
+            34  |  -28.61808   1.596648   -17.92   0.000    -31.84257   -25.39358
+            35  |  -11.92823   4.084291    -2.92   0.006    -20.17662   -3.679839
+            36  |  -36.96889   2.109505   -17.52   0.000    -41.22912   -32.70866
+            37  |  -34.20694   5.276723    -6.48   0.000     -44.8635   -23.55038
+            38  |  -6.928158   .6774795   -10.23   0.000    -8.296356    -5.55996
+            39  |  -59.57064   2.887186   -20.63   0.000    -65.40143   -53.73985
+            40  |  -34.55663   1.627816   -21.23   0.000    -37.84407   -31.26919
+            41  |  -24.85417   2.273322   -10.93   0.000    -29.44523    -20.2631
+            42  |  -48.46632   2.609181   -18.58   0.000    -53.73567   -43.19697
+                |
+          _cons |  -27.37805   22.35717    -1.22   0.228    -72.52927    17.77318
+---------------------------------------------------------------------------------
+
+Wild bootstrap-t, null imposed, 9999 replications, Wald test, bootstrap clustering by mcpio_i
+> d, Webb weights:
+  iica
+
+                           t(41) =     0.5834
+                        Prob>|t| =     0.5202
+
+95% confidence set for null hypothesis expression: [−4.003, 10.25]
+iica (m=4, dos etapas): b =   1.952611   p cluster = 0.5628   p salvaje = 0.5202   EMD =   1.
+> 067672
+
+
+--- IMPUTACION 5 ---
+
+Linear regression, absorbing indicators            Number of obs     =  69,750
+Absorbed variable: mcpio_id                        No. of categories =      42
+                                                   F(27, 41)         =       .
+                                                   Prob > F          =       .
+                                                   R-squared         =  0.3808
+                                                   Adj R-squared     =  0.3802
+                                                   Root MSE          = 36.1956
+
+                                       (Std. err. adjusted for 42 clusters in mcpio_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+          punt_global | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+               c_inse |   .4239912   .1142704     3.71   0.001     .1932175     .654765
+                mujer |  -8.103861   .9184373    -8.82   0.000    -9.958683   -6.249039
+                 edad |   -7.75098   .2653043   -29.22   0.000    -8.286773   -7.215188
+            repitente |   7.518538   2.345739     3.21   0.003     2.781222    12.25585
+        lectura_30min |   7.536364   .7019891    10.74   0.000     6.118668     8.95406
+        libros_26omas |   5.745675   .5532242    10.39   0.000     4.628416    6.862934
+        trabaja_mas20 |  -3.811296   .7092195    -5.37   0.000    -5.243594   -2.378998
+       internet_hogar |   .7231131   .4988939     1.45   0.155    -.2844236     1.73065
+     computador_hogar |   .4708603   .4801405     0.98   0.333    -.4988032    1.440524
+         ln_matricula |   9.174381   1.274733     7.20   0.000     6.600006    11.74876
+ratio_alumnos_docente |   .1701975   .2854276     0.60   0.554    -.4062352    .7466302
+           pct_planta |    14.3595   3.306582     4.34   0.000     7.681724    21.03728
+           z_posgrado |   .5136507   .2827304     1.82   0.077     -.057335    1.084636
+         dotacion_tic |   11.52788    3.90772     2.95   0.005     3.636077    19.41968
+                rural |  -5.491615   2.130846    -2.58   0.014    -9.794947   -1.188284
+             ju_unica |   2.145506   1.459932     1.47   0.149    -.8028855    5.093898
+              tecnico |  -1.657854   1.553225    -1.07   0.292    -4.794655    1.478947
+    tecnico_academico |  -6.593141   2.911808    -2.26   0.029    -12.47366   -.7126252
+        cole_femenino |   30.88525   1.811001    17.05   0.000     27.22786    34.54264
+      tasa_homicidios |  -.0106073   .0100727    -1.05   0.298    -.0309495     .009735
+                 iica |   1.867435   3.025778     0.62   0.541    -4.243247    7.978118
+              ln_coca |  -.0659889   .2378701    -0.28   0.783    -.5463774    .4143996
+      ln_inversion_pc |   4.563936   1.978084     2.31   0.026     .5691131    8.558758
+                      |
+                 year |
+                2019  |  -4.363704   .8281116    -5.27   0.000    -6.036109   -2.691298
+                2020  |  -4.060562   .8294804    -4.90   0.000    -5.735732   -2.385392
+                2021  |  -8.440519   1.030725    -8.19   0.000    -10.52211   -6.358928
+                2022  |  -2.731174   .9568246    -2.85   0.007     -4.66352   -.7988274
+                2023  |   1.199887   1.250544     0.96   0.343    -1.325637    3.725411
+                      |
+                _cons |   244.1951   22.40394    10.90   0.000     198.9494    289.4408
+---------------------------------------------------------------------------------------
+
+Wild bootstrap-t, null imposed, 9999 replications, Wald test, bootstrap clustering by mcpio_i
+> d, Webb weights:
+  iica
+
+                           t(41) =     0.6172
+                        Prob>|t| =     0.5431
+
+95% confidence set for null hypothesis expression: [−4.134, 9.892]
+iica (m=5): b =   1.867435   p cluster = 0.5405   p salvaje = 0.5431   EMD =   1.050323
+
+--- Dos etapas, m = 5 ---
+Observaciones de la segunda etapa: 252 (esperadas: 252)
+(sum of wgt is 69,750)
+
+Linear regression                               Number of obs     =        252
+                                                F(8, 41)          =          .
+                                                Prob > F          =          .
+                                                R-squared         =     0.9617
+                                                Root MSE          =     3.5125
+
+                                 (Std. err. adjusted for 42 clusters in mcpio_id)
+---------------------------------------------------------------------------------
+                |               Robust
+           d_ma | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------+----------------------------------------------------------------
+tasa_homicidios |  -.0110153   .0109464    -1.01   0.320    -.0331221    .0110914
+           iica |   1.866161   3.242165     0.58   0.568    -4.681523    8.413845
+        ln_coca |  -.0630799   .2673772    -0.24   0.815    -.6030592    .4768994
+ln_inversion_pc |   4.652131     2.1742     2.14   0.038     .2612443    9.043017
+                |
+           year |
+          2019  |  -4.364869   1.037545    -4.21   0.000    -6.460234   -2.269504
+          2020  |  -4.213916   .7657788    -5.50   0.000    -5.760437   -2.667394
+          2021  |  -8.542526   .7926053   -10.78   0.000    -10.14322   -6.941827
+          2022  |   -2.83359    1.15622    -2.45   0.019    -5.168623   -.4985575
+          2023  |   1.100451   1.553117     0.71   0.483    -2.036132    4.237034
+                |
+       mcpio_id |
+             2  |  -27.68006   4.152764    -6.67   0.000    -36.06674   -19.29338
+             3  |  -19.16976   3.131039    -6.12   0.000    -25.49302    -12.8465
+             4  |  -13.39057   2.233193    -6.00   0.000    -17.90059   -8.880543
+             5  |  -16.13554    1.18365   -13.63   0.000    -18.52597   -13.74511
+             6  |  -37.05051   2.089948   -17.73   0.000    -41.27124   -32.82977
+             7  |  -19.01661   1.653857   -11.50   0.000    -22.35664   -15.67658
+             8  |  -25.45416   .9099466   -27.97   0.000    -27.29184   -23.61649
+             9  |  -28.26638   1.442901   -19.59   0.000    -31.18038   -25.35239
+            10  |  -21.75397   1.922328   -11.32   0.000    -25.63619   -17.87175
+            11  |  -16.08843   2.532744    -6.35   0.000    -21.20341   -10.97345
+            12  |  -30.56042   5.356494    -5.71   0.000    -41.37808   -19.74277
+            13  |  -51.47662   2.682574   -19.19   0.000    -56.89419   -46.05905
+            14  |  -61.72103   2.944557   -20.96   0.000    -67.66769   -55.77438
+            15  |   -4.00995   1.704315    -2.35   0.024    -7.451883   -.5680167
+            16  |  -34.57467    3.59272    -9.62   0.000    -41.83031   -27.31902
+            17  |  -13.26393   4.355613    -3.05   0.004    -22.06027   -4.467595
+            18  |  -18.25101   3.265312    -5.59   0.000    -24.84544   -11.65658
+            19  |  -63.42231   3.588362   -17.67   0.000    -70.66916   -56.17547
+            20  |  -23.21018   2.843152    -8.16   0.000    -28.95204   -17.46832
+            21  |   -9.55897   1.275795    -7.49   0.000    -12.13549   -6.982451
+            22  |  -17.08098    1.60798   -10.62   0.000    -20.32836    -13.8336
+            23  |  -55.46664    2.77731   -19.97   0.000    -61.07553   -49.85775
+            24  |  -17.82653   1.286357   -13.86   0.000    -20.42438   -15.22868
+            25  |  -23.78688   1.791993   -13.27   0.000    -27.40589   -20.16788
+            26  |   -28.6878   4.951579    -5.79   0.000    -38.68772   -18.68788
+            27  |  -10.84362   .7234008   -14.99   0.000    -12.30456   -9.382683
+            28  |   -51.7088   .8659861   -59.71   0.000    -53.45769   -49.95991
+            29  |  -24.22662   3.395897    -7.13   0.000    -31.08477   -17.36847
+            30  |  -15.91299   4.257175    -3.74   0.001    -24.51053   -7.315452
+            31  |  -21.08488   4.891348    -4.31   0.000    -30.96316   -11.20661
+            32  |  -7.762433   1.467862    -5.29   0.000    -10.72684   -4.798026
+            33  |  -5.294165   6.336061    -0.84   0.408     -18.0901    7.501771
+            34  |  -28.62286   1.571594   -18.21   0.000    -31.79676   -25.44896
+            35  |  -12.11062    4.02129    -3.01   0.004    -20.23178   -3.989457
+            36  |  -37.12068   2.106387   -17.62   0.000    -41.37461   -32.86674
+            37  |  -34.12624   5.199269    -6.56   0.000    -44.62638    -23.6261
+            38  |  -6.975319   .6669534   -10.46   0.000    -8.322258   -5.628379
+            39  |   -59.8116   2.858736   -20.92   0.000    -65.58493   -54.03826
+            40  |  -34.68747   1.603229   -21.64   0.000    -37.92526   -31.44968
+            41  |  -24.84792   2.238232   -11.10   0.000    -29.36812   -20.32772
+            42  |  -48.56984   2.576539   -18.85   0.000    -53.77327   -43.36641
+                |
+          _cons |  -26.64969   22.01623    -1.21   0.233    -71.11237    17.81299
+---------------------------------------------------------------------------------
+
+Wild bootstrap-t, null imposed, 9999 replications, Wald test, bootstrap clustering by mcpio_i
+> d, Webb weights:
+  iica
+
+                           t(41) =     0.5756
+                        Prob>|t| =     0.5256
+
+95% confidence set for null hypothesis expression: [−3.947, 9.825]
+iica (m=5, dos etapas): b =   1.866161   p cluster = 0.5680   p salvaje = 0.5256   EMD =   1.
+> 031297
+. 
+.     postclose `pi'
+. 
+.     display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+.     display "[5.1] RANGO ENTRE IMPUTACIONES"
+[5.1] RANGO ENTRE IMPUTACIONES
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     use "Inferencia_C7_`hoy'.dta", clear
+.     format b p_cluster p_salvaje emd %10.6f
+.     list, clean noobs sepby(procedimiento)
+
+    m   variable   procedimie~o          b   p_clus~r   p_salv~e        emd  
+    1       iica   efectos fijo   1.954231   0.521793   0.522552   1.051000  
+    1       iica     dos etapas   1.954442   0.550070   0.504951   1.031974  
+    2       iica   efectos fijo   1.887070   0.542190   0.543154   1.062718  
+    2       iica     dos etapas   1.894504   0.567742   0.524452   1.039929  
+    3       iica   efectos fijo   1.830982   0.554666   0.555156   1.070965  
+    3       iica     dos etapas   1.831280   0.581784   0.543154   1.047965  
+    4       iica   efectos fijo   1.938318   0.535602   0.536554   1.083980  
+    4       iica     dos etapas   1.952611   0.562805   0.520152   1.067672  
+    5       iica   efectos fijo   1.867435   0.540532   0.543054   1.050323  
+    5       iica     dos etapas   1.866161   0.568038   0.525553   1.031297  
+. 
+.     display _newline "--- Rango por procedimiento ---"
+
+--- Rango por procedimiento ---
+.     tabstat b p_cluster p_salvaje emd, by(procedimiento) ///
+>         stat(n min max) format(%10.6f)
+
+Summary statistics: N, Min, Max
+Group variable: procedimiento 
+
+procedimiento |          b   p_clus~r   p_salv~e        emd
+--------------+--------------------------------------------
+   dos etapas |   5.000000   5.000000   5.000000   5.000000
+              |   1.831280   0.550070   0.504951   1.031297
+              |   1.954442   0.581784   0.543154   1.067672
+--------------+--------------------------------------------
+ efectos fijo |   5.000000   5.000000   5.000000   5.000000
+              |   1.830982   0.521793   0.522552   1.050323
+              |   1.954231   0.554666   0.555156   1.083980
+--------------+--------------------------------------------
+        Total |  10.000000  10.000000  10.000000  10.000000
+              |   1.830982   0.521793   0.504951   1.031297
+              |   1.954442   0.581784   0.555156   1.083980
+-----------------------------------------------------------
+. 
+.     display _newline "UMBRAL VIGENTE PARA iica_dev: 0,025, no 0,05."
+
+UMBRAL VIGENTE PARA iica_dev: 0,025, no 0,05.
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [6] CIERRE
+. ********************************************************************************
+. 
+. timer off 1
+
+. display _newline "--- Tiempo total ---"
+
+--- Tiempo total ---
+
+. timer list 1
+   1:   3409.31 /        1 =    3409.3080
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "C7 COMPLETADA EN LA PARTE COMPUTACIONAL."
+C7 COMPLETADA EN LA PARTE COMPUTACIONAL.
+
+. display "Aplicar la regla del bloque [0.9] ANTES de redactar."
+Aplicar la regla del bloque [0.9] ANTES de redactar.
+
+. display "No rellenar ningun [R-C7] con cifras que no esten en este log."
+No rellenar ningun [R-C7] con cifras que no esten en este log.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase16
+      name:  fase16
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_16_territorial_20261019
+> d.log
+  log type:  text
+ closed on:  19 Oct 2026, 11:59:26
+---------------------------------------------------------------------------------------------

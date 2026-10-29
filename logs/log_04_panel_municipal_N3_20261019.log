@@ -1,0 +1,1647 @@
+---------------------------------------------------------------------------------------------
+      name:  fase4
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_04_panel_municipal_N3_2
+> 0261019.log
+  log type:  text
+ opened on:  19 Oct 2026, 10:30:14
+
+. 
+. 
+. ********************************************************************************
+. * [1] DEFLACTORES A PARTIR DEL IPC
+. ********************************************************************************
+. * El archivo trae VARIACIONES anuales dic-dic en proporción, no el índice en
+. * nivel. Hay que encadenarlas y rebasar a 2018. Los encabezados están en la
+. * fila 4, con la columna A vacía, así que el import arranca en B4.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[1] DEFLACTORES"
+[1] DEFLACTORES
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. import excel "IPC anual desde el año 1955 a 2025.xlsx", ///
+>     sheet("IPC 1955 A 2025") cellrange(B4) firstrow clear
+(2 vars, 73 obs)
+
+. 
+. rename *, lower
+
+. quietly ds
+
+. local cols `r(varlist)'
+
+. local col_anio : word 1 of `cols'
+
+. local col_ipc  : word 2 of `cols'
+
+. rename `col_anio' year_dato
+
+. rename `col_ipc'  ipc_var
+
+. 
+. quietly destring year_dato ipc_var, replace force
+
+. quietly drop if missing(year_dato) | missing(ipc_var)
+
+. 
+. quietly summarize ipc_var
+
+. display "Variación media del IPC: " %8.5f r(mean)
+Variación media del IPC:  0.13350
+
+. if r(mean) > 0.5 {
+.     display as error "AVISO: la serie parece venir en PORCENTAJE, no en proporción."
+. }
+
+. 
+. sort year_dato
+
+. generate double ipc_indice = 1 in 1
+(70 missing values generated)
+
+. quietly replace ipc_indice = ipc_indice[_n-1] * (1 + ipc_var) in 2/l
+
+. 
+. quietly summarize ipc_indice if year_dato == 2018
+
+. quietly replace ipc_indice = ipc_indice / r(mean)
+
+. 
+. generate double deflactor = 1 / ipc_indice
+
+. label variable deflactor "Deflactor a pesos constantes de 2018"
+
+. 
+. display _newline "  Año   Índice(2018=1)   Deflactor"
+
+  Año   Índice(2018=1)   Deflactor
+
+. forvalues y = 2017/2022 {
+  2.     quietly summarize ipc_indice if year_dato == `y', meanonly
+  3.     local i = r(mean)
+  4.     quietly summarize deflactor if year_dato == `y', meanonly
+  5.     display "  `y'      " %10.5f `i' "     " %9.5f r(mean)
+  6. }
+  2017         0.96918       1.03180
+  2018         1.00000       1.00000
+  2019         1.03800       0.96339
+  2020         1.05471       0.94813
+  2021         1.11399       0.89768
+  2022         1.26014       0.79356
+
+. 
+. quietly summarize ipc_indice if year_dato == 2017, meanonly
+
+. scalar i2017 = r(mean)
+
+. quietly summarize ipc_indice if year_dato == 2022, meanonly
+
+. display _newline "Inflación acumulada 2017-2022: " %6.2f 100*(r(mean)/i2017 - 1) "%"
+
+Inflación acumulada 2017-2022:  30.02%
+
+. 
+. keep year_dato deflactor ipc_indice
+
+. quietly keep if inrange(year_dato, 2017, 2022)
+
+. isid year_dato
+
+. tempfile deflactores
+
+. save `deflactores', replace
+(file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_4ac0_000001.tmp not found)
+file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_4ac0_000001.tmp saved as .dta format
+
+. 
+. 
+. ********************************************************************************
+. * [2] PANEL DE HOMICIDIOS: EL MOLDE DE 42 MUNICIPIOS
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[2] PANEL DE HOMICIDIOS"
+[2] PANEL DE HOMICIDIOS
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. import excel "Panel_homicidios.xlsx", sheet("Panel_homicidios") firstrow clear
+(4 vars, 252 obs)
+
+. rename *, lower
+  (all newnames==oldnames)
+
+. capture rename homicidio homicidios
+
+. keep cole_cod_mcpio_ubicacion year homicidios pob
+
+. rename year year_dato
+
+. quietly destring cole_cod_mcpio_ubicacion year_dato homicidios pob, replace force
+
+. 
+. tabulate year_dato, missing
+
+       year |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       2017 |         42       16.67       16.67
+       2018 |         42       16.67       33.33
+       2019 |         42       16.67       50.00
+       2020 |         42       16.67       66.67
+       2021 |         42       16.67       83.33
+       2022 |         42       16.67      100.00
+------------+-----------------------------------
+      Total |        252      100.00
+
+. 
+. * Una celda vacía significa que el municipio no registró ningún caso ese año:
+. * el panel se construyó agregando registros individuales y un municipio-año
+. * sin registros no genera fila.
+. quietly count if missing(homicidios)
+
+. display _newline "Municipio-año con homicidios vacíos: " r(N) " -> se codifican como CERO"
+
+Municipio-año con homicidios vacíos: 29 -> se codifican como CERO
+
+. quietly replace homicidios = 0 if missing(homicidios)
+
+. 
+. assert !missing(pob) & pob > 0
+
+. 
+. generate double tasa_homicidios = homicidios / pob * 100000
+
+. label variable tasa_homicidios "Tasa de homicidios por 100.000 habitantes (t-1)"
+
+. label variable homicidios      "Homicidios registrados (t-1)"
+
+. label variable pob             "Población municipal (t-1)"
+
+. 
+. tabstat tasa_homicidios homicidios pob, by(year_dato) ///
+>     stat(n mean sd p50 min max) format(%9.2f)
+
+Summary statistics: N, Mean, SD, p50, Min, Max
+Group variable: year_dato (year)
+
+year_dato |  tasa_h~s  homici~s       pob
+----------+------------------------------
+     2017 |     42.00     42.00     42.00
+          |     19.82      7.21  34496.12
+          |     21.91     12.59  47510.41
+          |     12.42      3.00  25851.00
+          |      0.00      0.00   5176.00
+          |     74.99     62.00 314054.00
+----------+------------------------------
+     2018 |     42.00     42.00     42.00
+          |     36.29     12.67  34869.10
+          |     36.40     18.45  48117.47
+          |     21.56      4.00  26120.00
+          |      0.00      0.00   5202.00
+          |    139.37     79.00 318055.00
+----------+------------------------------
+     2019 |     42.00     42.00     42.00
+          |     42.45     15.14  35413.74
+          |     41.86     22.89  49156.15
+          |     30.14      7.00  26501.50
+          |      0.00      0.00   5222.00
+          |    171.31    126.00 324594.00
+----------+------------------------------
+     2020 |     42.00     42.00     42.00
+          |     47.52     17.62  35973.90
+          |     56.10     23.06  50221.58
+          |     30.48      9.00  26864.50
+          |      0.00      0.00   5224.00
+          |    293.02     86.00 331304.00
+----------+------------------------------
+     2021 |     42.00     42.00     42.00
+          |     53.63     18.33  36474.62
+          |     58.41     23.49  51056.54
+          |     32.49      9.00  27203.50
+          |      0.00      0.00   5214.00
+          |    290.63     96.00 336438.00
+----------+------------------------------
+     2022 |     42.00     42.00     42.00
+          |     60.62     21.71  36901.40
+          |     45.60     27.92  51761.02
+          |     57.17     14.50  27560.00
+          |      0.00      0.00   5213.00
+          |    144.04    155.00 340713.00
+----------+------------------------------
+    Total |    252.00    252.00    252.00
+          |     43.39     15.45  35688.15
+          |     46.52     22.20  49170.85
+          |     27.32      7.00  26663.50
+          |      0.00      0.00   5176.00
+          |    293.02    155.00 340713.00
+-----------------------------------------
+
+. 
+. quietly count if homicidios <= 5 & homicidios > 0
+
+. display _newline "Municipio-año con 5 o menos homicidios: " r(N)
+
+Municipio-año con 5 o menos homicidios: 85
+
+. 
+. 
+. * ======================= PARCHE 1 DE C7 — INICIO ==============================
+. * [2.1] TASA SUAVIZADA POR BAYES EMPÍRICO (Marshall, 1991)
+. * ------------------------------------------------------------------------------
+. * Estimador global, calculado POR AÑO DEL DATO:
+. *   m    = tasa media del departamento ese año, ponderada por población
+. *   s2   = varianza entre municipios, descontada la varianza de muestreo
+. *   w_i  = s2 / (s2 + m/pob_i)        peso de la tasa cruda del municipio
+. *   EB_i = w_i*r_i + (1-w_i)*m        encogimiento hacia la media departamental
+. *
+. * Un municipio grande recibe w cercano a 1 y casi no se mueve; uno pequeño
+. * recibe w bajo y su tasa se acerca a la media del departamento. Es
+. * exactamente el ruido que la corrección C7 quiere separar de la señal.
+. *
+. * Va AQUÍ, antes del `tempfile molde`, para que la variable viaje al
+. * ensamblaje del bloque [6]. Y usa `year_dato` porque el desplazamiento a
+. * `year` todavía no ha ocurrido: eso pasa en el bloque [7].
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[2.1] TASA SUAVIZADA POR BAYES EMPÍRICO (C7)"
+[2.1] TASA SUAVIZADA POR BAYES EMPÍRICO (C7)
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. bysort year_dato: egen double _H = total(homicidios)
+
+. bysort year_dato: egen double _P = total(pob)
+
+. generate double _m = _H / _P
+
+. generate double _r = homicidios / pob
+
+. bysort year_dato: egen double _s2 = total(pob * (_r - _m)^2)
+
+. replace _s2 = _s2 / _P
+(252 real changes made)
+
+. bysort year_dato: egen double _pbar = mean(pob)
+
+. replace _s2 = max(_s2 - _m/_pbar, 0)
+(252 real changes made)
+
+. generate double _w = _s2 / (_s2 + _m/pob)
+
+. generate double tasa_hom_eb = 100000 * (_w*_r + (1 - _w)*_m)
+
+. label variable tasa_hom_eb "Tasa de homicidios suavizada (Bayes empírico) (t-1)"
+
+. 
+. * Estas cifras deciden la precondición P1 del criterio de C7 y hay que poder
+. * citarlas desde este log.
+. display _newline "--- Peso w por año: cuánto se encoge cada tasa ---"
+
+--- Peso w por año: cuánto se encoge cada tasa ---
+
+. tabstat _w, by(year_dato) stat(n mean sd min max) format(%9.4f)
+
+Summary for variables: _w
+Group variable: year_dato (year)
+
+year_dato |         N      Mean        SD       Min       Max
+----------+--------------------------------------------------
+     2017 |   42.0000    0.7545    0.1225    0.4207    0.9778
+     2018 |   42.0000    0.8641    0.0831    0.6122    0.9897
+     2019 |   42.0000    0.8813    0.0753    0.6489    0.9914
+     2020 |   42.0000    0.9098    0.0607    0.7165    0.9938
+     2021 |   42.0000    0.9086    0.0618    0.7111    0.9937
+     2022 |   42.0000    0.8699    0.0822    0.6163    0.9906
+----------+--------------------------------------------------
+    Total |  252.0000    0.8647    0.0979    0.4207    0.9938
+-------------------------------------------------------------
+
+. 
+. display _newline "--- Municipios con mayor encogimiento (w más bajo) ---"
+
+--- Municipios con mayor encogimiento (w más bajo) ---
+
+. gsort _w
+
+. list cole_cod_mcpio_ubicacion year_dato pob homicidios tasa_homicidios ///
+>      tasa_hom_eb _w in 1/10, clean noobs
+
+    cole_c~n   year_d~o     pob   homici~s   tasa_ho~s   tasa_ho~b          _w  
+       19290       2017    5176          0           0    12.11411   .42074684  
+       19701       2017    5390          0           0    11.90698   .43065103  
+       19533       2017    8519          6   70.430802   47.876646    .5445213  
+       19785       2017    9487          1    10.54074   14.989946   .57106107  
+       19513       2017    9877          3   30.373595   26.408794   .58089974  
+       19392       2017   10807          2   18.506524   19.462904   .60263423  
+       19693       2017   10868          0           0   8.2820678   .60398131  
+       19290       2018    5202          3   57.670127    49.39337   .61221703  
+       19622       2017   11409          5    43.82505   35.016417   .61554036  
+       19290       2022    5213          5   95.914061   81.690731   .61631155  
+
+. sort cole_cod_mcpio_ubicacion year_dato
+
+. 
+. display _newline "--- Tasa cruda frente a tasa suavizada, por año ---"
+
+--- Tasa cruda frente a tasa suavizada, por año ---
+
+. tabstat tasa_homicidios tasa_hom_eb, by(year_dato) ///
+>     stat(n mean sd p50 min max) format(%9.2f)
+
+Summary statistics: N, Mean, SD, p50, Min, Max
+Group variable: year_dato (year)
+
+year_dato |  tasa_h~s  tasa_h~b
+----------+--------------------
+     2017 |     42.00     42.00
+          |     19.82     20.21
+          |     21.91     16.27
+          |     12.42     14.72
+          |      0.00      3.21
+          |     74.99     64.42
+----------+--------------------
+     2018 |     42.00     42.00
+          |     36.29     36.57
+          |     36.40     32.36
+          |     21.56     23.99
+          |      0.00      2.95
+          |    139.37    131.81
+----------+--------------------
+     2019 |     42.00     42.00
+          |     42.45     42.71
+          |     41.86     37.25
+          |     30.14     31.24
+          |      0.00      4.10
+          |    171.31    158.57
+----------+--------------------
+     2020 |     42.00     42.00
+          |     47.52     48.59
+          |     56.10     51.66
+          |     30.48     31.80
+          |      0.00      2.51
+          |    293.02    275.44
+----------+--------------------
+     2021 |     42.00     42.00
+          |     53.63     53.21
+          |     58.41     52.84
+          |     32.49     33.57
+          |      0.00      3.59
+          |    290.63    273.05
+----------+--------------------
+     2022 |     42.00     42.00
+          |     60.62     60.75
+          |     45.60     39.64
+          |     57.17     57.66
+          |      0.00      9.82
+          |    144.04    134.92
+----------+--------------------
+    Total |    252.00    252.00
+          |     43.39     43.67
+          |     46.52     41.93
+          |     27.32     28.43
+          |      0.00      2.51
+          |    293.02    275.44
+-------------------------------
+
+. 
+. display _newline "--- Correlación entre las dos series ---"
+
+--- Correlación entre las dos series ---
+
+. correlate tasa_homicidios tasa_hom_eb
+(obs=252)
+
+             | tasa_h~s tasa_h~b
+-------------+------------------
+tasa_homic~s |   1.0000
+ tasa_hom_eb |   0.9961   1.0000
+
+
+. 
+. drop _H _P _m _r _s2 _pbar _w
+
+. * ======================== PARCHE 1 DE C7 — FIN ================================
+. 
+. 
+. isid cole_cod_mcpio_ubicacion year_dato
+
+. tempfile molde
+
+. save `molde', replace
+(file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_4ac0_000002.tmp not found)
+file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_4ac0_000002.tmp saved as .dta format
+
+. 
+. 
+. ********************************************************************************
+. * [4] VARIABLES FISCALES MUNICIPALES
+. ********************************************************************************
+. * Todas provienen de TerriData del DNP, filtradas por municipios del Cauca,
+. * años 2017-2022 y corte de diciembre. Las de origen SGP vienen de SICODIS y
+. * las de operaciones efectivas de caja del FUT.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[4] VARIABLES FISCALES"
+[4] VARIABLES FISCALES
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. import excel "Panel_inversion.xlsx", sheet("Panel_inversion") firstrow clear
+(10 vars, 252 obs)
+
+. rename *, lower
+  (all newnames==oldnames)
+
+. capture drop municipio
+
+. rename year year_dato
+
+. 
+. quietly destring cole_cod_mcpio_ubicacion year_dato inversion sgp_educacion ///
+>     sgp_pae sgp_total inv_fut ing_trib_pc transf_pc, replace force
+
+. quietly drop if missing(cole_cod_mcpio_ubicacion) | missing(year_dato)
+
+. 
+. label variable inversion     "SGP libre inversión, pesos corrientes"
+
+. label variable sgp_educacion "SGP educación, pesos corrientes"
+
+. label variable sgp_pae       "SGP alimentación escolar, pesos corrientes"
+
+. label variable sgp_total     "SGP total asignado, pesos corrientes"
+
+. label variable inv_fut       "Inversión ejecutada (FUT), pesos corrientes"
+
+. label variable ing_trib_pc   "Ingresos tributarios per cápita, pesos corrientes"
+
+. label variable transf_pc     "Transferencias nacionales per cápita, pesos corrientes"
+
+. 
+. display _newline "--- Variables fiscales en pesos corrientes ---"
+
+--- Variables fiscales en pesos corrientes ---
+
+. tabstat inversion sgp_educacion sgp_pae sgp_total inv_fut, ///
+>     by(year_dato) stat(n mean p50) format(%15.0f)
+
+Summary statistics: N, Mean, p50
+Group variable: year_dato (year)
+
+year_dato |        invers~n        sgp_ed~n         sgp_pae        sgp_to~l         inv_fut
+----------+--------------------------------------------------------------------------------
+     2017 |              42              42              42              42              42
+          |      1895249673      4007235109       206110231     17955294972     30697037381
+          |      1766855404      1015768710       180112759     13906728849     23492485000
+----------+--------------------------------------------------------------------------------
+     2018 |              42              42              42              42              42
+          |      1927056903      4002064918       201137368     17795634548     33756846429
+          |      1789179726       939410747       178640136     13841106198     24861110000
+----------+--------------------------------------------------------------------------------
+     2019 |              42              42              42              42              42
+          |      2171752594      4268676900       230704222     20380142657     39147587381
+          |      2025820743       924438396       203567946     15507049376     29355605000
+----------+--------------------------------------------------------------------------------
+     2020 |              42              42              42              42              42
+          |      2283587922      4471791360       230128478     21559690707     36378116190
+          |      2098864500       877224972       195987684     15608748208     26137575000
+----------+--------------------------------------------------------------------------------
+     2021 |              42              42              42              42              42
+          |      2309319238      4608373747       232307857     22971934836     38931392381
+          |      2053214982       846405694       196158142     16685408173     26340560000
+----------+--------------------------------------------------------------------------------
+     2022 |              42              42              42              42              42
+          |      2221049737      4635185589       212832742     23518779574     46875399762
+          |      2002252791       799499881       167533271     17231636667     35899815000
+----------+--------------------------------------------------------------------------------
+    Total |             252             252             252             252             252
+          |      2134669345      4332221271       218870149     20696912882     37631063254
+          |      1955015279       884823633       184402819     15413932926     27233095000
+-------------------------------------------------------------------------------------------
+
+. 
+. display _newline "--- Correlaciones entre las medidas fiscales ---"
+
+--- Correlaciones entre las medidas fiscales ---
+
+. correlate inversion sgp_educacion sgp_pae sgp_total inv_fut ing_trib_pc transf_pc
+(obs=252)
+
+             | invers~n sgp_ed~n  sgp_pae sgp_to~l  inv_fut ing_tr~c transf~c
+-------------+---------------------------------------------------------------
+   inversion |   1.0000
+sgp_educac~n |   0.8284   1.0000
+     sgp_pae |   0.4712   0.4929   1.0000
+   sgp_total |   0.8188   0.9804   0.6014   1.0000
+     inv_fut |   0.7899   0.9729   0.5734   0.9896   1.0000
+ ing_trib_pc |   0.0631   0.1587  -0.0641   0.1062   0.1616   1.0000
+   transf_pc |   0.2333   0.0276  -0.1627   0.0063  -0.0024  -0.3264   1.0000
+
+
+. 
+. display _newline "ADVERTENCIA sobre sgp_educacion: su rango va de 138 millones a"
+
+ADVERTENCIA sobre sgp_educacion: su rango va de 138 millones a
+
+. display "161.076 millones porque Popayán está certificado en educación y recibe"
+161.076 millones porque Popayán está certificado en educación y recibe
+
+. display "la asignación completa, mientras los municipios no certificados solo"
+la asignación completa, mientras los municipios no certificados solo
+
+. display "reciben el componente de calidad. NO debe usarse como predictor: el"
+reciben el componente de calidad. NO debe usarse como predictor: el
+
+. display "coeficiente compararía Popayán con el resto, no capacidad fiscal."
+coeficiente compararía Popayán con el resto, no capacidad fiscal.
+
+. 
+. isid cole_cod_mcpio_ubicacion year_dato
+
+. tempfile fiscal
+
+. save `fiscal', replace
+(file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_4ac0_000003.tmp not found)
+file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_4ac0_000003.tmp saved as .dta format
+
+. 
+. 
+. ********************************************************************************
+. * [5] CARACTERIZACIÓN TERRITORIAL
+. ********************************************************************************
+. * Cobertura, deserción, repitencia y tránsito a la educación superior son
+. * resultados educativos codeterminados con el puntaje; incluirlos como
+. * predictores contaminaría la estimación.
+. *
+. * MATIZ DE C7: `iica` y `minas` no son resultados educativos y sí pueden
+. * entrar a los modelos como indicadores adicionales de conflicto (apartado
+. * 3.4.4). `desercion_of` se emplea como variable DEPENDIENTE en la prueba del
+. * canal de deserción. `cob_neta_media` se cita como descriptiva de
+. * representatividad en el apartado 3.3.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[5] CARACTERIZACIÓN TERRITORIAL"
+[5] CARACTERIZACIÓN TERRITORIAL
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. import excel "Panel_inversion.xlsx", sheet("Panel_caracterizacion") firstrow clear
+(20 vars, 252 obs)
+
+. rename *, lower
+  (all newnames==oldnames)
+
+. capture drop municipio
+
+. rename year year_dato
+
+. 
+. quietly ds cole_cod_mcpio_ubicacion year_dato, not
+
+. quietly destring `r(varlist)' cole_cod_mcpio_ubicacion year_dato, replace force
+
+. 
+. label variable cob_neta_total   "Cobertura neta total (%)"
+
+. label variable cob_neta_media   "Cobertura neta en educación media (%)"
+
+. label variable cob_neta_secund  "Cobertura neta en secundaria (%)"
+
+. label variable cob_bruta_media  "Cobertura bruta en educación media (%)"
+
+. label variable desercion_of     "Deserción intra-anual, sector oficial (%)"
+
+. label variable repitencia_of    "Repitencia, sector oficial (%)"
+
+. label variable transito_sup     "Tránsito inmediato a educación superior (%)"
+
+. label variable iica             "Índice de Incidencia del Conflicto Armado"
+
+. label variable coca_terridata   "Hectáreas de coca según TerriData"
+
+. label variable minas            "Eventos de minas antipersonal"
+
+. label variable tasa_hom_td      "Tasa de homicidio intencional (TerriData)"
+
+. label variable internet_mcpio   "Penetración de acceso fijo a internet"
+
+. label variable pct_va_primario  "Valor agregado en actividades primarias (%)"
+
+. label variable fecundidad_10_19 "Tasa de fecundidad, mujeres de 10 a 19 años"
+
+. 
+. display _newline "--- Contexto educativo y territorial del municipio ---"
+
+--- Contexto educativo y territorial del municipio ---
+
+. tabstat cob_neta_media desercion_of repitencia_of transito_sup ///
+>         iica internet_mcpio pct_va_primario, ///
+>     by(year_dato) stat(n mean sd) format(%9.2f)
+
+Summary statistics: N, Mean, SD
+Group variable: year_dato (year)
+
+year_dato |  cob_ne~a  deserc~f  repite~f  transi~p      iica  intern~o  pct_va~o
+----------+----------------------------------------------------------------------
+     2017 |     42.00     42.00     42.00     42.00     42.00     42.00     42.00
+          |     29.49      2.92      1.05     18.29      0.13      1.06     23.70
+          |      9.23      1.11      1.09      7.44      0.11      3.08     12.44
+----------+----------------------------------------------------------------------
+     2018 |     42.00     42.00     42.00     42.00     42.00     42.00     42.00
+          |     30.42      2.56      0.75     17.24      0.17      1.40     21.67
+          |      9.35      1.07      0.83      6.84      0.16      3.18     11.47
+----------+----------------------------------------------------------------------
+     2019 |     42.00     42.00     42.00     42.00     42.00     42.00     42.00
+          |     32.25      2.80      1.09     20.90      0.15      1.39     23.58
+          |     10.01      1.19      1.14      8.85      0.19      3.39     11.47
+----------+----------------------------------------------------------------------
+     2020 |     42.00     42.00     42.00     42.00     42.00     42.00     42.00
+          |     33.58      1.73      6.14     20.37      0.17      1.65     25.92
+          |     10.20      0.83      2.01      9.07      0.20      3.93     10.80
+----------+----------------------------------------------------------------------
+     2021 |     42.00     42.00     42.00     42.00     42.00     42.00     42.00
+          |     35.50      3.21      5.85     21.63      0.16      2.06     27.10
+          |     10.79      1.46      3.40      9.47      0.28      4.61     12.81
+----------+----------------------------------------------------------------------
+     2022 |     42.00     42.00     42.00     42.00     42.00     42.00     42.00
+          |     35.51      3.87      7.18     22.30      0.16      2.40     30.86
+          |     10.85      1.19      2.37      8.89      0.19      4.55     15.00
+----------+----------------------------------------------------------------------
+    Total |    252.00    252.00    252.00    252.00    252.00    252.00    252.00
+          |     32.79      2.85      3.68     20.12      0.16      1.66     25.47
+          |     10.26      1.31      3.40      8.59      0.19      3.83     12.64
+---------------------------------------------------------------------------------
+
+. 
+. * C7: cobertura de las cuatro variables que hasta ahora no se tabulaban.
+. * `, all` es obligatorio: sin él, misstable imprime SOLO las variables que
+. * tienen faltantes, y un bloque vacío no documenta cobertura.
+. display _newline "--- Cobertura de las variables territoriales (C7) ---"
+
+--- Cobertura de las variables territoriales (C7) ---
+
+. misstable summarize iica minas tasa_hom_td desercion_of cob_neta_media, all
+                                                               Obs<.
+                                                +------------------------------
+               |                                | Unique
+      Variable |     Obs=.     Obs>.     Obs<.  | values        Min         Max
+  -------------+--------------------------------+------------------------------
+          iica |                           252  |     56          0        1.72
+         minas |                           252  |     12          0          43
+   tasa_hom_td |        14                 238  |    208        2.5       300.5
+  desercion_of |                           252  |    192        .47        7.31
+  cob_neta_m~a |                           252  |    241       8.73       60.27
+  -----------------------------------------------------------------------------
+
+. 
+. display _newline "--- Descriptivos de minas y de la tasa de TerriData ---"
+
+--- Descriptivos de minas y de la tasa de TerriData ---
+
+. tabstat minas tasa_hom_td, by(year_dato) ///
+>     stat(n mean sd p50 min max) format(%9.3f)
+
+Summary statistics: N, Mean, SD, p50, Min, Max
+Group variable: year_dato (year)
+
+year_dato |     minas  tasa_h~d
+----------+--------------------
+     2017 |    42.000    41.000
+          |     0.619    42.800
+          |     2.938    33.783
+          |     0.000    32.700
+          |     0.000     2.500
+          |    19.000   139.000
+----------+--------------------
+     2018 |    42.000    40.000
+          |     0.452    50.895
+          |     1.435    43.468
+          |     0.000    36.500
+          |     0.000     3.500
+          |     7.000   221.400
+----------+--------------------
+     2019 |    42.000    40.000
+          |     0.429    56.508
+          |     0.887    55.929
+          |     0.000    42.450
+          |     0.000     4.000
+          |     4.000   272.500
+----------+--------------------
+     2020 |    42.000    38.000
+          |     0.476    61.139
+          |     1.612    57.914
+          |     0.000    49.200
+          |     0.000     5.700
+          |    10.000   300.500
+----------+--------------------
+     2021 |    42.000    40.000
+          |     1.167    56.940
+          |     5.548    56.237
+          |     0.000    35.900
+          |     0.000     7.700
+          |    36.000   294.400
+----------+--------------------
+     2022 |    42.000    39.000
+          |     2.238    63.531
+          |     7.963    42.897
+          |     0.000    69.600
+          |     0.000     5.600
+          |    43.000   144.000
+----------+--------------------
+    Total |   252.000   238.000
+          |     0.897    55.166
+          |     4.255    49.041
+          |     0.000    39.550
+          |     0.000     2.500
+          |    43.000   300.500
+-------------------------------
+
+. 
+. isid cole_cod_mcpio_ubicacion year_dato
+
+. tempfile carac
+
+. save `carac', replace
+(file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_4ac0_000004.tmp not found)
+file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_4ac0_000004.tmp saved as .dta format
+
+. 
+. 
+. ********************************************************************************
+. * [6] ENSAMBLAJE
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[6] ENSAMBLAJE DEL PANEL MUNICIPAL"
+[6] ENSAMBLAJE DEL PANEL MUNICIPAL
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use `molde', clear
+
+. 
+. * --- Fiscales ---
+. merge 1:1 cole_cod_mcpio_ubicacion year_dato using `fiscal', ///
+>     keep(master match) generate(_m_fis)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               252  (_m_fis==3)
+    -----------------------------------------
+
+. tabulate _m_fis
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+            Matched (3) |        252      100.00      100.00
+------------------------+-----------------------------------
+                  Total |        252      100.00
+
+. assert _m_fis == 3
+
+. drop _m_fis
+
+. 
+. * --- Caracterización ---
+. merge 1:1 cole_cod_mcpio_ubicacion year_dato using `carac', ///
+>     keep(master match) generate(_m_car)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               252  (_m_car==3)
+    -----------------------------------------
+
+. tabulate _m_car
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+            Matched (3) |        252      100.00      100.00
+------------------------+-----------------------------------
+                  Total |        252      100.00
+
+. assert _m_car == 3
+
+. drop _m_car
+
+. 
+. * --- Coca, tomada de TerriData ---
+. * La serie viene completa para las 252 observaciones y con ceros explícitos.
+. generate double coca = coca_terridata
+
+. label variable coca "Hectáreas de coca sembradas, TerriData (t-1)"
+
+. 
+. quietly count if missing(coca)
+
+. display _newline "Municipio-año sin dato de coca: " r(N) " (debe ser 0)"
+
+Municipio-año sin dato de coca: 0 (debe ser 0)
+
+. assert !missing(coca)
+
+. 
+. quietly count if coca == 0
+
+. display "Municipio-año sin cultivo detectado (cero explícito): " r(N)
+Municipio-año sin cultivo detectado (cero explícito): 127
+
+. 
+. generate double ln_coca = ln(coca + 1)
+
+. label variable ln_coca "Log de hectáreas de coca, ln(coca+1) (t-1)"
+
+. 
+. display _newline "--- Hectáreas de coca por año ---"
+
+--- Hectáreas de coca por año ---
+
+. tabstat coca ln_coca, by(year_dato) stat(n mean sd p50 max) format(%10.2f)
+
+Summary statistics: N, Mean, SD, p50, Max
+Group variable: year_dato (year)
+
+year_dato |       coca    ln_coca
+----------+----------------------
+     2017 |      42.00      42.00
+          |     380.01       2.15
+          |    1117.00       3.02
+          |       0.00       0.00
+          |    6661.01       8.80
+----------+----------------------
+     2018 |      42.00      42.00
+          |     407.55       2.22
+          |    1217.15       2.97
+          |       0.00       0.00
+          |    7242.99       8.89
+----------+----------------------
+     2019 |      42.00      42.00
+          |     413.23       2.48
+          |    1185.81       3.02
+          |       0.00       0.00
+          |    7102.46       8.87
+----------+----------------------
+     2020 |      42.00      42.00
+          |     393.90       2.37
+          |    1220.81       2.97
+          |       0.00       0.00
+          |    7483.60       8.92
+----------+----------------------
+     2021 |      42.00      42.00
+          |     597.60       3.05
+          |    1506.32       3.14
+          |       9.75       2.37
+          |    8737.35       9.08
+----------+----------------------
+     2022 |      42.00      42.00
+          |     624.35       3.10
+          |    1586.77       3.09
+          |      12.66       2.61
+          |    9223.56       9.13
+----------+----------------------
+    Total |     252.00     252.00
+          |     469.44       2.56
+          |    1308.08       3.03
+          |       0.00       0.00
+          |    9223.56       9.13
+---------------------------------
+
+. 
+. * --- Deflactación, sobre el año REAL del dato ---
+. merge m:1 year_dato using `deflactores', keep(master match) generate(_m_def)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               252  (_m_def==3)
+    -----------------------------------------
+
+. assert _m_def == 3
+
+. drop _m_def
+
+. 
+. * Todas las variables monetarias pasan a pesos constantes de 2018.
+. foreach v in inversion sgp_educacion sgp_pae sgp_total inv_fut {
+  2.     generate double `v'_r = `v' * deflactor
+  3. }
+
+. foreach v in ing_trib_pc transf_pc {
+  2.     generate double `v'_r = `v' * deflactor
+  3. }
+
+. 
+. * --- Versiones per cápita ---
+. generate double inversion_pc = inversion_r     / pob
+
+. generate double sgp_pae_pc   = sgp_pae_r       / pob
+
+. generate double sgp_total_pc = sgp_total_r     / pob
+
+. generate double inv_fut_pc   = inv_fut_r       / pob
+
+. 
+. label variable inversion_pc "SGP libre inversión per cápita, pesos de 2018 (t-1)"
+
+. label variable sgp_pae_pc   "SGP alimentación escolar per cápita, pesos de 2018 (t-1)"
+
+. label variable sgp_total_pc "SGP total per cápita, pesos de 2018 (t-1)"
+
+. label variable inv_fut_pc   "Inversión ejecutada per cápita, pesos de 2018 (t-1)"
+
+. label variable ing_trib_pc_r "Ingresos tributarios per cápita, pesos de 2018 (t-1)"
+
+. 
+. * --- Logaritmos ---
+. foreach v in inversion_pc sgp_pae_pc sgp_total_pc inv_fut_pc {
+  2.     generate double ln_`v' = ln(`v') if `v' > 0
+  3. }
+(1 missing value generated)
+
+. generate double ln_ing_trib_pc = ln(ing_trib_pc_r) if ing_trib_pc_r > 0
+(2 missing values generated)
+
+. 
+. label variable ln_inversion_pc "Log de la asignación SGP de libre inversión per cápita (t-1
+> )"
+
+. label variable ln_inv_fut_pc   "Log de la inversión ejecutada per cápita (t-1)"
+
+. label variable ln_sgp_total_pc "Log del SGP total per cápita (t-1)"
+
+. label variable ln_sgp_pae_pc   "Log del SGP de alimentación escolar per cápita (t-1)"
+
+. label variable ln_ing_trib_pc  "Log de los ingresos tributarios per cápita (t-1)"
+
+. 
+. display _newline "--- Efecto de la deflactación sobre la medida principal ---"
+
+--- Efecto de la deflactación sobre la medida principal ---
+
+. tabstat inversion inversion_r inversion_pc, by(year_dato) ///
+>     stat(n mean p50) format(%15.0f)
+
+Summary statistics: N, Mean, p50
+Group variable: year_dato (year)
+
+year_dato |        invers~n        invers~r        invers~c
+----------+------------------------------------------------
+     2017 |              42              42              42
+          |      1895249673      1955518612          100273
+          |      1766855404      1823041406           70614
+----------+------------------------------------------------
+     2018 |              42              42              42
+          |      1927056903      1927056903           98173
+          |      1789179726      1789179726           67213
+----------+------------------------------------------------
+     2019 |              42              42              42
+          |      2171752594      2092247201          105508
+          |      2025820743      1951657749           80224
+----------+------------------------------------------------
+     2020 |              42              42              42
+          |      2283587922      2165129775          110221
+          |      2098864500      1989988639           68228
+----------+------------------------------------------------
+     2021 |              42              42              42
+          |      2309319238      2073022450          102195
+          |      2053214982      1843123585           70205
+----------+------------------------------------------------
+     2022 |              42              42              42
+          |      2221049737      1762539747           82931
+          |      2002252791      1588910896           56605
+----------+------------------------------------------------
+    Total |             252             252             252
+          |      2134669345      1995919115           99884
+          |      1955015279      1789674772           68029
+-----------------------------------------------------------
+
+. 
+. display _newline "--- Medidas fiscales per cápita en pesos de 2018 ---"
+
+--- Medidas fiscales per cápita en pesos de 2018 ---
+
+. tabstat inversion_pc inv_fut_pc sgp_total_pc sgp_pae_pc ing_trib_pc_r, ///
+>     by(year_dato) stat(n mean sd) format(%12.1f)
+
+Summary statistics: N, Mean, SD
+Group variable: year_dato (year)
+
+year_dato |     invers~c     inv_fu~c     sgp_to~c     sgp_pa~c     ing_tr~r
+----------+-----------------------------------------------------------------
+     2017 |         42.0         42.0         42.0         42.0         42.0
+          |     100273.3    1012973.9     600789.8       7596.2     125013.7
+          |      87353.4     359200.5     216610.1       3415.9     154359.4
+----------+-----------------------------------------------------------------
+     2018 |         42.0         42.0         42.0         42.0         42.0
+          |      98173.2    1018683.5     570974.9       7081.7     132926.4
+          |      88424.5     287076.7     219459.8       3085.2     164534.6
+----------+-----------------------------------------------------------------
+     2019 |         42.0         42.0         42.0         42.0         42.0
+          |     105508.4    1094772.6     621935.7       7739.8     160541.2
+          |      94712.8     285812.6     230955.8       3560.2     191830.0
+----------+-----------------------------------------------------------------
+     2020 |         42.0         42.0         42.0         42.0         42.0
+          |     110221.3     989231.2     640477.4       7474.5     135937.7
+          |     105473.0     268740.1     255469.8       3853.8     161149.1
+----------+-----------------------------------------------------------------
+     2021 |         42.0         42.0         42.0         42.0         42.0
+          |     102195.5     998915.6     631331.1       7047.3     141841.4
+          |      96090.2     404416.7     239912.1       4733.0     162577.2
+----------+-----------------------------------------------------------------
+     2022 |         42.0         42.0         42.0         42.0         42.0
+          |      82930.5    1050222.5     555685.7       5589.3     160141.7
+          |      74461.0     292573.0     188963.1       4360.9     204119.0
+----------+-----------------------------------------------------------------
+    Total |        252.0        252.0        252.0        252.0        252.0
+          |      99883.7    1027466.6     603532.4       7088.1     142733.7
+          |      91064.1     318826.3     226088.0       3903.6     172830.8
+----------------------------------------------------------------------------
+
+. 
+. 
+. ********************************************************************************
+. * [7] DESPLAZAMIENTO TEMPORAL
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[7] REZAGO DE UN PERÍODO"
+[7] REZAGO DE UN PERÍODO
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. generate int year = year_dato + 1
+
+. label variable year      "Año de la cohorte Saber 11 (llave de cruce)"
+
+. label variable year_dato "Año real del dato municipal (year - 1)"
+
+. 
+. tabulate year_dato year
+
+  Año real |
+  del dato |
+ municipal |            Año de la cohorte Saber 11 (llave de cruce)
+(year - 1) |      2018       2019       2020       2021       2022       2023 |     Total
+-----------+------------------------------------------------------------------+----------
+      2017 |        42          0          0          0          0          0 |        42 
+      2018 |         0         42          0          0          0          0 |        42 
+      2019 |         0          0         42          0          0          0 |        42 
+      2020 |         0          0          0         42          0          0 |        42 
+      2021 |         0          0          0          0         42          0 |        42 
+      2022 |         0          0          0          0          0         42 |        42 
+-----------+------------------------------------------------------------------+----------
+     Total |        42         42         42         42         42         42 |       252 
+
+. assert inrange(year, 2018, 2023)
+
+. 
+. 
+. ********************************************************************************
+. * [8] PANEL DE CONTROL
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[8] PANEL DE CONTROL"
+[8] PANEL DE CONTROL
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. quietly count
+
+. display "Observaciones municipio-año: " r(N) " (esperadas: 252)"
+Observaciones municipio-año: 252 (esperadas: 252)
+
+. isid cole_cod_mcpio_ubicacion year
+
+. 
+. display _newline "--- Cobertura de las variables del modelo ---"
+
+--- Cobertura de las variables del modelo ---
+
+. misstable summarize tasa_homicidios tasa_hom_eb ln_coca ln_inversion_pc ///
+>     ln_inv_fut_pc ln_sgp_total_pc ln_sgp_pae_pc ln_ing_trib_pc, all
+                                                               Obs<.
+                                                +------------------------------
+               |                                | Unique
+      Variable |     Obs=.     Obs>.     Obs<.  | values        Min         Max
+  -------------+--------------------------------+------------------------------
+  tasa_homic~s |                           252  |    224          0    293.0238
+   tasa_hom_eb |                           252  |    252   2.508989    275.4351
+       ln_coca |                           252  |    125          0    9.129625
+  ln_inversi~c |                           252  |    252   9.625678    13.14554
+  ln_inv_fut~c |         1                 251  |    251   9.956107    14.76402
+  ln_sgp_tot~c |                           252  |    252   12.49677    14.27448
+  ln_sgp_pae~c |                           252  |    252    7.44696    10.09831
+  ln_ing_tri~c |         2                 250  |    250   9.710581     13.8636
+  -----------------------------------------------------------------------------
+
+. 
+. display _newline "--- Descriptivos por año de cohorte ---"
+
+--- Descriptivos por año de cohorte ---
+
+. tabstat tasa_homicidios tasa_hom_eb ln_coca ln_inversion_pc ln_inv_fut_pc ///
+>     ln_ing_trib_pc, by(year) stat(n mean sd min max) format(%12.4f)
+
+Summary statistics: N, Mean, SD, Min, Max
+Group variable: year (Año de la cohorte Saber 11 (llave de cruce))
+
+    year |     tasa_h~s     tasa_h~b      ln_coca     ln_~n_pc     ln_~t_pc     ln_ing~c
+---------+------------------------------------------------------------------------------
+    2018 |      42.0000      42.0000      42.0000      42.0000      42.0000      42.0000
+         |      19.8220      20.2107       2.1513      11.2152      13.7827      11.2754
+         |      21.9114      16.2745       3.0162       0.7684       0.2883       0.8849
+         |       0.0000       3.2137       0.0000       9.7517      13.2649       9.8920
+         |      74.9906      64.4223       8.8042      12.8477      14.7640      13.4402
+---------+------------------------------------------------------------------------------
+    2019 |      42.0000      42.0000      42.0000      42.0000      42.0000      42.0000
+         |      36.2919      36.5684       2.2223      11.1917      13.7991      11.3817
+         |      36.3960      32.3616       2.9723       0.7672       0.2624       0.8199
+         |       0.0000       2.9457       0.0000       9.6545      13.3037      10.2986
+         |     139.3695     131.8095       8.8879      13.0032      14.4222      13.6677
+---------+------------------------------------------------------------------------------
+    2020 |      42.0000      42.0000      42.0000      42.0000      42.0000      42.0000
+         |      42.4451      42.7125       2.4846      11.2527      13.8754      11.5734
+         |      41.8552      37.2542       3.0186       0.7852       0.2467       0.8500
+         |       0.0000       4.1036       0.0000       9.7018      13.4423       9.7106
+         |     171.3129     158.5733       8.8683      13.0019      14.4258      13.7349
+---------+------------------------------------------------------------------------------
+    2021 |      42.0000      42.0000      42.0000      42.0000      42.0000      42.0000
+         |      47.5245      48.5862       2.3667      11.2646      13.7734      11.3841
+         |      56.1035      51.6645       2.9707       0.8175       0.2461       0.8707
+         |       0.0000       2.5090       0.0000       9.7342      13.3951      10.0966
+         |     293.0238     275.4351       8.9206      13.1455      14.4896      13.4955
+---------+------------------------------------------------------------------------------
+    2022 |      42.0000      42.0000      42.0000      42.0000      41.0000      40.0000
+         |      53.6340      53.2071       3.0456      11.1973      13.6886      11.4997
+         |      58.4098      52.8353       3.1443       0.8088       0.7701       0.8516
+         |       0.0000       3.5864       0.0000       9.7597       9.9561      10.3665
+         |     290.6327     273.0489       9.0755      13.0726      14.5068      13.4825
+---------+------------------------------------------------------------------------------
+    2023 |      42.0000      42.0000      42.0000      42.0000      42.0000      42.0000
+         |      60.6172      60.7456       3.0981      11.0189      13.8331      11.5632
+         |      45.6043      39.6430       3.0937       0.7691       0.2455       0.8354
+         |       0.0000       9.8220       0.0000       9.6257      13.3822      10.2947
+         |     144.0443     134.9248       9.1296      12.8452      14.6639      13.8636
+---------+------------------------------------------------------------------------------
+   Total |     252.0000     252.0000     252.0000     252.0000     251.0000     250.0000
+         |      43.3891      43.6718       2.5614      11.1901      13.7925      11.4458
+         |      46.5159      41.9343       3.0298       0.7826       0.3910       0.8507
+         |       0.0000       2.5090       0.0000       9.6257       9.9561       9.7106
+         |     293.0238     275.4351       9.1296      13.1455      14.7640      13.8636
+----------------------------------------------------------------------------------------
+
+. 
+. display _newline "--- Variación within y between de las medidas fiscales ---"
+
+--- Variación within y between de las medidas fiscales ---
+
+. * Decide qué medidas alternativas tienen suficiente variación temporal para la
+. * descomposición de Mundlak. Una variable casi enteramente transversal no
+. * aporta a la parte within del Objetivo 4.
+. xtset cole_cod_mcpio_ubicacion year
+
+Panel variable: cole_cod_mcpio_ubicacion (strongly balanced)
+ Time variable: year, 2018 to 2023
+         Delta: 1 unit
+
+. xtsum tasa_homicidios ln_coca ln_inversion_pc ln_inv_fut_pc ///
+>       ln_sgp_total_pc ln_sgp_pae_pc ln_ing_trib_pc
+
+Variable         |      Mean   Std. dev.       Min        Max |    Observations
+-----------------+--------------------------------------------+----------------
+tasa_h~s overall |  43.38911   46.51589          0   293.0238 |     N =     252
+         between |             37.00691   3.054605   158.7145 |     n =      42
+         within  |             28.66178  -107.6048   177.6984 |     T =       6
+                 |                                            |
+ln_coca  overall |  2.561449   3.029797          0   9.129625 |     N =     252
+         between |             2.926514          0   8.947691 |     n =      42
+         within  |             .8864517  -.1020045   6.295732 |     T =       6
+                 |                                            |
+ln_~n_pc overall |  11.19005   .7826483   9.625678   13.14554 |     N =     252
+         between |              .773179   9.704599   12.98602 |     n =      42
+         within  |             .1632211   10.66249    11.6158 |     T =       6
+                 |                                            |
+ln_~t_pc overall |  13.79246   .3910245   9.956107   14.76402 |     N =     251
+         between |             .2693602   13.05419   14.53842 |     n =      42
+         within  |             .2855176   10.69437   14.48074 | T-bar = 5.97619
+                 |                                            |
+ln_~l_pc overall |  13.24984   .3420332   12.49677   14.27448 |     N =     252
+         between |             .3387738    12.5664   14.14537 |     n =      42
+         within  |              .067121   12.99109   13.45643 |     T =       6
+                 |                                            |
+ln_~e_pc overall |  8.738522   .5027373    7.44696   10.09831 |     N =     252
+         between |             .4770341   7.590848   9.908037 |     n =      42
+         within  |             .1723845    8.24935   9.101598 |     T =       6
+                 |                                            |
+ln_ing~c overall |  11.44581   .8507068   9.710581    13.8636 |     N =     250
+         between |             .8008495   10.14305   13.54758 |     n =      42
+         within  |             .3001342   10.06798   12.68061 | T-bar = 5.95238
+
+. 
+. * C7: la comparación que decide la precondición P1(i). La referencia es la
+. * desviación dentro del municipio de la tasa cruda, 28,66 [Tabla 21].
+. display _newline "--- C7: tasa cruda frente a suavizada, y los indicadores nuevos ---"
+
+--- C7: tasa cruda frente a suavizada, y los indicadores nuevos ---
+
+. xtsum tasa_homicidios tasa_hom_eb iica minas tasa_hom_td ///
+>       desercion_of cob_neta_media
+
+Variable         |      Mean   Std. dev.       Min        Max |    Observations
+-----------------+--------------------------------------------+----------------
+tasa_h~s overall |  43.38911   46.51589          0   293.0238 |     N =     252
+         between |             37.00691   3.054605   158.7145 |     n =      42
+         within  |             28.66178  -107.6048   177.6984 |     T =       6
+                 |                                            |
+tasa_h~b overall |  43.67175    41.9343   2.508989   275.4351 |     N =     252
+         between |             33.33414   7.949103   149.4452 |     n =      42
+         within  |             25.87383  -95.20677   169.6616 |     T =       6
+                 |                                            |
+iica     overall |  .1565873   .1934862          0       1.72 |     N =     252
+         between |             .1643155   .0116667   .8383333 |     n =      42
+         within  |             .1047624   -.471746   1.038254 |     T =       6
+                 |                                            |
+minas    overall |  .8968254   4.255448          0         43 |     N =     252
+         between |              2.49714          0   13.83333 |     n =      42
+         within  |             3.463718  -12.93651   30.06349 |     T =       6
+                 |                                            |
+tasa_h~d overall |  55.16597   49.04075        2.5      300.5 |     N =     238
+         between |             43.36921      6.475   192.5833 |     n =      42
+         within  |              23.3499  -30.31737   163.0826 | T-bar = 5.66667
+                 |                                            |
+deserc~f overall |  2.846865   1.314524        .47       7.31 |     N =     252
+         between |             .8216579   1.243333   5.123333 |     n =      42
+         within  |             1.032618   .2485317   7.018532 |     T =       6
+                 |                                            |
+cob_ne~a overall |  32.79242   10.25914       8.73      60.27 |     N =     252
+         between |             9.808732   11.10667   55.03167 |     n =      42
+         within  |             3.309865   22.34575   42.90742 |     T =       6
+
+. 
+. display _newline "--- C7: razón DE_dentro / DE_total ---"
+
+--- C7: razón DE_dentro / DE_total ---
+
+. display "    (umbral de la precondición P2: 0,20, la razón del SGP en Tabla 21)"
+    (umbral de la precondición P2: 0,20, la razón del SGP en Tabla 21)
+
+. foreach v in tasa_homicidios tasa_hom_eb iica minas {
+  2.     quietly xtsum `v'
+  3.     display "  `v': DE_total " %9.4f r(sd) ///
+>             "  DE_dentro " %9.4f r(sd_w) ///
+>             "  razón " %6.3f r(sd_w)/r(sd)
+  4. }
+  tasa_homicidios: DE_total   46.5159  DE_dentro   28.6618  razón  0.616
+  tasa_hom_eb: DE_total   41.9343  DE_dentro   25.8738  razón  0.617
+  iica: DE_total    0.1935  DE_dentro    0.1048  razón  0.541
+  minas: DE_total    4.2554  DE_dentro    3.4637  razón  0.814
+
+. 
+. display _newline "--- C7: concordancia con la fuente independiente ---"
+
+--- C7: concordancia con la fuente independiente ---
+
+. correlate tasa_homicidios tasa_hom_eb tasa_hom_td
+(obs=238)
+
+             | tasa_h~s tasa_h~b tasa_h~d
+-------------+---------------------------
+tasa_homic~s |   1.0000
+ tasa_hom_eb |   0.9968   1.0000
+ tasa_hom_td |   0.8976   0.8959   1.0000
+
+
+. 
+. display _newline "--- Correlación entre las medidas fiscales en logaritmo ---"
+
+--- Correlación entre las medidas fiscales en logaritmo ---
+
+. correlate ln_inversion_pc ln_inv_fut_pc ln_sgp_total_pc ln_sgp_pae_pc ln_ing_trib_pc
+(obs=250)
+
+             | ln_~n_pc ln_~t_pc ln_~l_pc ln_~e_pc ln_ing~c
+-------------+---------------------------------------------
+ln_inversi~c |   1.0000
+ln_inv_fut~c |   0.5281   1.0000
+ln_sgp_tot~c |   0.8087   0.5908   1.0000
+ln_sgp_pae~c |   0.3812   0.2047   0.5080   1.0000
+ln_ing_tri~c |  -0.1250   0.1150  -0.3406  -0.2963   1.0000
+
+
+. 
+. display _newline "--- Valores atípicos en la inversión ejecutada ---"
+
+--- Valores atípicos en la inversión ejecutada ---
+
+. * El FUT tiene errores de reporte ocasionales. Un municipio-año con un valor
+. * dos órdenes de magnitud por debajo del resto casi con seguridad es uno.
+. quietly summarize ln_inv_fut_pc, detail
+
+. scalar p1_fut = r(p1)
+
+. quietly count if ln_inv_fut_pc < 12 & !missing(ln_inv_fut_pc)
+
+. scalar n_atip_fut = r(N)
+
+. display "Municipio-año con log de inversión ejecutada menor que 12: " r(N)
+Municipio-año con log de inversión ejecutada menor que 12: 2
+
+. if r(N) > 0 {
+.     list cole_cod_mcpio_ubicacion year_dato inv_fut_pc ln_inv_fut_pc ///
+>         if ln_inv_fut_pc < 12, clean noobs
+
+    cole_c~n   year_d~o   inv_fut~c   ln_inv_~c  
+       19397       2021   86132.009   11.363636  
+       19532       2021   21080.569    9.956107  
+. }
+
+. 
+. * ----------------------------------------------------------------------
+. * [8.1] Versión de la inversión ejecutada sin el atípico
+. * ----------------------------------------------------------------------
+. * La versión 3 se limitaba a listar el atípico y dejaba la decisión al analista,
+. * pero la descomposición de Mundlak se calculaba igualmente sobre la serie
+. * completa. Eso contamina DOS coeficientes a la vez: el promedio del municipio
+. * queda arrastrado hacia abajo, y la desviación de ese año se vuelve enorme,
+. * justo en la variable cuyo componente temporal se quiere identificar en R5.
+. *
+. * La versión 4 construye una segunda serie con el atípico puesto en faltante y
+. * calcula su descomposición sobre las observaciones restantes. NO reemplaza a
+. * la original: las dos quedan en la base para que el capítulo de resultados
+. * pueda reportar la prueba con y sin el atípico y mostrar si la conclusión
+. * depende de un solo dato mal reportado.
+. generate double ln_inv_fut_pc_x = ln_inv_fut_pc
+(1 missing value generated)
+
+. replace ln_inv_fut_pc_x = . if ln_inv_fut_pc < 12
+(2 real changes made, 2 to missing)
+
+. label variable ln_inv_fut_pc_x "Log de la inversión ejecutada per cápita, sin el atípico de
+>  reporte (t-1)"
+
+. 
+. quietly count if missing(ln_inv_fut_pc_x) & !missing(ln_inv_fut_pc)
+
+. display _newline "Municipio-año excluidos de la serie depurada: " r(N)
+
+Municipio-año excluidos de la serie depurada: 2
+
+. 
+. display _newline "--- Comparación de las dos series ---"
+
+--- Comparación de las dos series ---
+
+. tabstat ln_inv_fut_pc ln_inv_fut_pc_x, stat(n mean sd min max) format(%9.4f)
+
+   Stats |  ln_~t_pc  ln_inv~x
+---------+--------------------
+       N |  251.0000  249.0000
+    Mean |   13.7925   13.8176
+      SD |    0.3910    0.2653
+     Min |    9.9561   12.8287
+     Max |   14.7640   14.7640
+------------------------------
+
+. 
+. display _newline "--- Variación entre y dentro del municipio, con y sin el atípico ---"
+
+--- Variación entre y dentro del municipio, con y sin el atípico ---
+
+. * Este es el cuadro que decide si el atípico explica el resultado de R5: si la
+. * variación dentro del municipio cae mucho al depurar la serie, el dinamismo
+. * que justificaba usar el FUT venía en buena parte del error de reporte.
+. xtsum ln_inversion_pc ln_inv_fut_pc ln_inv_fut_pc_x
+
+Variable         |      Mean   Std. dev.       Min        Max |    Observations
+-----------------+--------------------------------------------+----------------
+ln_~n_pc overall |  11.19005   .7826483   9.625678   13.14554 |     N =     252
+         between |              .773179   9.704599   12.98602 |     n =      42
+         within  |             .1632211   10.66249    11.6158 |     T =       6
+                 |                                            |
+ln_~t_pc overall |  13.79246   .3910245   9.956107   14.76402 |     N =     251
+         between |             .2693602   13.05419   14.53842 |     n =      42
+         within  |             .2855176   10.69437   14.48074 | T-bar = 5.97619
+                 |                                            |
+ln_inv~x overall |  13.81762   .2652649   12.82869   14.76402 |     N =     249
+         between |             .2358477   13.41182   14.53842 |     n =      42
+         within  |             .1236071   13.21382   14.16618 | T-bar = 5.92857
+
+. 
+. display _newline "--- Contexto educativo municipal (no entra a los modelos) ---"
+
+--- Contexto educativo municipal (no entra a los modelos) ---
+
+. tabstat cob_neta_media desercion_of repitencia_of transito_sup, ///
+>     by(year) stat(n mean sd) format(%9.2f)
+
+Summary statistics: N, Mean, SD
+Group variable: year (Año de la cohorte Saber 11 (llave de cruce))
+
+    year |  cob_ne~a  deserc~f  repite~f  transi~p
+---------+----------------------------------------
+    2018 |     42.00     42.00     42.00     42.00
+         |     29.49      2.92      1.05     18.29
+         |      9.23      1.11      1.09      7.44
+---------+----------------------------------------
+    2019 |     42.00     42.00     42.00     42.00
+         |     30.42      2.56      0.75     17.24
+         |      9.35      1.07      0.83      6.84
+---------+----------------------------------------
+    2020 |     42.00     42.00     42.00     42.00
+         |     32.25      2.80      1.09     20.90
+         |     10.01      1.19      1.14      8.85
+---------+----------------------------------------
+    2021 |     42.00     42.00     42.00     42.00
+         |     33.58      1.73      6.14     20.37
+         |     10.20      0.83      2.01      9.07
+---------+----------------------------------------
+    2022 |     42.00     42.00     42.00     42.00
+         |     35.50      3.21      5.85     21.63
+         |     10.79      1.46      3.40      9.47
+---------+----------------------------------------
+    2023 |     42.00     42.00     42.00     42.00
+         |     35.51      3.87      7.18     22.30
+         |     10.85      1.19      2.37      8.89
+---------+----------------------------------------
+   Total |    252.00    252.00    252.00    252.00
+         |     32.79      2.85      3.68     20.12
+         |     10.26      1.31      3.40      8.59
+--------------------------------------------------
+
+. 
+. * C7: advertencia de serie. repitencia_of pasa de ~1% a ~6% entre 2019 y 2020,
+. * lo que delata un cambio de criterio de reporte en la serie educativa de
+. * TerriData. desercion_of cae a 1,73 ese mismo año, compatible con las
+. * políticas de promoción de la pandemia. Los efectos de año absorben el nivel,
+. * no un cambio en lo que mide el indicador. Va declarado en la nota de la tabla.
+. display _newline "AVISO C7: el salto de repitencia_of entre 2019 y 2020 indica"
+
+AVISO C7: el salto de repitencia_of entre 2019 y 2020 indica
+
+. display "cambio de criterio de reporte en la serie educativa de TerriData."
+cambio de criterio de reporte en la serie educativa de TerriData.
+
+. display "Leer desercion_of con esa reserva."
+Leer desercion_of con esa reserva.
+
+. 
+. 
+. ********************************************************************************
+. * [9] DESCOMPOSICIÓN DE MUNDLAK DE LAS MEDIDAS FISCALES ALTERNATIVAS
+. ********************************************************************************
+. * La descomposición del índice, de las tres dimensiones principales y, desde
+. * C7, de la tasa suavizada y el IICA, se hace en el script 06. Aquí se prepara
+. * la de las medidas fiscales alternativas, que solo se usan en las pruebas de
+. * robustez del Objetivo 4.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[9] DESCOMPOSICIÓN ENTRE Y DENTRO PARA LAS ALTERNATIVAS"
+[9] DESCOMPOSICIÓN ENTRE Y DENTRO PARA LAS ALTERNATIVAS
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. * `egen mean` ignora los faltantes, de modo que el promedio de la serie
+. * depurada se calcula sobre las observaciones válidas del municipio y la
+. * desviación queda en faltante solo para el municipio-año excluido.
+. foreach v in ln_inv_fut_pc ln_inv_fut_pc_x ln_sgp_total_pc ln_sgp_pae_pc ln_ing_trib_pc {
+  2.     bysort cole_cod_mcpio_ubicacion: egen double `v'_bar = mean(`v')
+  3.     generate double `v'_dev = `v' - `v'_bar
+  4. }
+(1 missing value generated)
+(3 missing values generated)
+(2 missing values generated)
+
+. 
+. label variable ln_inv_fut_pc_bar   "Inversión ejecutada promedio del municipio (entre)"
+
+. label variable ln_inv_fut_pc_dev   "Desviación de la inversión ejecutada (dentro)"
+
+. label variable ln_inv_fut_pc_x_bar "Inversión ejecutada promedio, serie depurada (entre)"
+
+. label variable ln_inv_fut_pc_x_dev "Desviación de la inversión ejecutada, serie depurada (d
+> entro)"
+
+. label variable ln_ing_trib_pc_bar  "Ingresos tributarios promedio del municipio (entre)"
+
+. label variable ln_ing_trib_pc_dev  "Desviación de los ingresos tributarios (dentro)"
+
+. 
+. display _newline "--- Verificación de la descomposición ---"
+
+--- Verificación de la descomposición ---
+
+. foreach v in ln_inv_fut_pc ln_ing_trib_pc {
+  2.     generate double _chk = `v'_bar + `v'_dev - `v'
+  3.     quietly summarize _chk
+  4.     display "  `v': error máximo " %12.10f max(abs(r(max)), abs(r(min)))
+  5.     drop _chk
+  6. }
+(1 missing value generated)
+  ln_inv_fut_pc: error máximo 0.0000000000
+(2 missing values generated)
+  ln_ing_trib_pc: error máximo 0.0000000000
+
+. 
+. 
+. ********************************************************************************
+. * [10] GUARDADO
+. ********************************************************************************
+. 
+. order cole_cod_mcpio_ubicacion year year_dato ///
+>       tasa_homicidios tasa_hom_eb homicidios pob coca ln_coca ///
+>       inversion inversion_r inversion_pc ln_inversion_pc ///
+>       inv_fut_pc ln_inv_fut_pc ln_inv_fut_pc_x sgp_total_pc ln_sgp_total_pc ///
+>       sgp_pae_pc ln_sgp_pae_pc ing_trib_pc_r ln_ing_trib_pc deflactor ///
+>       iica minas tasa_hom_td desercion_of cob_neta_media
+
+. 
+. compress
+  (0 bytes saved)
+
+. save "N3_Municipios_2018_2023.dta", replace
+file N3_Municipios_2018_2023.dta saved
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "NIVEL 3 CERRADO: N3_Municipios_2018_2023.dta"
+NIVEL 3 CERRADO: N3_Municipios_2018_2023.dta
+
+. display "RECORDATORIO: year es el año de la COHORTE; los datos son de year - 1."
+RECORDATORIO: year es el año de la COHORTE; los datos son de year - 1.
+
+. display "La medida principal de inversión es ln_inversion_pc (SGP libre"
+La medida principal de inversión es ln_inversion_pc (SGP libre
+
+. display "inversión). Las alternativas van solo en las pruebas de robustez."
+inversión). Las alternativas van solo en las pruebas de robustez.
+
+. display "NUEVO EN v5: tasa_hom_eb, la tasa suavizada por Bayes empírico (C7)."
+NUEVO EN v5: tasa_hom_eb, la tasa suavizada por Bayes empírico (C7).
+
+. display "Siguiente: 06_pca_vulnerabilidad_v3.do"
+Siguiente: 06_pca_vulnerabilidad_v3.do
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase4
+      name:  fase4
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_04_panel_municipal_N3_2
+> 0261019.log
+  log type:  text
+ closed on:  19 Oct 2026, 10:30:36
+---------------------------------------------------------------------------------------------

@@ -1,0 +1,392 @@
+------------------------------------------------------------------------------------------------------------------------------------
+      name:  fase11b
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_11b_emd.log
+  log type:  text
+ opened on:  12 Oct 2026, 18:10:23
+
+. 
+. 
+. ********************************************************************************
+. * [1] DESVIACIONES ESTANDAR DENTRO DEL MUNICIPIO
+. ********************************************************************************
+. * Se recalculan en vez de copiarse a mano, para que el numero del documento no
+. * se desactualice si cambia el panel municipal.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[1] DESVIACIONES ESTANDAR DENTRO DEL MUNICIPIO"
+[1] DESVIACIONES ESTANDAR DENTRO DEL MUNICIPIO
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "N3_Municipios_PCA.dta", clear
+
+. xtset cole_cod_mcpio_ubicacion year
+
+Panel variable: cole_cod_mcpio_ubicacion (strongly balanced)
+ Time variable: year, 2018 to 2023
+         Delta: 1 unit
+
+. 
+. foreach v in tasa_homicidios ln_coca ln_inversion_pc {
+  2.     quietly xtsum `v'
+  3.     scalar sdw_`v' = r(sd_w)
+  4.     display "`v': " %10.4f sdw_`v'
+  5. }
+tasa_homicidios:    28.6618
+ln_coca:     0.8865
+ln_inversion_pc:     0.1632
+
+. 
+. display _newline "Comparar con el bloque [1] de log_10_blindaje.log:"
+
+Comparar con el bloque [1] de log_10_blindaje.log:
+
+. display "homicidios 28,6618   coca 0,8865   inversion 0,1632"
+homicidios 28,6618   coca 0,8865   inversion 0,1632
+
+. 
+. 
+. ********************************************************************************
+. * [2] EMD DE CADA ESPECIFICACION
+. ********************************************************************************
+. 
+. display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+
+. display "[2] EFECTO MINIMO DETECTABLE POR ESPECIFICACION"
+[2] EFECTO MINIMO DETECTABLE POR ESPECIFICACION
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. tempname pe
+
+. postfile `pe' str12 modelo str20 variable ///
+>     double b se z p emd using "EMD_C1.dta", replace
+(file EMD_C1.dta not found)
+
+. 
+. foreach m in ML3 ML3_reml ML3_robust ML3b {
+  2. 
+.     capture confirm file "`m'.ster"
+  3.     if _rc != 0 {
+  4.         display as error _newline "`m'.ster no existe en el directorio; se omite."
+  5.         continue
+  6.     }
+  7. 
+.     capture noisily estimates use "`m'.ster"
+  8.     if _rc != 0 {
+  9.         display as error "No se pudo leer `m'.ster. Codigo: " _rc
+ 10.         continue
+ 11.     }
+ 12. 
+.     display _newline "{hline 70}"
+ 13.     display "--- `m' ---"
+ 14.     display "{hline 70}"
+ 15. 
+.     foreach v in tasa_homicidios ln_coca ln_inversion_pc {
+ 16. 
+.         capture noisily lincom sdw_`v' * `v'_dev
+ 17.         if _rc != 0 {
+ 18.             display as error "  `v'_dev no esta en `m'. Se omite."
+ 19.             continue
+ 20.         }
+ 21. 
+.         scalar b_v   = r(estimate)
+ 22.         scalar se_v  = r(se)
+ 23.         scalar z_v   = b_v / se_v
+ 24.         scalar p_v   = 2*normal(-abs(z_v))
+ 25.         scalar emd_v = 2.802 * se_v
+ 26. 
+.         display "  `v': b = " %9.4f b_v "   EE = " %8.4f se_v ///
+>             "   EMD = " %8.4f emd_v
+ 27. 
+.         post `pe' ("`m'") ("`v'") (b_v) (se_v) (z_v) (p_v) (emd_v)
+ 28.     }
+ 29. }
+
+----------------------------------------------------------------------
+--- ML3 ---
+----------------------------------------------------------------------
+
+ ( 1)  28.66178*[punt_global]tasa_homicidios_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.1911905   .1808473    -1.06   0.290    -.5456446    .1632637
+------------------------------------------------------------------------------
+  tasa_homicidios: b =   -0.1912   EE =   0.1808   EMD =   0.5067
+
+ ( 1)  .8864517*[punt_global]ln_coca_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.1320938   .1365963    -0.97   0.334    -.3998177    .1356301
+------------------------------------------------------------------------------
+  ln_coca: b =   -0.1321   EE =   0.1366   EMD =   0.3827
+
+ ( 1)  .1632211*[punt_global]ln_inversion_pc_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .5330767   .1690044     3.15   0.002      .201834    .8643193
+------------------------------------------------------------------------------
+  ln_inversion_pc: b =    0.5331   EE =   0.1690   EMD =   0.4736
+
+----------------------------------------------------------------------
+--- ML3_reml ---
+----------------------------------------------------------------------
+
+ ( 1)  28.66178*[punt_global]tasa_homicidios_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.1907064   .1808788    -1.05   0.292    -.5452223    .1638095
+------------------------------------------------------------------------------
+  tasa_homicidios: b =   -0.1907   EE =   0.1809   EMD =   0.5068
+
+ ( 1)  .8864517*[punt_global]ln_coca_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   -.132138   .1366198    -0.97   0.333    -.3999079    .1356319
+------------------------------------------------------------------------------
+  ln_coca: b =   -0.1321   EE =   0.1366   EMD =   0.3828
+
+ ( 1)  .1632211*[punt_global]ln_inversion_pc_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .5322998   .1690353     3.15   0.002     .2009967     .863603
+------------------------------------------------------------------------------
+  ln_inversion_pc: b =    0.5323   EE =   0.1690   EMD =   0.4736
+
+----------------------------------------------------------------------
+--- ML3_robust ---
+----------------------------------------------------------------------
+
+ ( 1)  28.66178*[punt_global]tasa_homicidios_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.1911905   .2293905    -0.83   0.405    -.6407876    .2584066
+------------------------------------------------------------------------------
+  tasa_homicidios: b =   -0.1912   EE =   0.2294   EMD =   0.6428
+
+ ( 1)  .8864517*[punt_global]ln_coca_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.1320938   .1853685    -0.71   0.476    -.4954093    .2312217
+------------------------------------------------------------------------------
+  ln_coca: b =   -0.1321   EE =   0.1854   EMD =   0.5194
+
+ ( 1)  .1632211*[punt_global]ln_inversion_pc_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .5330767   .2638973     2.02   0.043     .0158475    1.050306
+------------------------------------------------------------------------------
+  ln_inversion_pc: b =    0.5331   EE =   0.2639   EMD =   0.7394
+
+----------------------------------------------------------------------
+--- ML3b ---
+----------------------------------------------------------------------
+
+ ( 1)  28.66178*[punt_global]tasa_homicidios_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.2516057   .2789011    -0.90   0.367    -.7982417    .2950303
+------------------------------------------------------------------------------
+  tasa_homicidios: b =   -0.2516   EE =   0.2789   EMD =   0.7815
+
+ ( 1)  .8864517*[punt_global]ln_coca_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.0505202   .2339523    -0.22   0.829    -.5090582    .4080178
+------------------------------------------------------------------------------
+  ln_coca: b =   -0.0505   EE =   0.2340   EMD =   0.6555
+
+ ( 1)  .1632211*[punt_global]ln_inversion_pc_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .4672403   .2638719     1.77   0.077    -.0499391    .9844198
+------------------------------------------------------------------------------
+  ln_inversion_pc: b =    0.4672   EE =   0.2639   EMD =   0.7394
+
+. 
+. postclose `pe'
+
+. 
+. 
+. ********************************************************************************
+. * [3] TABLA COMPARATIVA
+. ********************************************************************************
+. 
+. display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+
+. display "[3] TABLA PARA EL ANEXO F.1"
+[3] TABLA PARA EL ANEXO F.1
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "EMD_C1.dta", clear
+
+. format b se z p emd %9.4f
+
+. 
+. display _newline "--- Todas las especificaciones ---"
+
+--- Todas las especificaciones ---
+
+. list modelo variable b se p emd, clean noobs sepby(modelo)
+
+        modelo          variable         b       se        p      emd  
+           ML3   tasa_homicidios   -0.1912   0.1808   0.2904   0.5067  
+           ML3           ln_coca   -0.1321   0.1366   0.3335   0.3827  
+           ML3   ln_inversion_pc    0.5331   0.1690   0.0016   0.4736  
+      ML3_reml   tasa_homicidios   -0.1907   0.1809   0.2917   0.5068  
+      ML3_reml           ln_coca   -0.1321   0.1366   0.3334   0.3828  
+      ML3_reml   ln_inversion_pc    0.5323   0.1690   0.0016   0.4736  
+    ML3_robust   tasa_homicidios   -0.1912   0.2294   0.4046   0.6428  
+    ML3_robust           ln_coca   -0.1321   0.1854   0.4761   0.5194  
+    ML3_robust   ln_inversion_pc    0.5331   0.2639   0.0434   0.7394  
+          ML3b   tasa_homicidios   -0.2516   0.2789   0.3670   0.7815  
+          ML3b           ln_coca   -0.0505   0.2340   0.8290   0.6555  
+          ML3b   ln_inversion_pc    0.4672   0.2639   0.0766   0.7394  
+
+. 
+. display _newline "--- EMD por variable, una fila por especificacion ---"
+
+--- EMD por variable, una fila por especificacion ---
+
+. preserve
+
+.     keep modelo variable emd
+
+.     quietly reshape wide emd, i(variable) j(modelo) string
+
+.     format emd* %9.4f
+
+.     list, clean noobs
+
+           variable   emdML3   emdML3~l   emdML3~t   emdML3b  
+            ln_coca   0.3827     0.3828     0.5194    0.6555  
+    ln_inversion_pc   0.4736     0.4736     0.7394    0.7394  
+    tasa_homicidios   0.5067     0.5068     0.6428    0.7815  
+
+. restore
+
+. 
+. display _newline "--- Cuanto crece el EMD frente a la Tabla 28 (ML3) ---"
+
+--- Cuanto crece el EMD frente a la Tabla 28 (ML3) ---
+
+. preserve
+
+.     keep modelo variable emd
+
+.     quietly reshape wide emd, i(variable) j(modelo) string
+
+.     capture confirm variable emdML3
+
+.     if _rc == 0 {
+.         foreach m in ML3_reml ML3_robust ML3b {
+  2.             capture confirm variable emd`m'
+  3.             if _rc == 0 {
+  4.                 generate double razon_`m' = emd`m' / emdML3
+  5.             }
+  6.         }
+.         format razon_* %9.3f
+.         list variable razon_*, clean noobs
+
+           variable   razon_~l   razon_~t   razon~3b  
+            ln_coca      1.000      1.357      1.713  
+    ln_inversion_pc      1.000      1.561      1.561  
+    tasa_homicidios      1.000      1.268      1.542  
+.     }
+
+.     else {
+.         display as error "ML3.ster no estaba; no hay base de comparacion."
+.     }
+
+. restore
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "COMO LEER ESTA TABLA"
+COMO LEER ESTA TABLA
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. display "Si el EMD apenas se mueve de ML3 a ML3_reml, el metodo de estimacion"
+Si el EMD apenas se mueve de ML3 a ML3_reml, el metodo de estimacion
+
+. display "no es el responsable. Si ML3_robust y ML3b dan EMD parecidos, el"
+no es el responsable. Si ML3_robust y ML3b dan EMD parecidos, el
+
+. display "modelo de la estructura nueva esta reproduciendo lo que el estimador"
+modelo de la estructura nueva esta reproduciendo lo que el estimador
+
+. display "sandwich ya indicaba, que es la mejor senal de que la estructura esta"
+sandwich ya indicaba, que es la mejor senal de que la estructura esta
+
+. display "bien especificada."
+bien especificada.
+
+. display _newline "Desviacion estandar del puntaje global: 45,98 puntos."
+
+Desviacion estandar del puntaje global: 45,98 puntos.
+
+. display "Un EMD de un punto equivale a 0,022 desviaciones del puntaje."
+Un EMD de un punto equivale a 0,022 desviaciones del puntaje.
+
+. display _newline "El EMD de este script sale de los errores estandar del MODELO."
+
+El EMD de este script sale de los errores estandar del MODELO.
+
+. display "El del bloque [4] del 11 sale del bootstrap salvaje y es mayor. Los"
+El del bloque [4] del 11 sale del bootstrap salvaje y es mayor. Los
+
+. display "dos van al Anexo F.1, cada uno declarando su origen."
+dos van al Anexo F.1, cada uno declarando su origen.
+
+. 
+. log close fase11b
+      name:  fase11b
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_11b_emd.log
+  log type:  text
+ closed on:  12 Oct 2026, 18:10:25
+------------------------------------------------------------------------------------------------------------------------------------

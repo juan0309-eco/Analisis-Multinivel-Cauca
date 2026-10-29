@@ -1,0 +1,967 @@
+---------------------------------------------------------------------------------------------
+      name:  fase14c
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_14c_popayan_20261014b.l
+> og
+  log type:  text
+ opened on:  14 Oct 2026, 13:50:31
+
+. 
+. * ---------------------------------------------------------------------------
+. * INTERRUPTORES
+. * ---------------------------------------------------------------------------
+. local hacer_prep = 1    // [0] preparación y verificaciones   (2-4 min)
+
+. local hacer_A    = 1    // [A] descomposición de C2            (15-21 min)
+
+. local hacer_B    = 1    // [B] gradiente de Popayán            (16-23 min)
+
+. 
+. global v_n1 mujer edad repitente lectura_30min libros_26omas ///
+>             trabaja_mas20 internet_hogar computador_hogar
+
+. global v_n2 ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>             dotacion_tic rural ju_unica tecnico tecnico_academico ///
+>             cole_femenino
+
+. global v_mun tasa_homicidios_bar tasa_homicidios_dev ln_coca_bar ///
+>              ln_coca_dev ln_inversion_pc_bar ln_inversion_pc_dev
+
+. 
+. * Estructura aleatoria de C1, idéntica a la del script 12 y a la del 14
+. global RE "|| mcpio_id: || mcpio_id: R.year || sede_id: || sede_anio:"
+
+. 
+. timer clear
+
+. 
+. 
+. ********************************************************************************
+. * [0] PREPARACIÓN Y VERIFICACIONES
+. ********************************************************************************
+. 
+. if `hacer_prep' == 1 {
+. 
+.     timer on 1
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[0] PREPARACION"
+[0] PREPARACION
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     capture confirm file "Base_C2.dta"
+.     if _rc != 0 {
+.         display as error "No se encuentra Base_C2.dta."
+.         display as error "Correr el bloque [0] de 12_composicional.do."
+.         exit 601
+.     }
+. 
+.     use "Base_C2.dta", clear
+. 
+.     * --- [0.1] Que estén las variables de la descomposición ---
+.     confirm variable inse_sede_perm inse_sede_dev cwc_inse c_inse
+.     confirm variable c_inse_prom_sede inse_prom_sede sede_anio mcpio_id sede_id
+.     confirm variable cole_cod_mcpio_ubicacion
+.     * El cuerpo de un foreach NO puede ir en la misma línea que la llave de
+.     * apertura: Stata responde r(198), "code follows on the same line as open
+.     * brace". Así abortó la corrida de las 13:26.
+.     foreach v of global v_n1 {
+  2.         confirm variable `v'
+  3.     }
+.     foreach v of global v_n2 {
+  2.         confirm variable `v'
+  3.     }
+.     foreach v of global v_mun {
+  2.         confirm variable `v'
+  3.     }
+.     display "Todas las variables necesarias están presentes."
+Todas las variables necesarias están presentes.
+. 
+.     display _newline "--- Estado del conjunto de imputación ---"
+
+--- Estado del conjunto de imputación ---
+.     mi describe
+
+Style: flong
+       last mi update 12oct2026 21:35:01, approximately 40 hours ago
+
+Observations:
+   Complete            0
+   Incomplete     69,750  (M = 20 imputations)
+   ---------------------
+   Total          69,750
+
+Variables:
+   Imputed: 20; estu_inse_individual(3249) mujer(2) lectura_30min(5432) libros_26omas(7196)
+            trabaja_mas20(3368) internet_hogar(5322) computador_hogar(3435)
+            ln_matricula(179) ratio_alumnos_docente(179) pct_planta(179) pct_posgrado(179)
+            dotacion_tic(1614) tecnico(532) tecnico_academico(532) inse_prom_sede(69750)
+            c_inse(69750) cwc_inse(69750) c_inse_prom_sede(69750) inse_sede_perm(69750)
+            inse_sede_dev(69750)
+
+   Passive: 1; z_posgrado(179)
+
+   Regular: 36; punt_global edad repitente estrato year rural ju_unica evaluados_sede
+            indice_vuln indice_vuln_anual vuln_bar vuln_dev tasa_homicidios
+            tasa_homicidios_bar tasa_homicidios_dev coca ln_coca ln_coca_bar ln_coca_dev
+            ln_inversion_pc ln_inversion_pc_bar ln_inversion_pc_dev ln_inv_fut_pc
+            ln_inv_fut_pc_bar ln_inv_fut_pc_dev ln_ing_trib_pc ln_ing_trib_pc_bar
+            ln_ing_trib_pc_dev ln_sgp_pae_pc ln_sgp_total_pc ln_inv_fut_pc_x
+            ln_inv_fut_pc_x_bar ln_inv_fut_pc_x_dev sede_id mcpio_id sede_anio
+
+   System:  3; _mi_m _mi_id _mi_miss
+
+   (there are 118 unregistered variables)
+. 
+.     * --- [0.2] Indicadora de Popayán ---
+.     * Verificada en el bloque [0] del script 14: 19001 reúne 13.962 estudiantes,
+.     * que es el municipio mayor del agrupado [log_08, bloque 1].
+.     capture drop popayan
+.     generate byte popayan = (cole_cod_mcpio_ubicacion == 19001)
+.     label variable popayan "Municipio de Popayán (1 = sí)"
+.     mi register regular popayan
+.     mi update
+. 
+.     quietly count if popayan == 1 & _mi_m == 0
+.     display _newline "Estudiantes en Popayán: " r(N) " (esperados: 13.962)"
+
+Estudiantes en Popayán: 13962 (esperados: 13.962)
+.     assert r(N) == 13962
+. 
+.     quietly count if popayan == 0 & _mi_m == 0
+.     display "Estudiantes fuera de Popayán: " r(N) " (esperados: 55.788)"
+Estudiantes fuera de Popayán: 55788 (esperados: 55.788)
+.     assert r(N) == 55788
+. 
+.     * --- [0.3] Cuántas sedes aporta Popayán ---
+.     * Importa para leer el resultado: si Popayán concentra buena parte de las
+.     * sedes de nivel socioeconómico alto, excluirlo recorta el rango sobre el
+.     * que se identifica el componente permanente, y la pérdida de precisión
+.     * sería esperable antes que sorprendente.
+.     display _newline "--- Sedes y dispersión del componente permanente ---"
+
+--- Sedes y dispersión del componente permanente ---
+.     preserve
+.         keep if _mi_m == 1
+(1,395,000 observations deleted)
+.         egen byte _ts = tag(cole_cod_dane_sede)
+.         tabulate popayan if _ts == 1
+
+  Municipio |
+ de Popayán |
+   (1 = sí) |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |        391       89.47       89.47
+          1 |         46       10.53      100.00
+------------+-----------------------------------
+      Total |        437      100.00
+.         display _newline "Componente permanente, dentro y fuera de Popayán:"
+
+Componente permanente, dentro y fuera de Popayán:
+.         tabstat inse_sede_perm if _ts == 1, by(popayan) ///
+>             stat(n mean sd min max) format(%9.4f)
+
+Summary for variables: inse_sede_perm
+Group variable: popayan (Municipio de Popayán (1 = sí))
+
+ popayan |         N      Mean        SD       Min       Max
+---------+--------------------------------------------------
+       0 |  391.0000   -0.6001    3.2880   -8.8518   10.0881
+       1 |   46.0000    5.1010    5.0619   -4.5692   17.5871
+---------+--------------------------------------------------
+   Total |  437.0000   -0.0000    3.9221   -8.8518   17.5871
+------------------------------------------------------------
+.         display _newline "Desviación de cohorte:"
+
+Desviación de cohorte:
+.         tabstat inse_sede_dev, by(popayan) stat(n mean sd min max) format(%9.4f)
+
+Summary for variables: inse_sede_dev
+Group variable: popayan (Municipio de Popayán (1 = sí))
+
+ popayan |         N      Mean        SD       Min       Max
+---------+--------------------------------------------------
+       0 |  5.58e+04   -0.0058    1.8700   -8.6438   11.5792
+       1 |  1.40e+04    0.0000    1.3593   -5.5031    6.3028
+---------+--------------------------------------------------
+   Total |  6.98e+04   -0.0046    1.7795   -8.6438   11.5792
+------------------------------------------------------------
+.     restore
+. 
+.     save "C5_Base_Pop_`hoy'.dta", replace
+(file C5_Base_Pop_20261014b.dta not found)
+file C5_Base_Pop_20261014b.dta saved
+.     display _newline "Base guardada: C5_Base_Pop_`hoy'.dta"
+
+Base guardada: C5_Base_Pop_20261014b.dta
+. 
+.     timer off 1
+.     display _newline "Tiempo del bloque [0]:"
+
+Tiempo del bloque [0]:
+.     timer list 1
+   1:    196.51 /        1 =     196.5080
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [A] LA DESCOMPOSICIÓN DE C2, CON Y SIN POPAYÁN
+. ********************************************************************************
+. * [A0] reproduce la Tabla 11b columna (2) con cinco imputaciones. Es el control
+. *      que vuelve interpretable a [A1].
+. * [A1] es el modelo que decide, sobre popayan == 0.
+. 
+. if `hacer_A' == 1 {
+. 
+.     timer on 2
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[A] COMPONENTE PERMANENTE FRENTE A DESVIACION DE COHORTE"
+[A] COMPONENTE PERMANENTE FRENTE A DESVIACION DE COHORTE
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     capture confirm file "C5_Base_Pop_`hoy'.dta"
+.     if _rc != 0 {
+.         display as error "No se encuentra C5_Base_Pop_`hoy'.dta. Correr el bloque [0]."
+.         exit 601
+.     }
+.     use "C5_Base_Pop_`hoy'.dta", clear
+. 
+.     * ----------------------------------------------------------------------
+.     * [A0] Muestra completa: control de reproducción
+.     * ----------------------------------------------------------------------
+.     display _newline "--- [A0] Muestra completa, cinco imputaciones ---"
+
+--- [A0] Muestra completa, cinco imputaciones ---
+.     display "Debe reproducir la Tabla 11b columna (2):"
+Debe reproducir la Tabla 11b columna (2):
+.     display "   permanente 1,946 (0,248)   cohorte 0,010 (0,106)   betaw 0,279 (0,027)"
+   permanente 1,946 (0,248)   cohorte 0,010 (0,106)   betaw 0,279 (0,027)
+.     display "Si no la reproduce, [A1] no es interpretable y hay que parar."
+Si no la reproduce, [A1] no es interpretable y hay que parar.
+. 
+.     mi estimate, imputations(1/5) dots post: mixed punt_global cwc_inse    ///
+>         inse_sede_perm inse_sede_dev $v_n1 $v_n2 indice_vuln ib2018.year   ///
+>         $RE , reml
+
+Imputations (5):
+  ..... done
+
+Multiple-imputation estimates                   Imputations       =          5
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0275
+                                                Largest FMI       =     0.2401
+DF adjustment:   Large sample                   DF:     min       =      81.41
+                                                        avg       = 2256031.78
+                                                        max       =   3.55e+07
+Model F test:       Equal FMI                   F(  27,96478.7)   =     267.58
+                                                Prob > F          =     0.0000
+
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+             cwc_inse |   .2798269   .0279488    10.01   0.000     .2249399     .334714
+       inse_sede_perm |    1.96024   .2483782     7.89   0.000     1.473398    2.447083
+        inse_sede_dev |   .0282287   .1043265     0.27   0.787    -.1762645    .2327218
+                mujer |  -8.208509   .2768082   -29.65   0.000    -8.751044   -7.665975
+                 edad |  -7.479247   .1240633   -60.29   0.000    -7.722407   -7.236087
+            repitente |   5.928128   .4169351    14.22   0.000     5.110948    6.745308
+        lectura_30min |   6.765493   .3186525    21.23   0.000     6.131523    7.399463
+        libros_26omas |   5.383828   .4129122    13.04   0.000     4.566984    6.200671
+        trabaja_mas20 |  -3.021481   .7201595    -4.20   0.000    -4.435838   -1.607123
+       internet_hogar |   .2772588   .3752881     0.74   0.460    -.4586944    1.013212
+     computador_hogar |   .5617109   .3576573     1.57   0.116    -.1393701    1.262792
+         ln_matricula |   3.973057   1.020915     3.89   0.000      1.97204    5.974073
+ratio_alumnos_docente |   -.085941   .0784288    -1.10   0.273    -.2396588    .0677767
+           pct_planta |   8.776744   1.660078     5.29   0.000     5.522749    12.03074
+           z_posgrado |   .0489593   .2024893     0.24   0.809    -.3479212    .4458397
+         dotacion_tic |   .9684799   1.705287     0.57   0.570    -2.374919    4.311879
+                rural |  -5.579615   1.834683    -3.04   0.002    -9.175535   -1.983696
+             ju_unica |   .4054306   .8194973     0.49   0.621    -1.200762    2.011623
+              tecnico |  -1.353777    1.29135    -1.05   0.295    -3.888447    1.180893
+    tecnico_academico |  -7.248801   2.349655    -3.09   0.002    -11.85717   -2.640428
+        cole_femenino |   24.35228   5.438523     4.48   0.000     13.69296     35.0116
+          indice_vuln |  -.9262938   .6407948    -1.45   0.148    -2.182229    .3296417
+                      |
+                 year |
+                2019  |  -4.733722   .7822395    -6.05   0.000    -6.266886   -3.200559
+                2020  |  -3.307474    .853521    -3.88   0.000    -4.980345   -1.634602
+                2021  |  -7.601481   .8651617    -8.79   0.000    -9.297168   -5.905794
+                2022  |  -3.178464   .9135152    -3.48   0.001    -4.968921   -1.388007
+                2023  |  -.1617043   .9759753    -0.17   0.868    -2.074583    1.751174
+                      |
+                _cons |   325.6045   7.290554    44.66   0.000     311.3146    339.8944
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   14.86851   1.841801      11.66345    18.95431
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |   1.775617   .3263223      1.238556    2.545557
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                   sd(_cons) |   10.45114   .4563687      9.593878      11.385
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |    4.64244    .227581      4.217147    5.110622
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.36425   .0934507      34.18158     34.5479
+------------------------------------------------------------------------------
+.     display "Observaciones utilizadas: " e(N)
+Observaciones utilizadas: 69750
+.     estimates save "C5_A0_permdev_full_`hoy'.ster", replace
+(note: file C5_A0_permdev_full_20261014b.ster not found)
+file C5_A0_permdev_full_20261014b.ster saved
+. 
+.     display _newline "Contraste permanente = desviación de cohorte:"
+
+Contraste permanente = desviación de cohorte:
+.     test inse_sede_perm = inse_sede_dev
+
+ ( 1)  [punt_global]inse_sede_perm - [punt_global]inse_sede_dev = 0
+
+           chi2(  1) =   52.16
+         Prob > chi2 =    0.0000
+.     lincom inse_sede_perm - inse_sede_dev
+
+ ( 1)  [punt_global]inse_sede_perm - [punt_global]inse_sede_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   1.932012   .2675011     7.22   0.000     1.407719    2.456304
+------------------------------------------------------------------------------
+.     display "   [referencia con 20 imputaciones: chi2(1) = 52,69; p < 0,0001]"
+   [referencia con 20 imputaciones: chi2(1) = 52,69; p < 0,0001]
+. 
+.     display _newline "Desviación de cohorte frente al efecto dentro de la sede:"
+
+Desviación de cohorte frente al efecto dentro de la sede:
+.     test inse_sede_dev = cwc_inse
+
+ ( 1)  - [punt_global]cwc_inse + [punt_global]inse_sede_dev = 0
+
+           chi2(  1) =    5.72
+         Prob > chi2 =    0.0168
+.     lincom inse_sede_dev - cwc_inse
+
+ ( 1)  - [punt_global]cwc_inse + [punt_global]inse_sede_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.2515982   .1052155    -2.39   0.017    -.4578167   -.0453797
+------------------------------------------------------------------------------
+. 
+.     * ----------------------------------------------------------------------
+.     * [A1] Sin Popayán: el modelo que decide
+.     * ----------------------------------------------------------------------
+.     display _newline(2) "--- [A1] Sin Popayán ---"
+
+
+--- [A1] Sin Popayán ---
+.     display "Esperadas 55.788 observaciones."
+Esperadas 55.788 observaciones.
+. 
+.     mi estimate, imputations(1/5) dots post: mixed punt_global cwc_inse    ///
+>         inse_sede_perm inse_sede_dev $v_n1 $v_n2 indice_vuln ib2018.year   ///
+>         if popayan == 0 $RE , reml
+
+Imputations (5):
+  ..... done
+
+Multiple-imputation estimates                   Imputations       =          5
+Mixed-effects REML regression                   Number of obs     =     55,788
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         41        248    1,360.7      5,219
+                sede_id |        391          2      142.7      1,109
+              sede_anio |      2,186          1       25.5        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0287
+                                                Largest FMI       =     0.2246
+DF adjustment:   Large sample                   DF:     min       =      92.42
+                                                        avg       = 1874268.21
+                                                        max       =   1.41e+07
+Model F test:       Equal FMI                   F(  26,84135.3)   =     222.11
+                                                Prob > F          =     0.0000
+
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+             cwc_inse |    .209589   .0306769     6.83   0.000     .1493459    .2698321
+       inse_sede_perm |   1.431019   .2922607     4.90   0.000     .8581656    2.003873
+        inse_sede_dev |   .0028904   .1090264     0.03   0.979    -.2108239    .2166048
+                mujer |  -7.409198   .2950536   -25.11   0.000    -7.987493   -6.830903
+                 edad |  -7.316802    .131741   -55.54   0.000    -7.575009   -7.058594
+            repitente |   9.101206   .5138044    17.71   0.000     8.094168    10.10824
+        lectura_30min |   6.273073   .3423039    18.33   0.000       5.5948    6.951346
+        libros_26omas |   5.026861   .4786863    10.50   0.000     4.076207    5.977515
+        trabaja_mas20 |  -2.706681   .7589859    -3.57   0.000    -4.197089   -1.216274
+       internet_hogar |   .1139066   .4047711     0.28   0.778    -.6798527    .9076659
+     computador_hogar |   .7734529   .3910576     1.98   0.048      .006894    1.540012
+         ln_matricula |   4.130752   1.118697     3.69   0.000      1.93813    6.323375
+ratio_alumnos_docente |  -.0839097   .0841698    -1.00   0.319    -.2488794    .0810601
+           pct_planta |    9.26649   1.818425     5.10   0.000     5.702115    12.83086
+           z_posgrado |  -.0973899   .2290657    -0.43   0.671    -.5463512    .3515713
+         dotacion_tic |   .7262885   1.722249     0.42   0.673     -2.65011    4.102687
+                rural |  -7.351965   2.021015    -3.64   0.000    -11.31309   -3.390841
+             ju_unica |  -.0399698   .8511539    -0.05   0.963    -1.708212    1.628273
+              tecnico |  -1.365843   1.383781    -0.99   0.324    -4.083146     1.35146
+    tecnico_academico |  -7.373901   2.691304    -2.74   0.006    -12.65547   -2.092331
+        cole_femenino |          0  (omitted)
+          indice_vuln |  -.7896041   .6345833    -1.24   0.213    -2.033365    .4541568
+                      |
+                 year |
+                2019  |  -4.885062   .7870087    -6.21   0.000    -6.427573   -3.342552
+                2020  |  -3.047767   .8715343    -3.50   0.000    -4.755944   -1.339591
+                2021  |  -7.245027   .8829024    -8.21   0.000    -8.975484   -5.514569
+                2022  |  -3.098429    .939388    -3.30   0.001    -4.939595   -1.257262
+                2023  |  -.2219844   1.010395    -0.22   0.826    -2.202323    1.758354
+                      |
+                _cons |   321.7966   7.900825    40.73   0.000     306.3111    337.2821
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   14.08344   1.807598       10.9511    18.11173
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |   1.627118   .4036988      1.000529    2.646113
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                   sd(_cons) |   10.80304   .4945523      9.875945    11.81716
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |   4.741036   .2600539      4.257781     5.27914
+-----------------------------+------------------------------------------------
+                sd(Residual) |    33.4018   .1016832       33.2031     33.6017
+------------------------------------------------------------------------------
+.     display "Observaciones utilizadas: " e(N)
+Observaciones utilizadas: 55788
+.     estimates save "C5_A1_permdev_sinpop_`hoy'.ster", replace
+(note: file C5_A1_permdev_sinpop_20261014b.ster not found)
+file C5_A1_permdev_sinpop_20261014b.ster saved
+. 
+.     display _newline "Contraste permanente = desviación de cohorte:"
+
+Contraste permanente = desviación de cohorte:
+.     test inse_sede_perm = inse_sede_dev
+
+ ( 1)  [punt_global]inse_sede_perm - [punt_global]inse_sede_dev = 0
+
+           chi2(  1) =   21.17
+         Prob > chi2 =    0.0000
+.     lincom inse_sede_perm - inse_sede_dev
+
+ ( 1)  [punt_global]inse_sede_perm - [punt_global]inse_sede_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   1.428129   .3103632     4.60   0.000      .819828    2.036429
+------------------------------------------------------------------------------
+. 
+.     display _newline "Desviación de cohorte frente al efecto dentro de la sede:"
+
+Desviación de cohorte frente al efecto dentro de la sede:
+.     test inse_sede_dev = cwc_inse
+
+ ( 1)  - [punt_global]cwc_inse + [punt_global]inse_sede_dev = 0
+
+           chi2(  1) =    3.51
+         Prob > chi2 =    0.0608
+.     lincom inse_sede_dev - cwc_inse
+
+ ( 1)  - [punt_global]cwc_inse + [punt_global]inse_sede_dev = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.2066986    .110255    -1.87   0.061    -.4227944    .0093973
+------------------------------------------------------------------------------
+. 
+.     * Efecto mínimo detectable del componente de cohorte sin Popayán, para
+.     * poder distinguir pérdida de potencia de refutación, como exige el
+.     * criterio. Mismo factor 2,802 que usaron C1 y C2.
+.     display _newline "--- EMD del componente de cohorte, sin Popayán ---"
+
+--- EMD del componente de cohorte, sin Popayán ---
+.     scalar se_dev = _se[inse_sede_dev]
+.     display "   E. E. del componente de cohorte : " %8.4f se_dev
+   E. E. del componente de cohorte :   0.1090
+.     display "   EMD = 2,802 x E. E.             : " %8.4f 2.802*se_dev
+   EMD = 2,802 x E. E.             :   0.3055
+.     display "   [referencia con la muestra completa: EMD = 0,296]"
+   [referencia con la muestra completa: EMD = 0,296]
+. 
+.     display _newline "--- CRITERIO (fijado el 14 de octubre, 13:10) ---"
+
+--- CRITERIO (fijado el 14 de octubre, 13:10) ---
+.     display "  (a) permanente significativo al 5 %"
+  (a) permanente significativo al 5 %
+.     display "  (b) permanente >= 1,460"
+  (b) permanente >= 1,460
+.     display "  (c) contraste permanente = cohorte rechazado al 5 %"
+  (c) contraste permanente = cohorte rechazado al 5 %
+.     display "  (d) cohorte sin significancia al 5 %"
+  (d) cohorte sin significancia al 5 %
+.     display "  (a)(b)(c)(d)        -> SE MANTIENE"
+  (a)(b)(c)(d)        -> SE MANTIENE
+.     display "  (a)(c)(d) sin (b)   -> SE DEBILITA"
+  (a)(c)(d) sin (b)   -> SE DEBILITA
+.     display "  (b) sin (a)         -> NO CONCLUYENTE POR POTENCIA"
+  (b) sin (a)         -> NO CONCLUYENTE POR POTENCIA
+.     display "  sin (a) ni (b), o sin (c) -> DEPENDE DE UN SOLO MUNICIPIO"
+  sin (a) ni (b), o sin (c) -> DEPENDE DE UN SOLO MUNICIPIO
+.     display "  falla (d)           -> hallazgo nuevo, se reabre C2"
+  falla (d)           -> hallazgo nuevo, se reabre C2
+. 
+.     timer off 2
+.     display _newline "Tiempo del bloque [A]:"
+
+Tiempo del bloque [A]:
+.     timer list 2
+   2:   1175.92 /        1 =    1175.9160
+. }
+
+. 
+. 
+. ********************************************************************************
+. * [B] ¿ES EL GRADIENTE DE POPAYÁN DISTINTO DEL RESTO?
+. ********************************************************************************
+. * [B1] mide la diferencia directamente, en lugar de inferirla de la comparación
+. *      entre submuestras.
+. * [B2] pregunta si esa diferencia es de Popayán o simplemente de urbanidad. C6
+. *      estimó un gradiente de 0,373 en sedes urbanas y 0,015 en rurales, de modo
+. *      que la interacción con Popayán podría estar recogiendo eso.
+. 
+. if `hacer_B' == 1 {
+. 
+.     timer on 3
+.     display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+.     display "[B] GRADIENTE DE POPAYAN FRENTE AL RESTO"
+[B] GRADIENTE DE POPAYAN FRENTE AL RESTO
+.     display "{hline 78}"
+------------------------------------------------------------------------------
+. 
+.     use "C5_Base_Pop_`hoy'.dta", clear
+. 
+.     * ----------------------------------------------------------------------
+.     * [B1] Interacción con Popayán sobre la especificación de ML3b
+.     * ----------------------------------------------------------------------
+.     display _newline "--- [B1] c_inse x Popayán ---"
+
+--- [B1] c_inse x Popayán ---
+.     display "Hipótesis declarada: la interacción es POSITIVA."
+Hipótesis declarada: la interacción es POSITIVA.
+.     display "Si resulta significativa y NEGATIVA, revisar la construcción de"
+Si resulta significativa y NEGATIVA, revisar la construcción de
+.     display "las variables antes de interpretar nada."
+las variables antes de interpretar nada.
+. 
+.     mi estimate, imputations(1/5) dots post: mixed punt_global             ///
+>         c.c_inse##i.popayan $v_n1 $v_n2 $v_mun ib2018.year $RE , reml
+
+Imputations (5):
+  ..... done
+
+Multiple-imputation estimates                   Imputations       =          5
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0249
+                                                Largest FMI       =     0.2389
+DF adjustment:   Large sample                   DF:     min       =      82.20
+                                                        avg       =   1.30e+08
+                                                        max       =   3.66e+09
+Model F test:       Equal FMI                   F(  32,148437.8)  =     225.28
+                                                Prob > F          =     0.0000
+
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+               c_inse |   .2085136   .0295159     7.06   0.000     .1505298    .2664974
+            1.popayan |   20.02429   14.52197     1.38   0.168    -8.438247    48.48683
+                      |
+     popayan#c.c_inse |
+                   1  |    .337995   .0467363     7.23   0.000     .2462121     .429778
+                      |
+                mujer |  -8.202705   .2767735   -29.64   0.000    -8.745172   -7.660238
+                 edad |  -7.497329   .1240801   -60.42   0.000    -7.740522   -7.254137
+            repitente |   5.942144   .4169249    14.25   0.000     5.124984    6.759305
+        lectura_30min |   6.771643   .3183305    21.27   0.000     6.138405    7.404881
+        libros_26omas |   5.306911   .4115582    12.89   0.000     4.493217    6.120606
+        trabaja_mas20 |  -3.034359   .7201522    -4.21   0.000    -4.448746   -1.619971
+       internet_hogar |   .3575665   .3755181     0.95   0.341    -.3788554    1.093988
+     computador_hogar |    .560571   .3577286     1.57   0.117    -.1406575      1.2618
+         ln_matricula |   5.151925   1.037805     4.96   0.000     3.117784    7.186066
+ratio_alumnos_docente |  -.0931432   .0792074    -1.18   0.240    -.2483869    .0621005
+           pct_planta |   9.761196   1.684874     5.79   0.000      6.45882    13.06357
+           z_posgrado |   .0424006   .2027091     0.21   0.834    -.3549101    .4397114
+         dotacion_tic |   1.326106    1.72589     0.77   0.442    -2.057675    4.709888
+                rural |  -10.70333   1.788012    -5.99   0.000    -14.20779   -7.198867
+             ju_unica |   .2630599   .8264492     0.32   0.750     -1.35676     1.88288
+              tecnico |  -.5792603   1.368086    -0.42   0.672    -3.266216    2.107695
+    tecnico_academico |  -5.882362   2.484763    -2.37   0.018     -10.7559   -1.008821
+        cole_femenino |   33.50782   5.544937     6.04   0.000     22.63995     44.3757
+  tasa_homicidios_bar |   .0167903   .0654553     0.26   0.798    -.1114997    .1450804
+  tasa_homicidios_dev |  -.0091343   .0097476    -0.94   0.349    -.0282392    .0099706
+          ln_coca_bar |  -.9298655   .8038888    -1.16   0.247    -2.505458    .6457275
+          ln_coca_dev |  -.0573157   .2642125    -0.22   0.828    -.5751628    .4605315
+  ln_inversion_pc_bar |   .7063009   3.171643     0.22   0.824    -5.510004    6.922606
+  ln_inversion_pc_dev |   2.907413   1.618879     1.80   0.073    -.2655347    6.080361
+                      |
+                 year |
+                2019  |  -4.730617   .7880239    -6.00   0.000    -6.275118   -3.186116
+                2020  |  -3.337685   .8482695    -3.93   0.000    -5.000263   -1.675107
+                2021  |  -7.636607    .865189    -8.83   0.000    -9.332348   -5.940866
+                2022  |  -3.157742   .9128106    -3.46   0.001    -4.946819   -1.368665
+                2023  |   .2421233   1.001786     0.24   0.809    -1.721355    2.205602
+                      |
+                _cons |   315.1534   37.42819     8.42   0.000     241.7955    388.5114
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   13.41076   1.789818      10.32407    17.42031
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |    1.79105    .327094      1.252147    2.561887
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                   sd(_cons) |   11.23271   .4770016      10.33566    12.20763
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |   4.649328   .2282419      4.222829    5.118902
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.35133   .0934693      34.16862    34.53502
+------------------------------------------------------------------------------
+.     display "Observaciones utilizadas: " e(N)
+Observaciones utilizadas: 69750
+.     estimates save "C5_B1_inter_pop_`hoy'.ster", replace
+(note: file C5_B1_inter_pop_20261014b.ster not found)
+file C5_B1_inter_pop_20261014b.ster saved
+. 
+.     display _newline "Gradiente FUERA de Popayán:"
+
+Gradiente FUERA de Popayán:
+.     lincom c_inse
+
+ ( 1)  [punt_global]c_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .2085136   .0295159     7.06   0.000     .1506635    .2663637
+------------------------------------------------------------------------------
+.     display "   [comparar con 0,2076 (0,0303) de la submuestra 4]"
+   [comparar con 0,2076 (0,0303) de la submuestra 4]
+. 
+.     display _newline "Gradiente DENTRO de Popayán:"
+
+Gradiente DENTRO de Popayán:
+.     lincom c_inse + 1.popayan#c.c_inse
+
+ ( 1)  [punt_global]c_inse + [punt_global]1.popayan#c.c_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .5465086   .0455013    12.01   0.000     .4573278    .6356895
+------------------------------------------------------------------------------
+. 
+.     display _newline "Diferencia (la interacción):"
+
+Diferencia (la interacción):
+.     lincom 1.popayan#c.c_inse
+
+ ( 1)  [punt_global]1.popayan#c.c_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |    .337995   .0467363     7.23   0.000     .2463936    .4295965
+------------------------------------------------------------------------------
+. 
+.     * ----------------------------------------------------------------------
+.     * [B2] ¿Popayán, o simplemente urbanidad?
+.     * ----------------------------------------------------------------------
+.     display _newline(2) "--- [B2] Añade c_inse x rural ---"
+
+
+--- [B2] Añade c_inse x rural ---
+.     display "Si la interacción con Popayán sobrevive, el efecto es de Popayán."
+Si la interacción con Popayán sobrevive, el efecto es de Popayán.
+.     display "Si desaparece, es urbanidad: conecta con el apartado 4.3.5."
+Si desaparece, es urbanidad: conecta con el apartado 4.3.5.
+. 
+.     * `rural` ya viene dentro de $v_n2, de modo que la interacción se añade
+.     * con una sola almohadilla. Con `##` Stata la duplicaría y la omitiría por
+.     * colinealidad, que es lo que ensució la salida del bloque [1] del 14.
+.     mi estimate, imputations(1/5) dots post: mixed punt_global             ///
+>         c.c_inse##i.popayan c.c_inse#i.rural $v_n1 $v_n2 $v_mun            ///
+>         ib2018.year $RE , reml
+
+Imputations (5):
+  ..... done
+
+Multiple-imputation estimates                   Imputations       =          5
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Average RVI       =     0.0257
+                                                Largest FMI       =     0.2398
+DF adjustment:   Large sample                   DF:     min       =      81.62
+                                                        avg       =   1.76e+08
+                                                        max       =   5.43e+09
+Model F test:       Equal FMI                   F(  33,145387.7)  =     219.76
+                                                Prob > F          =     0.0000
+
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+               c_inse |   .3444089   .0366656     9.39   0.000     .2722925    .4165253
+            1.popayan |   20.14044   14.46989     1.39   0.164    -8.220018    48.50089
+                      |
+     popayan#c.c_inse |
+                   1  |    .226669   .0499933     4.53   0.000     .1284515    .3248865
+                      |
+       rural#c.c_inse |
+                   1  |  -.2633091   .0398988    -6.60   0.000    -.3415574   -.1850609
+                      |
+                mujer |  -8.183477   .2766684   -29.58   0.000    -8.725738   -7.641216
+                 edad |  -7.493233   .1240409   -60.41   0.000    -7.736349   -7.250117
+            repitente |   5.916993   .4169279    14.19   0.000     5.099826    6.734161
+        lectura_30min |   6.796999   .3184156    21.35   0.000     6.163525    7.430473
+        libros_26omas |   5.266317   .4117523    12.79   0.000     4.452146    6.080488
+        trabaja_mas20 |  -3.026966   .7211761    -4.20   0.000    -4.443594   -1.610338
+       internet_hogar |   .3396059   .3755434     0.90   0.366    -.3968789    1.076091
+     computador_hogar |   .5285835   .3576974     1.48   0.140    -.1725864    1.229753
+         ln_matricula |    5.14625   1.036981     4.96   0.000     3.113731     7.17877
+ratio_alumnos_docente |  -.0921555   .0791938    -1.16   0.245    -.2473727    .0630616
+           pct_planta |   9.874857   1.684007     5.86   0.000     6.574186    13.17553
+           z_posgrado |   .0560774   .2026435     0.28   0.782    -.3411035    .4532583
+         dotacion_tic |    1.38006   1.726471     0.80   0.424    -2.004934    4.765053
+                rural |  -11.12214   1.787192    -6.22   0.000    -14.62499   -7.619287
+             ju_unica |   .2254269   .8262989     0.27   0.785    -1.394098    1.844951
+              tecnico |  -.4998677    1.36533    -0.37   0.714    -3.181086    2.181351
+    tecnico_academico |  -5.721874   2.482617    -2.30   0.021    -10.59118   -.8525732
+        cole_femenino |   33.40317     5.5405     6.03   0.000     22.54399    44.26235
+  tasa_homicidios_bar |   .0178305   .0652345     0.27   0.785    -.1100268    .1456878
+  tasa_homicidios_dev |  -.0094311   .0097485    -0.97   0.333    -.0285378    .0096755
+          ln_coca_bar |  -.9201614   .8011871    -1.15   0.251    -2.490459    .6501364
+          ln_coca_dev |  -.0410799    .264292    -0.16   0.876    -.5590828     .476923
+  ln_inversion_pc_bar |   .8080765   3.161347     0.26   0.798     -5.38805    7.004203
+  ln_inversion_pc_dev |   2.892523   1.619238     1.79   0.074    -.2811292    6.066176
+                      |
+                 year |
+                2019  |  -4.754912   .7881199    -6.03   0.000    -6.299601   -3.210223
+                2020  |  -3.370725   .8484607    -3.97   0.000    -5.033678   -1.707772
+                2021  |  -7.626532   .8652759    -8.81   0.000    -9.322443    -5.93062
+                2022  |  -3.124497   .9128508    -3.42   0.001    -4.913653   -1.335342
+                2023  |   .3414262   1.001807     0.34   0.733     -1.62209    2.304942
+                      |
+                _cons |   313.6926   37.31139     8.41   0.000     240.5636    386.8215
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                   sd(_cons) |   13.36128   1.784326       10.2843    17.35886
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  sd(R.year) |   1.792352   .3276028      1.252686     2.56451
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                   sd(_cons) |   11.22312   .4772833      10.32558    12.19867
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                   sd(_cons) |   4.650977   .2279452      4.224999    5.119903
+-----------------------------+------------------------------------------------
+                sd(Residual) |   34.34026   .0934532      34.15758    34.52392
+------------------------------------------------------------------------------
+.     display "Observaciones utilizadas: " e(N)
+Observaciones utilizadas: 69750
+.     estimates save "C5_B2_inter_pop_rural_`hoy'.ster", replace
+(note: file C5_B2_inter_pop_rural_20261014b.ster not found)
+file C5_B2_inter_pop_rural_20261014b.ster saved
+. 
+.     display _newline "Interacción con Popayán, ya controlada la ruralidad:"
+
+Interacción con Popayán, ya controlada la ruralidad:
+.     lincom 1.popayan#c.c_inse
+
+ ( 1)  [punt_global]1.popayan#c.c_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |    .226669   .0499933     4.53   0.000      .128684    .3246539
+------------------------------------------------------------------------------
+. 
+.     display _newline "Interacción con ruralidad:"
+
+Interacción con ruralidad:
+.     lincom 1.rural#c.c_inse
+
+ ( 1)  [punt_global]1.rural#c.c_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.2633091   .0398988    -6.60   0.000    -.3415092    -.185109
+------------------------------------------------------------------------------
+.     display "   [C6 estimó, con centrado al clúster, -0,314 (0,052)]"
+   [C6 estimó, con centrado al clúster, -0,314 (0,052)]
+. 
+.     display _newline "Gradiente en sede urbana fuera de Popayán:"
+
+Gradiente en sede urbana fuera de Popayán:
+.     lincom c_inse
+
+ ( 1)  [punt_global]c_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .3444089   .0366656     9.39   0.000     .2725458    .4162721
+------------------------------------------------------------------------------
+. 
+.     display _newline "Gradiente en sede rural fuera de Popayán:"
+
+Gradiente en sede rural fuera de Popayán:
+.     lincom c_inse + 1.rural#c.c_inse
+
+ ( 1)  [punt_global]c_inse + [punt_global]1.rural#c.c_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .0810998   .0347107     2.34   0.019     .0130681    .1491315
+------------------------------------------------------------------------------
+. 
+.     display _newline "Gradiente en sede urbana de Popayán:"
+
+Gradiente en sede urbana de Popayán:
+.     lincom c_inse + 1.popayan#c.c_inse
+
+ ( 1)  [punt_global]c_inse + [punt_global]1.popayan#c.c_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .5710779   .0457004    12.50   0.000     .4815068    .6606489
+------------------------------------------------------------------------------
+. 
+.     display _newline "Contraste conjunto de las dos interacciones:"
+
+Contraste conjunto de las dos interacciones:
+.     testparm 1.popayan#c.c_inse 1.rural#c.c_inse
+
+ ( 1)  [punt_global]1.popayan#c.c_inse = 0
+ ( 2)  [punt_global]1.rural#c.c_inse = 0
+
+           chi2(  2) =   97.29
+         Prob > chi2 =    0.0000
+. 
+.     timer off 3
+.     display _newline "Tiempo del bloque [B]:"
+
+Tiempo del bloque [B]:
+.     timer list 3
+   3:   1420.63 /        1 =    1420.6350
+. }
+
+. 
+. 
+. ********************************************************************************
+. * CIERRE
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "SCRIPT 14C TERMINADO."
+SCRIPT 14C TERMINADO.
+
+. display ""
+
+
+. display "Tiempos por bloque:"
+Tiempos por bloque:
+
+. timer list
+   1:    196.51 /        1 =     196.5080
+   2:   1175.92 /        1 =    1175.9160
+   3:   1420.63 /        1 =    1420.6350
+
+. display ""
+
+
+. display "NO reescribir el apartado 4.3.3 ni la Tabla 11b hasta aplicar el"
+NO reescribir el apartado 4.3.3 ni la Tabla 11b hasta aplicar el
+
+. display "criterio fijado antes de esta corrida sobre el resultado de [A1]."
+criterio fijado antes de esta corrida sobre el resultado de [A1].
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase14c
+      name:  fase14c
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_14c_popayan_20261014b.l
+> og
+  log type:  text
+ closed on:  14 Oct 2026, 14:37:04
+---------------------------------------------------------------------------------------------

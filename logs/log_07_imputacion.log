@@ -1,0 +1,785 @@
+---------------------------------------------------------------------------------------------
+      name:  fase7
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_07_imputacion.log
+  log type:  text
+ opened on:  21 Aug 2026, 22:22:38
+
+. 
+. * Número de imputaciones. Veinte es la referencia habitual cuando la fracción
+. * de información perdida ronda el 10%, que es el caso de este proyecto.
+. local M = 20
+
+. 
+. timer clear 1
+
+. timer on 1
+
+. 
+. 
+. ********************************************************************************
+. * PARTE A. IMPUTACIÓN DE LAS VARIABLES DE SEDE (2.447 SEDE-AÑO)
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "PARTE A. IMPUTACIÓN EN EL NIVEL DE SEDE"
+PARTE A. IMPUTACIÓN EN EL NIVEL DE SEDE
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "N2_Sedes_2018_2023.dta", clear
+
+. 
+. * Los archivos guardados por los scripts 03 y 05 conservan un `xtset` que
+. * apunta a `sede_id`, variable que esos scripts crean para el diagnóstico y
+. * borran antes de guardar. `mi set` se niega a trabajar con esa inconsistencia.
+. capture xtset, clear
+
+. 
+. * El contexto municipal entra como predictor: una sede sin registro
+. * administrativo sigue perteneciendo a un municipio del que sí se conoce todo.
+. merge m:1 cole_cod_mcpio_ubicacion year using "N3_Municipios_PCA.dta", ///
+>     keepusing(tasa_homicidios ln_coca ln_inversion_pc) ///
+>     keep(match) nogenerate
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                             2,447  
+    -----------------------------------------
+
+. 
+. quietly count
+
+. display "Sede-año: " r(N)
+Sede-año: 2447
+
+. 
+. display _newline "--- Faltantes antes de imputar ---"
+
+--- Faltantes antes de imputar ---
+
+. misstable summarize ln_matricula ratio_alumnos_docente pct_planta ///
+>     pct_posgrado dotacion_tic tecnico tecnico_academico
+                                                               Obs<.
+                                                +------------------------------
+               |                                | Unique
+      Variable |     Obs=.     Obs>.     Obs<.  | values        Min         Max
+  -------------+--------------------------------+------------------------------
+  ln_matricula |        11               2,436  |   >500   3.178054    7.779885
+  ratio_alum~e |        11               2,436  |   >500        4.5          63
+    pct_planta |        11               2,436  |    308          0           1
+  pct_posgrado |        11               2,436  |    395          0           1
+  dotacion_tic |       105               2,342  |   >500          0    3.230769
+       tecnico |        38               2,409  |      2          0           1
+  tecnico_ac~o |        38               2,409  |      2          0           1
+  -----------------------------------------------------------------------------
+
+. 
+. * ----------------------------------------------------------------------
+. * [A.1] Declaración del conjunto de imputación
+. * ----------------------------------------------------------------------
+. mi set flong
+
+. mi set M = 0
+(number of imputations M = 0 unchanged)
+
+. 
+. mi register imputed ln_matricula ratio_alumnos_docente pct_planta ///
+>     pct_posgrado dotacion_tic tecnico tecnico_academico
+(134 m=0 obs now marked as incomplete)
+
+. 
+. * Variables completas que actúan como predictoras. `rural`, `ju_unica` y el
+. * tamaño de la cohorte evaluada son los mejores predictores disponibles de las
+. * condiciones administrativas de una sede sin registro.
+. mi register regular rural ju_unica cole_femenino cole_masculino ///
+>     sede_principal inse_prom_sede evaluados_sede year ///
+>     tasa_homicidios ln_coca ln_inversion_pc
+
+. 
+. * ----------------------------------------------------------------------
+. * [A.2] Imputación encadenada
+. * ----------------------------------------------------------------------
+. * `augment` protege contra la separación perfecta en los modelos logit, que es
+. * un riesgo real con variables binarias poco frecuentes.
+. mi impute chained                                                         ///
+>     (pmm, knn(10)) ln_matricula ratio_alumnos_docente pct_planta          ///
+>                    pct_posgrado dotacion_tic                              ///
+>     (logit, augment) tecnico tecnico_academico                            ///
+>     = rural ju_unica cole_femenino sede_principal inse_prom_sede          ///
+>       evaluados_sede i.year tasa_homicidios ln_coca ln_inversion_pc,      ///
+>     add(`M') rseed(2026) dots
+
+Conditional models:
+      ln_matricula: pmm ln_matricula ratio_alumnos_docente pct_planta pct_posgrado
+                     i.tecnico i.tecnico_academico dotacion_tic rural ju_unica
+                     cole_femenino sede_principal inse_prom_sede evaluados_sede i.year
+                     tasa_homicidios ln_coca ln_inversion_pc , knn(10)
+    ratio_alumno~e: pmm ratio_alumnos_docente ln_matricula pct_planta pct_posgrado
+                     i.tecnico i.tecnico_academico dotacion_tic rural ju_unica
+                     cole_femenino sede_principal inse_prom_sede evaluados_sede i.year
+                     tasa_homicidios ln_coca ln_inversion_pc , knn(10)
+        pct_planta: pmm pct_planta ln_matricula ratio_alumnos_docente pct_posgrado
+                     i.tecnico i.tecnico_academico dotacion_tic rural ju_unica
+                     cole_femenino sede_principal inse_prom_sede evaluados_sede i.year
+                     tasa_homicidios ln_coca ln_inversion_pc , knn(10)
+      pct_posgrado: pmm pct_posgrado ln_matricula ratio_alumnos_docente pct_planta
+                     i.tecnico i.tecnico_academico dotacion_tic rural ju_unica
+                     cole_femenino sede_principal inse_prom_sede evaluados_sede i.year
+                     tasa_homicidios ln_coca ln_inversion_pc , knn(10)
+           tecnico: logit tecnico ln_matricula ratio_alumnos_docente pct_planta
+                     pct_posgrado i.tecnico_academico dotacion_tic rural ju_unica
+                     cole_femenino sede_principal inse_prom_sede evaluados_sede i.year
+                     tasa_homicidios ln_coca ln_inversion_pc , augment
+    tecnico_acad~o: logit tecnico_academico ln_matricula ratio_alumnos_docente pct_planta
+                     pct_posgrado i.tecnico dotacion_tic rural ju_unica cole_femenino
+                     sede_principal inse_prom_sede evaluados_sede i.year tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+      dotacion_tic: pmm dotacion_tic ln_matricula ratio_alumnos_docente pct_planta
+                     pct_posgrado i.tecnico i.tecnico_academico rural ju_unica
+                     cole_femenino sede_principal inse_prom_sede evaluados_sede i.year
+                     tasa_homicidios ln_coca ln_inversion_pc , knn(10)
+
+Performing chained iterations:
+  imputing m=1 through m=20 .........10.........20 done
+
+Multivariate imputation                     Imputations =       20
+Chained equations                                 added =       20
+Imputed: m=1 through m=20                       updated =        0
+
+Initialization: monotone                     Iterations =      200
+                                                burn-in =       10
+
+      ln_matricula: predictive mean matching
+    ratio_alumno~e: predictive mean matching
+        pct_planta: predictive mean matching
+      pct_posgrado: predictive mean matching
+      dotacion_tic: predictive mean matching
+           tecnico: augmented logistic regression
+    tecnico_acad~o: augmented logistic regression
+
+------------------------------------------------------------------
+                   |               Observations per m             
+                   |----------------------------------------------
+          Variable |   Complete   Incomplete   Imputed |     Total
+-------------------+-----------------------------------+----------
+      ln_matricula |       2436           11        11 |      2447
+    ratio_alumno~e |       2436           11        11 |      2447
+        pct_planta |       2436           11        11 |      2447
+      pct_posgrado |       2436           11        11 |      2447
+      dotacion_tic |       2342          105       105 |      2447
+           tecnico |       2409           38        38 |      2447
+    tecnico_acad~o |       2409           38        38 |      2447
+------------------------------------------------------------------
+(Complete + Incomplete = Total; Imputed is the minimum across m
+ of the number of filled-in observations.)
+
+. 
+. display _newline "--- Resumen del conjunto imputado de sede ---"
+
+--- Resumen del conjunto imputado de sede ---
+
+. mi describe
+
+Style: flong
+       last mi update 21aug2026 22:22:40, approximately 2 minutes ago
+
+Observations:
+   Complete        2,313
+   Incomplete        134  (M = 20 imputations)
+   ---------------------
+   Total           2,447
+
+Variables:
+   Imputed: 7; ln_matricula(11) ratio_alumnos_docente(11) pct_planta(11) pct_posgrado(11)
+            dotacion_tic(105) tecnico(38) tecnico_academico(38)
+
+   Passive: 0
+
+   Regular: 11; rural ju_unica cole_femenino cole_masculino sede_principal inse_prom_sede
+            evaluados_sede year tasa_homicidios ln_coca ln_inversion_pc
+
+   System:  3; _mi_m _mi_id _mi_miss
+
+   (there are 21 unregistered variables)
+
+. 
+. * ----------------------------------------------------------------------
+. * [A.3] Estandarización intra-anual de la formación docente
+. * ----------------------------------------------------------------------
+. * z_posgrado NO se imputa: se deriva de pct_posgrado imputado. Al declararla
+. * pasiva, la estandarización se rehace dentro de cada imputación, de modo que
+. * la media y la desviación de cada año se calculan sobre datos completos.
+. * Imputarla directamente rompería la relación entre ambas variables.
+. bysort _mi_m year: egen double _mpos = mean(pct_posgrado)
+
+. bysort _mi_m year: egen double _spos = sd(pct_posgrado)
+
+. generate double z_posgrado_mi = (pct_posgrado - _mpos) / _spos
+(11 missing values generated)
+
+. drop _mpos _spos
+
+. 
+. capture drop z_posgrado
+
+. rename z_posgrado_mi z_posgrado
+
+. mi register passive z_posgrado
+(46260 values of passive variable z_posgrado in m>0 updated to match values in m=0)
+
+. label variable z_posgrado "Docentes con posgrado, estandarizado dentro del año"
+
+. 
+. display _newline "--- Verificación de z_posgrado por imputación y año ---"
+
+--- Verificación de z_posgrado por imputación y año ---
+
+. tabstat z_posgrado if _mi_m > 0, by(year) stat(n mean sd) format(%9.4f)
+
+Summary for variables: z_posgrado
+Group variable: year (Año de presentación de la prueba)
+
+    year |         N      Mean        SD
+---------+------------------------------
+    2018 | 7760.0000   -0.0017    0.9980
+    2019 | 7980.0000    0.0008    0.9990
+    2020 | 8120.0000    0.0003    0.9987
+    2021 | 8320.0000   -0.0005    0.9989
+    2022 | 8340.0000    0.0002    0.9989
+    2023 | 8420.0000    0.0018    0.9999
+---------+------------------------------
+   Total |  4.89e+04    0.0002    0.9988
+----------------------------------------
+
+. display "Se espera media cero y desviación uno en cada año."
+Se espera media cero y desviación uno en cada año.
+
+. 
+. * ----------------------------------------------------------------------
+. * [A.4] Guardado del conjunto de sedes
+. * ----------------------------------------------------------------------
+. * Las TRES variables de sistema (_mi_m, _mi_id y _mi_miss) tienen que
+. * sobrevivir al `keep`. Sin `_mi_miss`, Stata deja de reconocer el archivo
+. * como conjunto de imputación y `mi merge` se detiene.
+. keep cole_cod_dane_sede year _mi_m _mi_id _mi_miss                        ///
+>      ln_matricula ratio_alumnos_docente pct_planta pct_posgrado           ///
+>      z_posgrado dotacion_tic tecnico tecnico_academico
+
+. 
+. save "MI_Sedes.dta", replace
+file MI_Sedes.dta saved
+
+. display _newline "Parte A completada: MI_Sedes.dta"
+
+Parte A completada: MI_Sedes.dta
+
+. 
+. 
+. ********************************************************************************
+. * PARTE B. IMPUTACIÓN DE LAS VARIABLES INDIVIDUALES (69.750 ESTUDIANTES)
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "PARTE B. IMPUTACIÓN EN EL NIVEL DE ESTUDIANTE"
+PARTE B. IMPUTACIÓN EN EL NIVEL DE ESTUDIANTE
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "Base_Multinivel_PCA.dta", clear
+
+. capture xtset, clear
+
+. 
+. * Las variables de sede salen de aquí: vienen imputadas de la Parte A.
+. foreach v in ln_matricula ratio_alumnos_docente pct_planta pct_posgrado ///
+>              z_posgrado dotacion_tic tecnico tecnico_academico          ///
+>              ratio_alt dotacion_tic_total inse_prom_sede {
+  2.     capture drop `v'
+  3. }
+
+. 
+. * El índice y su descomposición se retiran aquí. Ya no son predictores del
+. * modelo de imputación y conservarlos solo lograría que el archivo resultante
+. * arrastrara una versión del índice que puede quedar obsoleta. El script 07c
+. * los reincorpora, actualizados, después de la unión.
+. foreach v in indice_vuln indice_vuln_anual vuln_bar vuln_dev {
+  2.     capture drop `v'
+  3. }
+
+. 
+. quietly count
+
+. display "Estudiantes: " r(N)
+Estudiantes: 69750
+
+. 
+. display _newline "--- Faltantes antes de imputar ---"
+
+--- Faltantes antes de imputar ---
+
+. misstable summarize estu_inse_individual mujer lectura_30min ///
+>     libros_26omas trabaja_mas20 internet_hogar computador_hogar
+                                                               Obs<.
+                                                +------------------------------
+               |                                | Unique
+      Variable |     Obs=.     Obs>.     Obs<.  | values        Min         Max
+  -------------+--------------------------------+------------------------------
+  estu_inse_~l |     3,249              66,501  |   >500    12.7171    82.80698
+         mujer |         2              69,748  |      2          0           1
+  lectura_30~n |     5,432              64,318  |      2          0           1
+  libros_26~as |     7,196              62,554  |      2          0           1
+  trabaja_m~20 |     3,368              66,382  |      2          0           1
+  internet_h~r |     5,322              64,428  |      2          0           1
+  computador~r |     3,435              66,315  |      2          0           1
+  -----------------------------------------------------------------------------
+
+. 
+. * ----------------------------------------------------------------------
+. * [B.1] Media de la cohorte como predictor de contexto
+. * ----------------------------------------------------------------------
+. * El modelo de imputación debe reconocer que los estudiantes están agrupados en
+. * sedes. Incluir la media observada del índice socioeconómico de la sede-año
+. * traslada esa información al modelo sin necesidad de 437 variables indicadoras.
+. bysort cole_cod_dane_sede year: egen double inse_sede_obs = ///
+>     mean(estu_inse_individual)
+
+. label variable inse_sede_obs "INSE medio observado de la cohorte (predictor)"
+
+. 
+. quietly count if missing(inse_sede_obs)
+
+. display "Estudiantes sin media de sede observada: " r(N)
+Estudiantes sin media de sede observada: 0
+
+. 
+. * ----------------------------------------------------------------------
+. * [B.2] Declaración del conjunto de imputación
+. * ----------------------------------------------------------------------
+. mi set flong
+
+. mi set M = 0
+(number of imputations M = 0 unchanged)
+
+. 
+. mi register imputed estu_inse_individual mujer lectura_30min ///
+>     libros_26omas trabaja_mas20 internet_hogar computador_hogar
+(9061 m=0 obs now marked as incomplete)
+
+. 
+. mi register regular punt_global edad repitente estrato year ///
+>     rural ju_unica evaluados_sede inse_sede_obs ///
+>     tasa_homicidios ln_coca ln_inversion_pc
+
+. 
+. * ----------------------------------------------------------------------
+. * [B.3] Imputación encadenada, separada por año
+. * ----------------------------------------------------------------------
+. * La imputación corre por año porque son cortes transversales repetidos: cada
+. * cohorte es una muestra distinta y el patrón de faltantes cambia entre años
+. * (la tasa de ausencia del cuestionario familiar cae a un tercio en 2020).
+. * Imputar de forma agrupada impondría una estructura común que los datos no
+. * respaldan.
+. *
+. * La variable dependiente entra como predictora. Omitirla sesgaría hacia cero
+. * las asociaciones entre el puntaje y las covariables imputadas, que es
+. * precisamente lo que el estudio quiere estimar.
+. mi impute chained                                                          ///
+>     (pmm, knn(10)) estu_inse_individual                                    ///
+>     (logit, augment) mujer lectura_30min libros_26omas trabaja_mas20       ///
+>                      internet_hogar computador_hogar                       ///
+>     = punt_global edad repitente rural ju_unica evaluados_sede             ///
+>       inse_sede_obs tasa_homicidios ln_coca ln_inversion_pc,               ///
+>     add(`M') rseed(2026) by(year) dots
+
+Performing setup for each by() group:
+
+-> year = 2018
+note: variable mujer contains no soft missing (.) values; imputing nothing
+Conditional models:
+    estu_inse_in~l: pmm estu_inse_individual i.mujer i.computador_hogar i.trabaja_mas20
+                     i.internet_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , knn(10)
+    computador_h~r: logit computador_hogar i.mujer estu_inse_individual i.trabaja_mas20
+                     i.internet_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+     trabaja_mas20: logit trabaja_mas20 i.mujer estu_inse_individual i.computador_hogar
+                     i.internet_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+    internet_hogar: logit internet_hogar i.mujer estu_inse_individual i.computador_hogar
+                     i.trabaja_mas20 i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+     lectura_30min: logit lectura_30min i.mujer estu_inse_individual i.computador_hogar
+                     i.trabaja_mas20 i.internet_hogar i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+     libros_26omas: logit libros_26omas i.mujer estu_inse_individual i.computador_hogar
+                     i.trabaja_mas20 i.internet_hogar i.lectura_30min punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+
+-> year = 2019
+Conditional models:
+             mujer: logit mujer i.computador_hogar estu_inse_individual i.trabaja_mas20
+                     i.internet_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+    computador_h~r: logit computador_hogar i.mujer estu_inse_individual i.trabaja_mas20
+                     i.internet_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+    estu_inse_in~l: pmm estu_inse_individual i.mujer i.computador_hogar i.trabaja_mas20
+                     i.internet_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , knn(10)
+     trabaja_mas20: logit trabaja_mas20 i.mujer i.computador_hogar estu_inse_individual
+                     i.internet_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+    internet_hogar: logit internet_hogar i.mujer i.computador_hogar estu_inse_individual
+                     i.trabaja_mas20 i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+     lectura_30min: logit lectura_30min i.mujer i.computador_hogar estu_inse_individual
+                     i.trabaja_mas20 i.internet_hogar i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+     libros_26omas: logit libros_26omas i.mujer i.computador_hogar estu_inse_individual
+                     i.trabaja_mas20 i.internet_hogar i.lectura_30min punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+
+-> year = 2020
+note: variable mujer contains no soft missing (.) values; imputing nothing
+Conditional models:
+    internet_hogar: logit internet_hogar i.mujer estu_inse_individual i.libros_26omas
+                     i.lectura_30min i.trabaja_mas20 i.computador_hogar punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+    estu_inse_in~l: pmm estu_inse_individual i.mujer i.internet_hogar i.libros_26omas
+                     i.lectura_30min i.trabaja_mas20 i.computador_hogar punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , knn(10)
+     libros_26omas: logit libros_26omas i.mujer i.internet_hogar estu_inse_individual
+                     i.lectura_30min i.trabaja_mas20 i.computador_hogar punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+     lectura_30min: logit lectura_30min i.mujer i.internet_hogar estu_inse_individual
+                     i.libros_26omas i.trabaja_mas20 i.computador_hogar punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+     trabaja_mas20: logit trabaja_mas20 i.mujer i.internet_hogar estu_inse_individual
+                     i.libros_26omas i.lectura_30min i.computador_hogar punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+    computador_h~r: logit computador_hogar i.mujer i.internet_hogar estu_inse_individual
+                     i.libros_26omas i.lectura_30min i.trabaja_mas20 punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+
+-> year = 2021
+note: variable mujer contains no soft missing (.) values; imputing nothing
+Conditional models:
+    estu_inse_in~l: pmm estu_inse_individual i.mujer i.trabaja_mas20 i.computador_hogar
+                     i.internet_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , knn(10)
+     trabaja_mas20: logit trabaja_mas20 i.mujer estu_inse_individual i.computador_hogar
+                     i.internet_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+    computador_h~r: logit computador_hogar i.mujer estu_inse_individual i.trabaja_mas20
+                     i.internet_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+    internet_hogar: logit internet_hogar i.mujer estu_inse_individual i.trabaja_mas20
+                     i.computador_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+     lectura_30min: logit lectura_30min i.mujer estu_inse_individual i.trabaja_mas20
+                     i.computador_hogar i.internet_hogar i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+     libros_26omas: logit libros_26omas i.mujer estu_inse_individual i.trabaja_mas20
+                     i.computador_hogar i.internet_hogar i.lectura_30min punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+
+-> year = 2022
+note: variable mujer contains no soft missing (.) values; imputing nothing
+Conditional models:
+    estu_inse_in~l: pmm estu_inse_individual i.mujer i.computador_hogar i.trabaja_mas20
+                     i.internet_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , knn(10)
+    computador_h~r: logit computador_hogar i.mujer estu_inse_individual i.trabaja_mas20
+                     i.internet_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+     trabaja_mas20: logit trabaja_mas20 i.mujer estu_inse_individual i.computador_hogar
+                     i.internet_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+    internet_hogar: logit internet_hogar i.mujer estu_inse_individual i.computador_hogar
+                     i.trabaja_mas20 i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+     lectura_30min: logit lectura_30min i.mujer estu_inse_individual i.computador_hogar
+                     i.trabaja_mas20 i.internet_hogar i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+     libros_26omas: logit libros_26omas i.mujer estu_inse_individual i.computador_hogar
+                     i.trabaja_mas20 i.internet_hogar i.lectura_30min punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+
+-> year = 2023
+note: variable mujer contains no soft missing (.) values; imputing nothing
+Conditional models:
+    computador_h~r: logit computador_hogar i.mujer i.trabaja_mas20 estu_inse_individual
+                     i.internet_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+     trabaja_mas20: logit trabaja_mas20 i.mujer i.computador_hogar estu_inse_individual
+                     i.internet_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+    estu_inse_in~l: pmm estu_inse_individual i.mujer i.computador_hogar i.trabaja_mas20
+                     i.internet_hogar i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , knn(10)
+    internet_hogar: logit internet_hogar i.mujer i.computador_hogar i.trabaja_mas20
+                     estu_inse_individual i.lectura_30min i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+     lectura_30min: logit lectura_30min i.mujer i.computador_hogar i.trabaja_mas20
+                     estu_inse_individual i.internet_hogar i.libros_26omas punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+     libros_26omas: logit libros_26omas i.mujer i.computador_hogar i.trabaja_mas20
+                     estu_inse_individual i.internet_hogar i.lectura_30min punt_global edad
+                     repitente rural ju_unica evaluados_sede inse_sede_obs tasa_homicidios
+                     ln_coca ln_inversion_pc , augment
+
+Performing imputation for each by() group:
+
+-> year = 2018
+Performing chained iterations:
+  imputing m=1 through m=20 .........10.........20 done
+
+-> year = 2019
+Performing chained iterations:
+  imputing m=1 through m=20 .........10.........20 done
+
+-> year = 2020
+Performing chained iterations:
+  imputing m=1 through m=20 .........10.........20 done
+
+-> year = 2021
+Performing chained iterations:
+  imputing m=1 through m=20 .........10.........20 done
+
+-> year = 2022
+Performing chained iterations:
+  imputing m=1 through m=20 .........10.........20 done
+
+-> year = 2023
+Performing chained iterations:
+  imputing m=1 through m=20 .........10.........20 done
+
+Multivariate imputation                     Imputations =       20
+Chained equations                                 added =       20
+Imputed: m=1 through m=20                       updated =        0
+
+Initialization: monotone                     Iterations =      200
+                                                burn-in =       10
+
+    estu_inse_in~l: predictive mean matching
+             mujer: logistic regression
+     lectura_30min: logistic regression
+     libros_26omas: logistic regression
+     trabaja_mas20: logistic regression
+    internet_hogar: logistic regression
+    computador_h~r: logistic regression
+
+------------------------------------------------------------------
+                   |               Observations per m             
+by()               |----------------------------------------------
+          Variable |   Complete   Incomplete   Imputed |     Total
+-------------------+-----------------------------------+----------
+year = 2018        |                                   |
+    estu_inse_in~l |      10993          463       463 |     11456
+             mujer |      11456            0         0 |     11456
+     lectura_30min |      10488          968       968 |     11456
+     libros_26omas |      10092         1364      1364 |     11456
+     trabaja_mas20 |      10965          491       491 |     11456
+    internet_hogar |      10507          949       949 |     11456
+    computador_h~r |      10974          482       482 |     11456
+                   |                                   |
+year = 2019        |                                   |
+    estu_inse_in~l |      11088          399       399 |     11487
+             mujer |      11485            2         2 |     11487
+     lectura_30min |      10688          799       799 |     11487
+     libros_26omas |      10287         1200      1200 |     11487
+     trabaja_mas20 |      11085          402       402 |     11487
+    internet_hogar |      10728          759       759 |     11487
+    computador_h~r |      11099          388       388 |     11487
+                   |                                   |
+year = 2020        |                                   |
+    estu_inse_in~l |      10620          372       372 |     10992
+             mujer |      10992            0         0 |     10992
+     lectura_30min |      10612          380       380 |     10992
+     libros_26omas |      10614          378       378 |     10992
+     trabaja_mas20 |      10538          454       454 |     10992
+    internet_hogar |      10627          365       365 |     10992
+    computador_h~r |      10456          536       536 |     10992
+                   |                                   |
+year = 2021        |                                   |
+    estu_inse_in~l |      11189          463       463 |     11652
+             mujer |      11652            0         0 |     11652
+     lectura_30min |      10743          909       909 |     11652
+     libros_26omas |      10330         1322      1322 |     11652
+     trabaja_mas20 |      11187          465       465 |     11652
+    internet_hogar |      10751          901       901 |     11652
+    computador_h~r |      11163          489       489 |     11652
+                   |                                   |
+year = 2022        |                                   |
+    estu_inse_in~l |      11140          657       657 |     11797
+             mujer |      11797            0         0 |     11797
+     lectura_30min |      10802          995       995 |     11797
+     libros_26omas |      10369         1428      1428 |     11797
+     trabaja_mas20 |      11121          676       676 |     11797
+    internet_hogar |      10814          983       983 |     11797
+    computador_h~r |      11122          675       675 |     11797
+                   |                                   |
+year = 2023        |                                   |
+    estu_inse_in~l |      11471          895       895 |     12366
+             mujer |      12366            0         0 |     12366
+     lectura_30min |      10985         1381      1381 |     12366
+     libros_26omas |      10862         1504      1504 |     12366
+     trabaja_mas20 |      11486          880       880 |     12366
+    internet_hogar |      11001         1365      1365 |     12366
+    computador_h~r |      11501          865       865 |     12366
+                   |                                   |
+-------------------+-----------------------------------+----------
+Overall            |                                   |
+    estu_inse_in~l |      66501         3249      3249 |     69750
+             mujer |      69748            2         2 |     69750
+     lectura_30min |      64318         5432      5432 |     69750
+     libros_26omas |      62554         7196      7196 |     69750
+     trabaja_mas20 |      66382         3368      3368 |     69750
+    internet_hogar |      64428         5322      5322 |     69750
+    computador_h~r |      66315         3435      3435 |     69750
+------------------------------------------------------------------
+(Complete + Incomplete = Total; Imputed is the minimum across m
+ of the number of filled-in observations.)
+
+. 
+. display _newline "--- Resumen del conjunto imputado de estudiante ---"
+
+--- Resumen del conjunto imputado de estudiante ---
+
+. mi describe
+
+Style: flong
+       last mi update 21aug2026 22:26:17, approximately 4 hours ago
+
+Observations:
+   Complete       60,689
+   Incomplete      9,061  (M = 20 imputations)
+   ---------------------
+   Total          69,750
+
+Variables:
+   Imputed: 7; estu_inse_individual(3249) mujer(2) lectura_30min(5432) libros_26omas(7196)
+            trabaja_mas20(3368) internet_hogar(5322) computador_hogar(3435)
+
+   Passive: 0
+
+   Regular: 12; punt_global edad repitente estrato year rural ju_unica evaluados_sede
+            inse_sede_obs tasa_homicidios ln_coca ln_inversion_pc
+
+   System:  3; _mi_m _mi_id _mi_miss
+
+   (there are 139 unregistered variables)
+
+. 
+. save "MI_Estudiantes.dta", replace
+file MI_Estudiantes.dta saved
+
+. display _newline "Parte B completada: MI_Estudiantes.dta"
+
+Parte B completada: MI_Estudiantes.dta
+
+. 
+. 
+. ********************************************************************************
+. * CIERRE
+. ********************************************************************************
+. * La unión de los dos conjuntos, las variables derivadas y los diagnósticos
+. * están en 07b_reparar_y_unir.do. Los dos archivos generados aquí NO se borran:
+. * con lo que cuesta producirlos, conviene que sobrevivan por si hay que rehacer
+. * la unión sin volver a imputar.
+. 
+. timer off 1
+
+. display _newline "--- Tiempo de ejecución ---"
+
+--- Tiempo de ejecución ---
+
+. timer list 1
+   1:  16616.32 /        1 =   16616.3170
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "PARTES A Y B COMPLETADAS."
+PARTES A Y B COMPLETADAS.
+
+. display "Archivos generados: MI_Sedes.dta y MI_Estudiantes.dta"
+Archivos generados: MI_Sedes.dta y MI_Estudiantes.dta
+
+. display ""
+
+
+. display "El modelo de imputación NO usó el índice de vulnerabilidad, sino sus"
+El modelo de imputación NO usó el índice de vulnerabilidad, sino sus
+
+. display "tres dimensiones crudas. Los valores imputados son por tanto"
+tres dimensiones crudas. Los valores imputados son por tanto
+
+. display "independientes de cómo se construya el índice."
+independientes de cómo se construya el índice.
+
+. display ""
+
+
+. display "Siguiente: correr 07b_reparar_y_unir_v2.do y después 07c."
+Siguiente: correr 07b_reparar_y_unir_v2.do y después 07c.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase7
+      name:  fase7
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_07_imputacion.log
+  log type:  text
+ closed on:  22 Aug 2026, 02:59:35
+---------------------------------------------------------------------------------------------

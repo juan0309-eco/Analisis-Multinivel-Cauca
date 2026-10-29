@@ -1,0 +1,393 @@
+---------------------------------------------------------------------------------------------
+      name:  fase7c
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_07c_actualizar_n3.log
+  log type:  text
+ opened on:  22 Aug 2026, 05:51:54
+
+. 
+. 
+. ********************************************************************************
+. * [1] PREPARACIÓN DE LAS VARIABLES NUEVAS
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[1] VARIABLES MUNICIPALES ACTUALIZADAS"
+[1] VARIABLES MUNICIPALES ACTUALIZADAS
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "N3_Municipios_PCA.dta", clear
+
+. capture xtset, clear
+
+. 
+. keep cole_cod_mcpio_ubicacion year ///
+>      indice_vuln indice_vuln_anual vuln_bar vuln_dev ///
+>      tasa_homicidios tasa_homicidios_bar tasa_homicidios_dev ///
+>      coca ln_coca ln_coca_bar ln_coca_dev ///
+>      ln_inversion_pc ln_inversion_pc_bar ln_inversion_pc_dev ///
+>      ln_inv_fut_pc ln_inv_fut_pc_bar ln_inv_fut_pc_dev ///
+>      ln_inv_fut_pc_x ln_inv_fut_pc_x_bar ln_inv_fut_pc_x_dev ///
+>      ln_ing_trib_pc ln_ing_trib_pc_bar ln_ing_trib_pc_dev ///
+>      ln_sgp_pae_pc ln_sgp_total_pc
+
+. 
+. quietly count
+
+. display "Municipio-año: " r(N) " (esperados: 252)"
+Municipio-año: 252 (esperados: 252)
+
+. assert _N == 252
+
+. isid cole_cod_mcpio_ubicacion year
+
+. 
+. display _newline "--- Índice corregido por año ---"
+
+--- Índice corregido por año ---
+
+. tabstat indice_vuln, by(year) stat(n mean sd min max) format(%9.4f)
+
+Summary for variables: indice_vuln
+Group variable: year (Año de la cohorte Saber 11 (llave de cruce))
+
+    year |         N      Mean        SD       Min       Max
+---------+--------------------------------------------------
+    2018 |   42.0000   -0.3689    0.6997   -1.7988    1.0826
+    2019 |   42.0000   -0.1430    0.8778   -1.6479    1.8132
+    2020 |   42.0000   -0.0562    0.9478   -1.7281    1.7802
+    2021 |   42.0000   -0.0190    1.1564   -1.7210    3.6998
+    2022 |   42.0000    0.2005    1.1085   -1.3593    3.8412
+    2023 |   42.0000    0.3864    1.0195   -1.2973    2.3341
+---------+--------------------------------------------------
+   Total |  252.0000   -0.0000    1.0000   -1.7988    3.8412
+------------------------------------------------------------
+
+. 
+. tempfile n3nuevo
+
+. save `n3nuevo', replace
+(file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_5234_000001.tmp not found)
+file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_5234_000001.tmp saved as .dta format
+
+. 
+. 
+. ********************************************************************************
+. * [2] SUSTITUCIÓN DENTRO DE LA BASE IMPUTADA
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[2] SUSTITUCIÓN EN LA BASE IMPUTADA"
+[2] SUSTITUCIÓN EN LA BASE IMPUTADA
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "Base_Multinivel_MI.dta", clear
+
+. 
+. quietly count
+
+. display "Filas del conjunto imputado: " r(N)
+Filas del conjunto imputado: 1464750
+
+. 
+. * Las variables municipales viejas se retiran del registro antes de borrarlas,
+. * porque `mi` no permite eliminar una variable registrada sin desregistrarla.
+. local n3viejas indice_vuln indice_vuln_anual vuln_bar vuln_dev ///
+>                tasa_homicidios tasa_homicidios_bar tasa_homicidios_dev ///
+>                coca ln_coca ln_coca_bar ln_coca_dev ///
+>                ln_inversion_pc ln_inversion_pc_bar ln_inversion_pc_dev ///
+>                ln_inv_fut_pc ln_inv_fut_pc_bar ln_inv_fut_pc_dev ///
+>                ln_inv_fut_pc_x ln_inv_fut_pc_x_bar ln_inv_fut_pc_x_dev ///
+>                ln_ing_trib_pc ln_ing_trib_pc_bar ln_ing_trib_pc_dev ///
+>                ln_sgp_pae_pc ln_sgp_total_pc inversion_pc
+
+. 
+. foreach v of local n3viejas {
+  2.     capture mi unregister `v'
+  3.     capture drop `v'
+  4. }
+
+. 
+. display _newline "Variables municipales antiguas eliminadas."
+
+Variables municipales antiguas eliminadas.
+
+. 
+. * El merge es m:1 sobre municipio y año. Como las variables son idénticas en
+. * todas las imputaciones, se replican correctamente en las 21 copias de cada
+. * estudiante.
+. mi merge m:1 cole_cod_mcpio_ubicacion year using `n3nuevo', generate(_m_n3)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                            69,750  (_m_n3==3)
+    -----------------------------------------
+
+. 
+. display _newline "--- Resultado de la unión ---"
+
+--- Resultado de la unión ---
+
+. tabulate _m_n3
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+            Matched (3) |  1,464,750      100.00      100.00
+------------------------+-----------------------------------
+                  Total |  1,464,750      100.00
+
+. assert _m_n3 == 3
+
+. drop _m_n3
+
+. 
+. * Se registran como regulares: son completas y no varían entre imputaciones.
+. mi register regular indice_vuln indice_vuln_anual vuln_bar vuln_dev ///
+>     tasa_homicidios tasa_homicidios_bar tasa_homicidios_dev ///
+>     coca ln_coca ln_coca_bar ln_coca_dev ///
+>     ln_inversion_pc ln_inversion_pc_bar ln_inversion_pc_dev ///
+>     ln_inv_fut_pc ln_inv_fut_pc_bar ln_inv_fut_pc_dev ///
+>     ln_ing_trib_pc ln_ing_trib_pc_bar ln_ing_trib_pc_dev ///
+>     ln_sgp_pae_pc ln_sgp_total_pc
+
+. 
+. * La serie depurada del FUT también se registra como regular, aunque tiene
+. * faltantes en el municipio-año excluido. `mi update` emitirá una nota
+. * advirtiendo que una variable regular tiene valores perdidos: es esperado y no
+. * es un error. Lo que NO debe hacerse es registrarla como imputada, porque el
+. * dato no falta, sino que se descartó a propósito por ser un error de reporte.
+. * La consecuencia práctica es que la prueba R5b estimará sobre un número de
+. * observaciones menor que R5, diferencia que hay que declarar en los resultados.
+. mi register regular ln_inv_fut_pc_x ln_inv_fut_pc_x_bar ln_inv_fut_pc_x_dev
+
+. 
+. quietly count if missing(ln_inv_fut_pc_x)
+
+. display _newline "Filas sin valor en la serie depurada del FUT: " r(N)
+
+Filas sin valor en la serie depurada del FUT: 16002
+
+. 
+. mi update
+
+. 
+. 
+. ********************************************************************************
+. * [3] VERIFICACIÓN
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[3] VERIFICACIÓN"
+[3] VERIFICACIÓN
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. mi describe
+
+Style: flong
+       last mi update 22aug2026 06:02:41, 14 seconds ago
+
+Observations:
+   Complete       58,948
+   Incomplete     10,802  (M = 20 imputations)
+   ---------------------
+   Total          69,750
+
+Variables:
+   Imputed: 14; estu_inse_individual(3249) mujer(2) lectura_30min(5432) libros_26omas(7196)
+            trabaja_mas20(3368) internet_hogar(5322) computador_hogar(3435)
+            ln_matricula(179) ratio_alumnos_docente(179) pct_planta(179) pct_posgrado(179)
+            dotacion_tic(1614) tecnico(532) tecnico_academico(532)
+
+   Passive: 5; z_posgrado(179) inse_prom_sede(0) c_inse(3249) cwc_inse(3249)
+            c_inse_prom_sede(0)
+
+   Regular: 33; punt_global edad repitente estrato year rural ju_unica evaluados_sede
+            indice_vuln indice_vuln_anual vuln_bar vuln_dev tasa_homicidios
+            tasa_homicidios_bar tasa_homicidios_dev coca ln_coca ln_coca_bar ln_coca_dev
+            ln_inversion_pc ln_inversion_pc_bar ln_inversion_pc_dev ln_inv_fut_pc
+            ln_inv_fut_pc_bar ln_inv_fut_pc_dev ln_ing_trib_pc ln_ing_trib_pc_bar
+            ln_ing_trib_pc_dev ln_sgp_pae_pc ln_sgp_total_pc ln_inv_fut_pc_x
+            ln_inv_fut_pc_x_bar ln_inv_fut_pc_x_dev
+
+   System:  3; _mi_m _mi_id _mi_miss
+
+   (there are 120 unregistered variables)
+
+. 
+. display _newline "--- El índice debe ser idéntico en todas las imputaciones ---"
+
+--- El índice debe ser idéntico en todas las imputaciones ---
+
+. bysort _mi_id: egen double _sd_idx = sd(indice_vuln)
+
+. quietly count if _sd_idx > 1e-10 & !missing(_sd_idx)
+
+. display "Estudiantes con índice distinto entre imputaciones: " r(N) " (debe ser 0)"
+Estudiantes con índice distinto entre imputaciones: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. drop _sd_idx
+
+. 
+. display _newline "--- El índice debe ser constante dentro de cada municipio-año ---"
+
+--- El índice debe ser constante dentro de cada municipio-año ---
+
+. bysort _mi_m cole_cod_mcpio_ubicacion year: egen double _sd_mcp = sd(indice_vuln)
+
+. quietly count if _sd_mcp > 1e-10 & !missing(_sd_mcp)
+
+. display "Municipio-año con índice no constante: " r(N) " (debe ser 0)"
+Municipio-año con índice no constante: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. drop _sd_mcp
+
+. 
+. quietly count if missing(indice_vuln)
+
+. display _newline "Estudiantes sin valor del índice: " r(N) " (debe ser 0)"
+
+Estudiantes sin valor del índice: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. 
+. display _newline "--- Índice y componentes en la base de estudiantes ---"
+
+--- Índice y componentes en la base de estudiantes ---
+
+. tabstat indice_vuln vuln_bar vuln_dev ln_coca if _mi_m == 1, ///
+>     by(year) stat(n mean sd) format(%9.4f)
+
+Summary statistics: N, Mean, SD
+Group variable: year (Año de presentación de la prueba)
+
+    year |  indice~n  vuln_bar  vuln_dev   ln_coca
+---------+----------------------------------------
+    2018 |  1.15e+04  1.15e+04  1.15e+04  1.15e+04
+         |   -0.1670    0.1989   -0.3659    1.6086
+         |    0.5481    0.7787    0.4328    2.7486
+---------+----------------------------------------
+    2019 |  1.15e+04  1.15e+04  1.15e+04  1.15e+04
+         |    0.0532    0.2043   -0.1511    1.7101
+         |    0.7469    0.7814    0.2592    2.7342
+---------+----------------------------------------
+    2020 |  1.10e+04  1.10e+04  1.10e+04  1.10e+04
+         |    0.1514    0.2200   -0.0686    2.0221
+         |    0.8120    0.7840    0.2548    2.8568
+---------+----------------------------------------
+    2021 |  1.17e+04  1.17e+04  1.17e+04  1.17e+04
+         |    0.2381    0.2195    0.0186    2.0532
+         |    0.9549    0.7837    0.3128    2.7223
+---------+----------------------------------------
+    2022 |  1.18e+04  1.18e+04  1.18e+04  1.18e+04
+         |    0.4027    0.2064    0.1962    2.8648
+         |    0.9595    0.7735    0.3092    3.0342
+---------+----------------------------------------
+    2023 |  1.24e+04  1.24e+04  1.24e+04  1.24e+04
+         |    0.5867    0.2192    0.3675    2.7975
+         |    0.9631    0.7822    0.3616    2.9686
+---------+----------------------------------------
+   Total |  6.98e+04  6.98e+04  6.98e+04  6.98e+04
+         |    0.2171    0.2114    0.0057    2.1880
+         |    0.8815    0.7806    0.4059    2.8911
+--------------------------------------------------
+
+. 
+. display _newline "--- Medidas fiscales alternativas ---"
+
+--- Medidas fiscales alternativas ---
+
+. tabstat ln_inversion_pc ln_inv_fut_pc ln_ing_trib_pc if _mi_m == 1, ///
+>     by(year) stat(n mean sd) format(%9.4f)
+
+Summary statistics: N, Mean, SD
+Group variable: year (Año de presentación de la prueba)
+
+    year |  ln_~n_pc  ln_~t_pc  ln_ing~c
+---------+------------------------------
+    2018 |  1.15e+04  1.15e+04  1.15e+04
+         |   10.6776   13.7053   11.5633
+         |    0.6697    0.2139    0.9817
+---------+------------------------------
+    2019 |  1.15e+04  1.15e+04  1.15e+04
+         |   10.6615   13.7595   11.6487
+         |    0.6915    0.2114    0.8948
+---------+------------------------------
+    2020 |  1.10e+04  1.10e+04  1.10e+04
+         |   10.7008   13.8584   11.8237
+         |    0.6938    0.2207    0.8592
+---------+------------------------------
+    2021 |  1.17e+04  1.17e+04  1.17e+04
+         |   10.7173   13.7437   11.6433
+         |    0.6985    0.2185    0.9161
+---------+------------------------------
+    2022 |  1.18e+04  1.15e+04  1.12e+04
+         |   10.6652   13.6650   11.7499
+         |    0.6599    0.7300    0.8827
+---------+------------------------------
+    2023 |  1.24e+04  1.24e+04  1.24e+04
+         |   10.5093   13.8028   11.7802
+         |    0.6194    0.2121    0.8655
+---------+------------------------------
+   Total |  6.98e+04  6.94e+04  6.91e+04
+         |   10.6533   13.7557   11.7013
+         |    0.6755    0.3615    0.9053
+----------------------------------------
+
+. 
+. 
+. ********************************************************************************
+. * [4] GUARDADO
+. ********************************************************************************
+. 
+. compress
+  variable _mi_m was int now byte
+  (1,464,750 bytes saved)
+
+. save "Base_Multinivel_MI.dta", replace
+file Base_Multinivel_MI.dta saved
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "BASE IMPUTADA ACTUALIZADA con el Nivel 3 corregido."
+BASE IMPUTADA ACTUALIZADA con el Nivel 3 corregido.
+
+. display "Siguiente: 08_estimacion_v4.do"
+Siguiente: 08_estimacion_v4.do
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase7c
+      name:  fase7c
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_07c_actualizar_n3.log
+  log type:  text
+ closed on:  22 Aug 2026, 06:03:51
+---------------------------------------------------------------------------------------------

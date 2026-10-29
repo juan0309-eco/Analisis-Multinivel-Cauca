@@ -1,0 +1,441 @@
+---------------------------------------------------------------------------------------------
+      name:  fase7b
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_07b_union.log
+  log type:  text
+ opened on:  22 Aug 2026, 05:26:58
+
+. 
+. 
+. ********************************************************************************
+. * [1] REPARACIÓN DE MI_Sedes.dta
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[1] REPARACIÓN DEL CONJUNTO DE IMPUTACIÓN DE SEDES"
+[1] REPARACIÓN DEL CONJUNTO DE IMPUTACIÓN DE SEDES
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "MI_Sedes.dta", clear
+
+. 
+. quietly count
+
+. display "Filas totales: " r(N) "   (esperadas: " 2447*21 ")"
+Filas totales: 51387   (esperadas: 51387)
+
+. 
+. capture confirm variable _mi_miss
+
+. if _rc == 0 {
+.     display "El archivo ya tiene _mi_miss. No hace falta repararlo."
+El archivo ya tiene _mi_miss. No hace falta repararlo.
+. }
+
+. else {
+.     display "Falta _mi_miss. Reconstruyendo a partir de las filas de m = 0..."
+. 
+.     * Al ordenar por identificador y número de imputación, la primera fila de
+.     * cada grupo es la de m = 0, que conserva los datos tal como llegaron.
+.     sort _mi_id _mi_m
+. 
+.     generate byte _mi_miss = 0
+. 
+.     foreach v in ln_matricula ratio_alumnos_docente pct_planta pct_posgrado ///
+>                  dotacion_tic tecnico tecnico_academico {
+  2.         by _mi_id: replace _mi_miss = 1 if missing(`v'[1])
+  3.     }
+. 
+.     quietly count if _mi_miss == 1 & _mi_m == 0
+.     display "Observaciones marcadas como incompletas: " r(N) " (esperadas: 134)"
+. 
+.     order _mi_m _mi_id _mi_miss, first
+. }
+
+. 
+. * `mi update` revisa la consistencia interna del conjunto y corrige lo que
+. * pueda quedar descuadrado. Si el archivo estuviera realmente dañado, aquí se
+. * detendría.
+. mi update
+(regular variables rural ju_unica cole_femenino cole_masculino sede_principal inse_prom_sede
+evaluados_sede tasa_homicidios ln_coca ln_inversion_pc unregistered because not in m=0)
+
+. 
+. display _newline "--- Estado del conjunto de sedes tras la reparación ---"
+
+--- Estado del conjunto de sedes tras la reparación ---
+
+. mi describe
+
+Style: flong
+       last mi update 22aug2026 05:26:58, 0 seconds ago
+
+Observations:
+   Complete        2,313
+   Incomplete        134  (M = 20 imputations)
+   ---------------------
+   Total           2,447
+
+Variables:
+   Imputed: 7; ln_matricula(11) ratio_alumnos_docente(11) pct_planta(11) pct_posgrado(11)
+            dotacion_tic(105) tecnico(38) tecnico_academico(38)
+
+   Passive: 1; z_posgrado(11)
+
+   Regular: 1; year
+
+   System:  3; _mi_m _mi_id _mi_miss
+
+   (there is one unregistered variable; cole_cod_dane_sede)
+
+. 
+. save "MI_Sedes.dta", replace
+file MI_Sedes.dta saved
+
+. display _newline "MI_Sedes.dta reparado."
+
+MI_Sedes.dta reparado.
+
+. 
+. 
+. ********************************************************************************
+. * [2] UNIÓN DE LOS DOS NIVELES
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[2] UNIÓN DE LOS DOS CONJUNTOS DE IMPUTACIÓN"
+[2] UNIÓN DE LOS DOS CONJUNTOS DE IMPUTACIÓN
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "MI_Estudiantes.dta", clear
+
+. 
+. quietly count
+
+. display "Filas del conjunto de estudiantes: " r(N)
+Filas del conjunto de estudiantes: 1464750
+
+. 
+. * `mi merge` empareja imputación con imputación: la número 7 del estudiante se
+. * cruza con la número 7 de su sede. Un `merge` ordinario mezclaría imputaciones
+. * distintas y produciría combinaciones que nunca fueron generadas juntas.
+. mi merge m:1 cole_cod_dane_sede year using "MI_Sedes.dta", generate(_m_mi)
+(new variables ln_matricula ratio_alumnos_docente pct_planta pct_posgrado dotacion_tic
+tecnico tecnico_academico registered as imputed)
+(new variable z_posgrado registered as passive)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                            69,750  (_m_mi==3)
+    -----------------------------------------
+
+. 
+. display _newline "--- Resultado de la unión ---"
+
+--- Resultado de la unión ---
+
+. tabulate _m_mi
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+            Matched (3) |  1,464,750      100.00      100.00
+------------------------+-----------------------------------
+                  Total |  1,464,750      100.00
+
+. assert _m_mi == 3
+
+. drop _m_mi
+
+. 
+. 
+. ********************************************************************************
+. * [3] VARIABLES DERIVADAS
+. ********************************************************************************
+. * Todas se recalculan DENTRO de cada imputación. El agrupamiento incluye
+. * `_mi_m` y `year`: sin lo primero se mezclarían imputaciones distintas, sin lo
+. * segundo se promediarían seis cohortes en un mismo valor.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[3] VARIABLES DERIVADAS"
+[3] VARIABLES DERIVADAS
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. * Media socioeconómica de la cohorte, sobre el INSE ya imputado.
+. capture drop inse_prom_sede
+
+. bysort _mi_m cole_cod_dane_sede year: egen double inse_prom_sede = ///
+>     mean(estu_inse_individual)
+
+. mi register passive inse_prom_sede
+(875460 values of passive variable inse_prom_sede in m>0 updated to match values in m=0)
+
+. label variable inse_prom_sede "INSE medio de la cohorte de la sede (imputado)"
+
+. 
+. * Centrado en la gran media del año. Especificación principal del Objetivo 3.
+. bysort _mi_m year: egen double _gm_inse = mean(estu_inse_individual)
+
+. generate double c_inse = estu_inse_individual - _gm_inse
+(3,249 missing values generated)
+
+. drop _gm_inse
+
+. mi register passive c_inse
+(1178960 values of passive variable c_inse in m>0 updated to match values in m=0)
+
+. label variable c_inse "INSE centrado en la gran media del año"
+
+. 
+. * Centrado en la media de la sede. Mide la posición del estudiante frente a sus
+. * propios compañeros; su coeficiente es el efecto dentro de la sede y la
+. * diferencia con el de `inse_prom_sede` es el efecto composicional.
+. generate double cwc_inse = estu_inse_individual - inse_prom_sede
+(3,249 missing values generated)
+
+. mi register passive cwc_inse
+
+. label variable cwc_inse "INSE centrado en la media de la sede"
+
+. 
+. * La media de sede también se centra, para que el intercepto conserve
+. * interpretación en el modelo con centrado al clúster.
+. bysort _mi_m year: egen double _gm_sede = mean(inse_prom_sede)
+
+. generate double c_inse_prom_sede = inse_prom_sede - _gm_sede
+
+. drop _gm_sede
+
+. mi register passive c_inse_prom_sede
+(1178960 values of passive variable c_inse_prom_sede in m>0 updated to match values in m=0)
+
+. label variable c_inse_prom_sede "INSE medio de la sede, centrado"
+
+. 
+. capture drop inse_sede_obs
+
+. 
+. 
+. ********************************************************************************
+. * [4] DIAGNÓSTICO
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[4] DIAGNÓSTICO DEL CONJUNTO FINAL"
+[4] DIAGNÓSTICO DEL CONJUNTO FINAL
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. mi describe
+(regular variable inse_sede_obs unregistered because not in m=0)
+
+Style: flong
+       last mi update 22aug2026 05:41:57, 21 seconds ago
+
+Observations:
+   Complete       58,948
+   Incomplete     10,802  (M = 20 imputations)
+   ---------------------
+   Total          69,750
+
+Variables:
+   Imputed: 14; estu_inse_individual(3249) mujer(2) lectura_30min(5432) libros_26omas(7196)
+            trabaja_mas20(3368) internet_hogar(5322) computador_hogar(3435)
+            ln_matricula(179) ratio_alumnos_docente(179) pct_planta(179) pct_posgrado(179)
+            dotacion_tic(1614) tecnico(532) tecnico_academico(532)
+
+   Passive: 5; z_posgrado(179) inse_prom_sede(0) c_inse(3249) cwc_inse(3249)
+            c_inse_prom_sede(0)
+
+   Regular: 11; punt_global edad repitente estrato year rural ju_unica evaluados_sede
+            tasa_homicidios ln_coca ln_inversion_pc
+
+   System:  3; _mi_m _mi_id _mi_miss
+
+   (there are 139 unregistered variables)
+
+. 
+. display _newline "--- Observado frente a completado: INSE ---"
+
+--- Observado frente a completado: INSE ---
+
+. quietly summarize estu_inse_individual if _mi_m == 0
+
+. display "  Observados (m = 0):  media " %8.4f r(mean) "   n = " r(N)
+  Observados (m = 0):  media  44.1003   n = 66501
+
+. quietly summarize estu_inse_individual if _mi_m == 1
+
+. display "  Completos (m = 1):   media " %8.4f r(mean) "   n = " r(N)
+  Completos (m = 1):   media  44.1145   n = 69750
+
+. display "  Una diferencia moderada es correcta: los casos sin dato no son"
+  Una diferencia moderada es correcta: los casos sin dato no son
+
+. display "  iguales a los completos."
+  iguales a los completos.
+
+. 
+. display _newline "--- Proporciones antes y después de imputar ---"
+
+--- Proporciones antes y después de imputar ---
+
+. foreach v in mujer lectura_30min libros_26omas trabaja_mas20 ///
+>              internet_hogar computador_hogar tecnico {
+  2.     quietly summarize `v' if _mi_m == 0
+  3.     local p0 = r(mean)
+  4.     quietly summarize `v' if _mi_m > 0
+  5.     display "  `v': observado " %6.4f `p0' "   tras imputar " %6.4f r(mean)
+  6. }
+  mujer: observado 0.5670   tras imputar 0.5670
+  lectura_30min: observado 0.3473   tras imputar 0.3462
+  libros_26omas: observado 0.1736   tras imputar 0.1708
+  trabaja_mas20: observado 0.0382   tras imputar 0.0383
+  internet_hogar: observado 0.4623   tras imputar 0.4611
+  computador_hogar: observado 0.3862   tras imputar 0.3866
+  tecnico: observado 0.4283   tras imputar 0.4297
+
+. 
+. display _newline "--- Rangos: ninguna imputación debe salirse de lo posible ---"
+
+--- Rangos: ninguna imputación debe salirse de lo posible ---
+
+. foreach v in pct_planta dotacion_tic ln_matricula estu_inse_individual {
+  2.     quietly summarize `v' if _mi_m > 0
+  3.     display "  `v': [" %8.4f r(min) " , " %8.4f r(max) "]"
+  4. }
+  pct_planta: [  0.0000 ,   1.0000]
+  dotacion_tic: [  0.0000 ,   3.2308]
+  ln_matricula: [  3.1781 ,   7.7799]
+  estu_inse_individual: [ 12.7171 ,  82.8070]
+
+. quietly count if _mi_m > 0 & (pct_planta < 0 | pct_planta > 1)
+
+. display "Valores de pct_planta fuera de [0,1]: " r(N) " (debe ser 0)"
+Valores de pct_planta fuera de [0,1]: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. quietly count if _mi_m > 0 & dotacion_tic < 0
+
+. display "Valores negativos de dotacion_tic: " r(N) " (debe ser 0)"
+Valores negativos de dotacion_tic: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. 
+. * Comprobación central de la estrategia en dos partes: los estudiantes de una
+. * misma sede deben compartir exactamente el mismo valor en cada imputación.
+. display _newline "--- Constancia de las variables de sede dentro de la sede-año ---"
+
+--- Constancia de las variables de sede dentro de la sede-año ---
+
+. bysort _mi_m cole_cod_dane_sede year: egen double _sd_mat = sd(ln_matricula)
+(451 missing values generated)
+
+. quietly count if _sd_mat > 1e-8 & !missing(_sd_mat)
+
+. display "Sede-año con matrícula no constante entre sus estudiantes: " r(N) ///
+>         " (debe ser 0)"
+Sede-año con matrícula no constante entre sus estudiantes: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. drop _sd_mat
+
+. 
+. bysort _mi_m cole_cod_dane_sede year: egen double _sd_tic = sd(dotacion_tic)
+(1,883 missing values generated)
+
+. quietly count if _sd_tic > 1e-8 & !missing(_sd_tic)
+
+. display "Sede-año con dotación no constante entre sus estudiantes: " r(N) ///
+>         " (debe ser 0)"
+Sede-año con dotación no constante entre sus estudiantes: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. drop _sd_tic
+
+. 
+. display _newline "--- Faltantes remanentes en las variables del modelo ---"
+
+--- Faltantes remanentes en las variables del modelo ---
+
+. * El índice y su descomposición ya NO viajan dentro del conjunto imputado: el
+. * script 07 v3 los retira porque dejaron de ser predictores de la imputación.
+. * Los reincorpora el 07c, que es ahora un paso obligatorio de la cadena.
+. mi xeq 1: misstable summarize punt_global estu_inse_individual c_inse       ///
+>     cwc_inse inse_prom_sede mujer lectura_30min libros_26omas              ///
+>     trabaja_mas20 internet_hogar computador_hogar ln_matricula pct_planta  ///
+>     z_posgrado dotacion_tic tecnico rural ju_unica
+
+m=1 data:
+-> misstable summarize punt_global estu_inse_individual c_inse           cwc_inse inse_prom_s
+> ede mujer lectura_30min libros_26omas                  trabaja_mas20 internet_hogar computa
+> dor_hogar ln_matricula pct_planta      z_posgrado dotacion_tic tecnico rural ju_unica
+(variables nonmissing or string)
+
+. 
+. 
+. ********************************************************************************
+. * [5] GUARDADO
+. ********************************************************************************
+. 
+. compress
+  variable _mi_m was int now byte
+  (1,464,750 bytes saved)
+
+. save "Base_Multinivel_MI.dta", replace
+file Base_Multinivel_MI.dta saved
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "IMPUTACIÓN COMPLETADA: Base_Multinivel_MI.dta (M = 20)"
+IMPUTACIÓN COMPLETADA: Base_Multinivel_MI.dta (M = 20)
+
+. display "MI_Sedes.dta y MI_Estudiantes.dta se conservan por si hace falta"
+MI_Sedes.dta y MI_Estudiantes.dta se conservan por si hace falta
+
+. display "rehacer la unión sin volver a imputar."
+rehacer la unión sin volver a imputar.
+
+. display "Siguiente: 07c_actualizar_nivel3.do (incorpora el Nivel 3), y luego el 08."
+Siguiente: 07c_actualizar_nivel3.do (incorpora el Nivel 3), y luego el 08.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase7b
+      name:  fase7b
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_07b_union.log
+  log type:  text
+ closed on:  22 Aug 2026, 05:49:50
+---------------------------------------------------------------------------------------------

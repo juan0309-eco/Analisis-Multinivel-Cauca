@@ -1,0 +1,1148 @@
+--------------------------------------------------------------------------------------------
+      name:  fase1
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_01_depuracion_N1.log
+  log type:  text
+ opened on:  22 Aug 2026, 14:25:53
+
+. 
+. * Fechas reales de aplicación de Saber 11, calendario A (semestre 2)
+. local fecha2018 "12 08 2018"
+
+. local fecha2019 "11 08 2019"
+
+. local fecha2020 "15 11 2020"
+
+. local fecha2021 "22 08 2021"
+
+. local fecha2022 "04 09 2022"
+
+. local fecha2023 "13 08 2023"
+
+. 
+. * Variables que deben existir en cada archivo anual.
+. local vars_llave    periodo estu_consecutivo cole_cod_dane_sede               ///
+>                     cole_cod_dane_establecimiento cole_cod_mcpio_ubicacion    ///
+>                     cole_cod_depto_ubicacion cole_mcpio_ubicacion             ///
+>                     cole_nombre_sede cole_sede_principal cole_codigo_icfes
+
+. 
+. local vars_filtro   cole_calendario cole_naturaleza cole_jornada estu_grado   ///
+>                     estu_discapacidad estu_agregado estu_estudiante           ///
+>                     estu_privado_libertad estu_fechanacimiento
+
+. 
+. local vars_result   punt_global punt_matematicas punt_lectura_critica         ///
+>                     punt_c_naturales punt_sociales_ciudadanas punt_ingles
+
+. 
+. local vars_n1       estu_genero estu_inse_individual estu_nse_individual      ///
+>                     estu_horassemanatrabaja estu_dedicacionlecturadiaria      ///
+>                     fami_numlibros fami_tieneinternet fami_tienecomputador    ///
+>                     fami_educacionmadre fami_educacionpadre                   ///
+>                     fami_estratovivienda fami_personashogar                   ///
+>                     fami_cuartoshogar estu_repite
+
+. 
+. local vars_n2icfes  cole_area_ubicacion cole_caracter cole_genero             ///
+>                     estu_nse_establecimiento
+
+. 
+. local vars_todas    `vars_llave' `vars_filtro' `vars_result' `vars_n1' `vars_n2icfes'
+
+. 
+. 
+. ********************************************************************************
+. * BUCLE ANUAL DE DEPURACIÓN
+. ********************************************************************************
+. 
+. foreach y in 2018 2019 2020 2021 2022 2023 {
+  2. 
+.     display _newline(2)
+  3.     display "{hline 78}"
+  4.     display "PROCESANDO AÑO `y'"
+  5.     display "{hline 78}"
+  6. 
+.     * ------------------------------------------------------------------
+.     * [1] IMPORTACIÓN
+.     * ------------------------------------------------------------------
+.     capture noisily import delimited "Examen_Saber_11_`y'2.txt", ///
+>         delimiter(";") varnames(1) stringcols(_all) encoding("UTF-8") clear
+  7. 
+.     if _rc != 0 {
+  8.         display as error "No se pudo leer Examen_Saber_11_`y'2.txt. Año omitido."
+  9.         continue
+ 10.     }
+ 11. 
+.     quietly count
+ 12.     local n_bruto = r(N)
+ 13.     display "Registros en el archivo bruto: `n_bruto'"
+ 14. 
+.     * ------------------------------------------------------------------
+.     * [2] VERIFICACIÓN DE PRESENCIA DE VARIABLES
+.     * ------------------------------------------------------------------
+.     foreach v of local vars_todas {
+ 15.         capture confirm variable `v'
+ 16.         if _rc != 0 {
+ 17.             display as error "  AVISO: la variable `v' NO existe en `y'. Se crea vacía.
+> "
+ 18.             quietly generate str1 `v' = ""
+ 19.         }
+ 20.     }
+ 21. 
+.     keep `vars_todas'
+ 22. 
+.     * ------------------------------------------------------------------
+.     * [3] NORMALIZACIÓN DE CADENAS (mayúsculas, espacios y acentos)
+.     * ------------------------------------------------------------------
+.     quietly ds, has(type string)
+ 23.     local strvars `r(varlist)'
+ 24. 
+.     foreach v of local strvars {
+ 25.         quietly replace `v' = trim(itrim(upper(`v')))
+ 26.         quietly replace `v' = "" if inlist(`v', ".", "NA", "N/A", "NULL")
+ 27.         foreach par in "Á A" "É E" "Í I" "Ó O" "Ú U" "Ü U" "Ñ N" {
+ 28.             local orig : word 1 of `par'
+ 29.             local dest : word 2 of `par'
+ 30.             quietly replace `v' = subinstr(`v', "`orig'", "`dest'", .)
+ 31.         }
+ 32.     }
+ 33. 
+.     * ------------------------------------------------------------------
+.     * [4] TIPADO DE LLAVES Y CONVERSIÓN NUMÉRICA
+.     * ------------------------------------------------------------------
+.     quietly replace cole_cod_dane_sede = subinstr(cole_cod_dane_sede, ".0", "", .) ///
+>         if strpos(cole_cod_dane_sede, ".0") == strlen(cole_cod_dane_sede) - 1
+ 34.     quietly replace cole_cod_dane_sede = trim(cole_cod_dane_sede)
+ 35. 
+.     quietly destring cole_cod_mcpio_ubicacion cole_cod_depto_ubicacion ///
+>         cole_cod_dane_establecimiento cole_codigo_icfes, replace force
+ 36. 
+.     quietly destring `vars_result' estu_inse_individual estu_nse_establecimiento ///
+>         estu_grado estu_repite periodo, replace force
+ 37. 
+.     generate int year = `y'
+ 38.     label variable year "Año de presentación de la prueba"
+ 39. 
+.     * ------------------------------------------------------------------
+.     * [5] EMBUDO DE FILTROS - se reporta el efecto de cada uno
+.     * ------------------------------------------------------------------
+.     display _newline "--- EMBUDO DE FILTROS, AÑO `y' ---"
+ 40.     local n_prev = _N
+ 41. 
+.     * (5.1) Departamento del Cauca (código DANE 19)
+.     quietly drop if cole_cod_depto_ubicacion != 19
+ 42.     display "  Fuera del Cauca (depto != 19) ..... removidos: " `n_prev' - _N
+ 43.     local n_prev = _N
+ 44. 
+.     * (5.2) Calendario A
+.     tabulate cole_calendario, missing
+ 45.     quietly keep if cole_calendario == "A"
+ 46.     display "  Calendario distinto de A .......... removidos: " `n_prev' - _N
+ 47.     local n_prev = _N
+ 48. 
+.     * (5.3) Naturaleza oficial
+.     quietly keep if cole_naturaleza == "OFICIAL"
+ 49.     display "  Sector no oficial ................. removidos: " `n_prev' - _N
+ 50.     local n_prev = _N
+ 51. 
+.     * (5.4) Jornadas diurnas regulares.
+.     *       Se excluyen NOCHE y SABATINA: educación de adultos y por
+.     *       flexibilización, con lógica institucional distinta al bachillerato
+.     *       regular. También se pierden aquí los registros con jornada vacía.
+.     tabulate cole_jornada, missing
+ 52.     quietly keep if inlist(cole_jornada, "UNICA", "MANANA", "TARDE", "COMPLETA")
+ 53.     display "  Jornada NOCHE / SABATINA / vacía .. removidos: " `n_prev' - _N
+ 54.     local n_prev = _N
+ 55. 
+.     * (5.5) Grado 11
+.     quietly keep if estu_grado == 11
+ 56.     display "  Grado distinto de 11 .............. removidos: " `n_prev' - _N
+ 57.     local n_prev = _N
+ 58. 
+.     * (5.6) Marca oficial de agregado del ICFES.
+.     *       DECISIÓN CERRADA: se activa. Deja solo a los estudiantes que el
+.     *       ICFES imputa a la cohorte del colegio en el informe nacional, que
+.     *       es la población sobre la que se define el Nivel 2.
+.     *       Se tabula ANTES de filtrar para distinguir los "N" reales de las
+.     *       celdas vacías: ambos se van con el keep, pero no son lo mismo.
+.     tabulate estu_agregado, missing
+ 59.     quietly keep if estu_agregado == "S"
+ 60.     display "  estu_agregado != S ................ removidos: " `n_prev' - _N
+ 61.     local n_prev = _N
+ 62. 
+.     * (5.7) Privados de la libertad
+.     quietly drop if estu_privado_libertad == "S"
+ 63.     display "  Privados de la libertad ........... removidos: " `n_prev' - _N
+ 64.     local n_prev = _N
+ 65. 
+.     * (5.8) Condición de discapacidad.
+.     *       La prueba se aplica con ajustes razonables y los puntajes no son
+.     *       estrictamente comparables. Se tabula antes para dejar constancia
+.     *       de la distribución del año.
+.     tabulate estu_discapacidad, missing
+ 66.     quietly keep if estu_discapacidad == "N"
+ 67.     display "  Discapacidad declarada / vacía .... removidos: " `n_prev' - _N
+ 68.     local n_prev = _N
+ 69. 
+.     * (5.9) Integridad de llaves y del resultado
+.     quietly drop if missing(cole_cod_dane_sede) | cole_cod_dane_sede == ""
+ 70.     quietly drop if missing(cole_cod_mcpio_ubicacion)
+ 71.     quietly drop if missing(estu_consecutivo) | estu_consecutivo == ""
+ 72.     quietly drop if missing(punt_global)
+ 73.     display "  Llaves o punt_global vacíos ....... removidos: " `n_prev' - _N
+ 74.     local n_prev = _N
+ 75. 
+.     * (5.10) Exámenes anulados o incompletos.
+.     *        Un cero en cualquiera de las cuatro áreas de escala 0-100 es
+.     *        estructuralmente imposible en una prueba efectivamente presentada.
+.     *        INGLÉS QUEDA FUERA DE LA REGLA: allí el -1, no el 0, marca
+.     *        "no contestó ninguna pregunta".
+.     generate byte anulado = (punt_matematicas == 0 | punt_lectura_critica == 0 | ///
+>                              punt_c_naturales == 0 | punt_sociales_ciudadanas == 0)
+ 76.     quietly count if anulado == 1
+ 77.     display "  Exámenes anulados (subpuntaje 0) ... detectados: " r(N)
+ 78.     quietly drop if anulado == 1
+ 79.     drop anulado
+ 80.     local n_prev = _N
+ 81. 
+.     * (5.11) Duplicados de estudiante dentro del mismo año
+.     quietly duplicates tag estu_consecutivo, generate(_dup)
+ 82.     quietly count if _dup > 0
+ 83.     display "  Registros con estu_consecutivo repetido: " r(N)
+ 84.     quietly duplicates drop estu_consecutivo, force
+ 85.     capture drop _dup
+ 86.     local n_prev = _N
+ 87. 
+.     * ------------------------------------------------------------------
+.     * [6] EDAD AL MOMENTO DEL EXAMEN
+.     * ------------------------------------------------------------------
+.     local dd : word 1 of `fecha`y''
+ 88.     local mm : word 2 of `fecha`y''
+ 89.     local aa : word 3 of `fecha`y''
+ 90. 
+.     generate double fecnac = date(estu_fechanacimiento, "DMY")
+ 91.     format fecnac %td
+ 92.     quietly count if missing(fecnac)
+ 93.     display "  Fecha de nacimiento ilegible ...... casos: " r(N)
+ 94. 
+.     generate double fec_examen = mdy(`mm', `dd', `aa')
+ 95.     format fec_examen %td
+ 96.     label variable fec_examen "Fecha de aplicación Saber 11"
+ 97. 
+.     generate byte edad = floor((fec_examen - fecnac) / 365.25)
+ 98.     label variable edad "Edad cumplida al momento del examen"
+ 99. 
+.     quietly count if !inrange(edad, 15, 21)
+100.     display "  Edad fuera del rango 15-21 ........ removidos: " r(N)
+101.     quietly keep if inrange(edad, 15, 21)
+102. 
+.     drop fecnac
+103. 
+.     * ------------------------------------------------------------------
+.     * [7] VARIABLE DEPENDIENTE Y PUNTAJES POR ÁREA
+.     * ------------------------------------------------------------------
+.     label variable punt_global              "Puntaje global Saber 11"
+104.     label variable punt_matematicas         "Puntaje matemáticas"
+105.     label variable punt_lectura_critica     "Puntaje lectura crítica"
+106.     label variable punt_c_naturales         "Puntaje ciencias naturales"
+107.     label variable punt_sociales_ciudadanas "Puntaje sociales y ciudadanas"
+108. 
+.     quietly replace punt_ingles = . if punt_ingles == -1
+109.     label variable punt_ingles "Puntaje inglés (-1 recodificado a missing)"
+110. 
+.     * ------------------------------------------------------------------
+.     * [8] RECODIFICACIÓN DE VARIABLES DE NIVEL 1
+.     * ------------------------------------------------------------------
+.     * REGLA GENERAL: los vacíos se conservan como missing verdadero. No se
+.     * imputa nada aquí; MICE es un paso posterior y necesita ver el patrón
+.     * de faltantes intacto. Cada variable recodificada lleva su bandera _miss.
+. 
+.     * (8.1) Sexo
+.     generate byte mujer_miss = missing(estu_genero) | estu_genero == ""
+111.     generate byte mujer = (estu_genero == "F") if mujer_miss == 0
+112.     label variable mujer "Mujer (1 = sí)"
+113. 
+.     * (8.2) INSE individual - SE CONSERVA CRUDO.
+.     *       Solo se limpian los valores imposibles (negativos). El índice queda
+.     *       en su escala original para los descriptivos del Objetivo 1. Las
+.     *       transformaciones (centrado en la gran media y al clúster) se
+.     *       aplican en el do-file de estimación.
+.     quietly replace estu_inse_individual = . if estu_inse_individual < 0
+114.     generate byte inse_miss = missing(estu_inse_individual)
+115.     label variable estu_inse_individual "INSE individual (escala original ICFES)"
+116.     label variable inse_miss "INSE individual faltante (1 = sí)"
+117. 
+.     * (8.3) Trabajo intensivo (más de 20 horas semanales)
+.     generate byte trabaja_mas20_miss = missing(estu_horassemanatrabaja) | ///
+>                                        estu_horassemanatrabaja == ""
+118.     generate byte trabaja_mas20 = inlist(estu_horassemanatrabaja,        ///
+>         "ENTRE 21 Y 30 HORAS", "MAS DE 30 HORAS") if trabaja_mas20_miss == 0
+119.     label variable trabaja_mas20 "Trabaja más de 20 horas por semana (1 = sí)"
+120. 
+.     * (8.4) Lectura diaria por entretenimiento (más de 30 minutos)
+.     generate byte lectura_30min_miss = missing(estu_dedicacionlecturadiaria) | ///
+>                                        estu_dedicacionlecturadiaria == ""
+121.     generate byte lectura_30min = inlist(estu_dedicacionlecturadiaria,   ///
+>         "ENTRE 30 Y 60 MINUTOS", "ENTRE 1 Y 2 HORAS", "MAS DE 2 HORAS")  ///
+>         if lectura_30min_miss == 0
+122.     label variable lectura_30min "Lee más de 30 minutos diarios (1 = sí)"
+123. 
+.     * (8.5) Libros en el hogar (26 o más)
+.     generate byte libros_26omas_miss = missing(fami_numlibros) | fami_numlibros == ""
+124.     generate byte libros_26omas = inlist(fami_numlibros,                 ///
+>         "26 A 100 LIBROS", "MAS DE 100 LIBROS") if libros_26omas_miss == 0
+125.     label variable libros_26omas "26 o más libros en el hogar (1 = sí)"
+126. 
+.     * (8.6) Internet y computador en el hogar
+.     generate byte internet_miss = missing(fami_tieneinternet) | fami_tieneinternet == ""
+127.     generate byte internet_hogar = (fami_tieneinternet == "SI") if internet_miss == 0
+128.     label variable internet_hogar "Internet en el hogar (1 = sí)"
+129. 
+.     generate byte compu_miss = missing(fami_tienecomputador) | fami_tienecomputador == ""
+130.     generate byte computador_hogar = (fami_tienecomputador == "SI") if compu_miss == 0
+131.     label variable computador_hogar "Computador en el hogar (1 = sí)"
+132. 
+.     * (8.7) Repitencia de la prueba.
+.     *       DECISIÓN CERRADA: los repitentes NO se excluyen. Entran como
+.     *       control de Nivel 1.
+.     generate byte repitente = (estu_repite != 0 & !missing(estu_repite))
+133.     label variable repitente "Ha presentado Saber 11 en más de un periodo (1 = sí)"
+134. 
+.     * (8.8) Variables auxiliares del hogar (descriptivos e insumos de MICE)
+.     generate byte educ_madre_sup_miss = missing(fami_educacionmadre) | ///
+>                                         fami_educacionmadre == ""
+135.     generate byte educ_madre_sup = inlist(fami_educacionmadre,           ///
+>         "TECNICA O TECNOLOGICA COMPLETA", "EDUCACION PROFESIONAL COMPLETA", ///
+>         "POSTGRADO") if educ_madre_sup_miss == 0
+136.     label variable educ_madre_sup "Madre con educación superior completa (1 = sí)"
+137. 
+.     generate byte educ_padre_sup_miss = missing(fami_educacionpadre) | ///
+>                                         fami_educacionpadre == ""
+138.     generate byte educ_padre_sup = inlist(fami_educacionpadre,           ///
+>         "TECNICA O TECNOLOGICA COMPLETA", "EDUCACION PROFESIONAL COMPLETA", ///
+>         "POSTGRADO") if educ_padre_sup_miss == 0
+139.     label variable educ_padre_sup "Padre con educación superior completa (1 = sí)"
+140. 
+.     generate byte estrato = real(subinstr(fami_estratovivienda, "ESTRATO ", "", .))
+141.     quietly replace estrato = 0 if fami_estratovivienda == "SIN ESTRATO"
+142.     label variable estrato "Estrato de la vivienda (0 = sin estrato)"
+143. 
+.     * ------------------------------------------------------------------
+.     * [9] ATRIBUTOS DE SEDE DE ORIGEN ICFES (insumos del Nivel 2)
+.     * ------------------------------------------------------------------
+.     * Se generan a nivel de estudiante; la consolidación a sede-año va en Fase 2.
+.     generate byte rural = (cole_area_ubicacion == "RURAL") ///
+>         if !missing(cole_area_ubicacion) & cole_area_ubicacion != ""
+144.     label variable rural "Sede rural (1 = sí)"
+145. 
+.     generate byte ju_unica    = (cole_jornada == "UNICA")
+146.     generate byte ju_completa = (cole_jornada == "COMPLETA")
+147.     label variable ju_unica    "Jornada única (1 = sí)"
+148.     label variable ju_completa "Jornada completa (1 = sí)"
+149. 
+.     generate byte tecnico = (cole_caracter == "TECNICO") ///
+>         if !missing(cole_caracter) & cole_caracter != ""
+150.     generate byte mixto = (cole_caracter == "TECNICO/ACADEMICO") ///
+>         if !missing(cole_caracter) & cole_caracter != ""
+151.     label variable tecnico "Sede de carácter técnico (1 = sí)"
+152.     label variable mixto   "Sede de carácter técnico/académico (1 = sí)"
+153. 
+.     generate byte cole_femenino  = (cole_genero == "FEMENINO")  if cole_genero != ""
+154.     generate byte cole_masculino = (cole_genero == "MASCULINO") if cole_genero != ""
+155.     label variable cole_femenino  "Sede exclusivamente femenina (1 = sí)"
+156.     label variable cole_masculino "Sede exclusivamente masculina (1 = sí)"
+157. 
+.     generate byte sede_principal = (cole_sede_principal == "S") ///
+>         if cole_sede_principal != ""
+158.     label variable sede_principal "Sede principal del establecimiento (1 = sí)"
+159. 
+.     * ------------------------------------------------------------------
+.     * [10] CIERRE DEL AÑO
+.     * ------------------------------------------------------------------
+.     quietly count
+160.     display _newline "RESULTADO AÑO `y': " r(N) " estudiantes (de `n_bruto' brutos)"
+161. 
+.     quietly egen byte _tag = tag(cole_cod_dane_sede)
+162.     quietly count if _tag == 1
+163.     display "                  " r(N) " sedes distintas"
+164.     drop _tag
+165. 
+.     quietly egen byte _tag = tag(cole_cod_mcpio_ubicacion)
+166.     quietly count if _tag == 1
+167.     display "                  " r(N) " municipios distintos"
+168.     drop _tag
+169. 
+.     compress
+170.     save "N1_saber11_`y'.dta", replace
+171. }
+
+
+
+------------------------------------------------------------------------------
+PROCESANDO AÑO 2018
+------------------------------------------------------------------------------
+(85 vars, 14,211 obs)
+Registros en el archivo bruto: 14211
+
+--- EMBUDO DE FILTROS, AÑO 2018 ---
+  Fuera del Cauca (depto != 19) ..... removidos: 0
+
+cole_calend |
+       ario |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          A |     13,978       98.36       98.36
+       OTRO |        233        1.64      100.00
+------------+-----------------------------------
+      Total |     14,211      100.00
+  Calendario distinto de A .......... removidos: 233
+  Sector no oficial ................. removidos: 1718
+
+cole_jornad |
+          a |      Freq.     Percent        Cum.
+------------+-----------------------------------
+   COMPLETA |      2,035       16.60       16.60
+     MANANA |      8,422       68.69       85.29
+      NOCHE |        248        2.02       87.32
+   SABATINA |        206        1.68       89.00
+      TARDE |      1,117        9.11       98.11
+      UNICA |        232        1.89      100.00
+------------+-----------------------------------
+      Total |     12,260      100.00
+  Jornada NOCHE / SABATINA / vacía .. removidos: 454
+  Grado distinto de 11 .............. removidos: 54
+
+estu_agrega |
+         do |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          N |        171        1.46        1.46
+          S |     11,581       98.54      100.00
+------------+-----------------------------------
+      Total |     11,752      100.00
+  estu_agregado != S ................ removidos: 171
+  Privados de la libertad ........... removidos: 0
+
+estu_discap |
+     acidad |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          N |     11,581      100.00      100.00
+------------+-----------------------------------
+      Total |     11,581      100.00
+  Discapacidad declarada / vacía .... removidos: 0
+  Llaves o punt_global vacíos ....... removidos: 0
+  Exámenes anulados (subpuntaje 0) ... detectados: 1
+  Registros con estu_consecutivo repetido: 0
+  Fecha de nacimiento ilegible ...... casos: 0
+  Edad fuera del rango 15-21 ........ removidos: 124
+(491 missing values generated)
+(968 missing values generated)
+(1,364 missing values generated)
+(949 missing values generated)
+(482 missing values generated)
+(933 missing values generated)
+(940 missing values generated)
+(1,917 missing values generated)
+(91 missing values generated)
+(91 missing values generated)
+
+RESULTADO AÑO 2018: 11456 estudiantes (de 14211 brutos)
+                  388 sedes distintas
+                  42 municipios distintos
+  variable fec_examen was double now int
+  variable cole_calendario was str4 now str1
+  variable cole_caracter was str19 now str17
+  variable cole_naturaleza was str10 now str7
+  variable cole_nombre_sede was str87 now str86
+  variable cole_sede_principal was str2 now str1
+  variable fami_numlibros was str18 now str17
+  (194,752 bytes saved)
+file N1_saber11_2018.dta saved
+
+
+
+------------------------------------------------------------------------------
+PROCESANDO AÑO 2019
+------------------------------------------------------------------------------
+(85 vars, 14,248 obs)
+Registros en el archivo bruto: 14248
+
+--- EMBUDO DE FILTROS, AÑO 2019 ---
+  Fuera del Cauca (depto != 19) ..... removidos: 0
+
+cole_calend |
+       ario |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          A |     13,930       97.77       97.77
+       OTRO |        318        2.23      100.00
+------------+-----------------------------------
+      Total |     14,248      100.00
+  Calendario distinto de A .......... removidos: 318
+  Sector no oficial ................. removidos: 1640
+
+cole_jornad |
+          a |      Freq.     Percent        Cum.
+------------+-----------------------------------
+   COMPLETA |      1,854       15.09       15.09
+     MANANA |      8,238       67.03       82.12
+      NOCHE |        244        1.99       84.10
+   SABATINA |        217        1.77       85.87
+      TARDE |      1,141        9.28       95.15
+      UNICA |        596        4.85      100.00
+------------+-----------------------------------
+      Total |     12,290      100.00
+  Jornada NOCHE / SABATINA / vacía .. removidos: 461
+  Grado distinto de 11 .............. removidos: 31
+
+estu_agrega |
+         do |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          N |        195        1.65        1.65
+          S |     11,603       98.35      100.00
+------------+-----------------------------------
+      Total |     11,798      100.00
+  estu_agregado != S ................ removidos: 195
+  Privados de la libertad ........... removidos: 0
+
+estu_discap |
+     acidad |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          N |     11,603      100.00      100.00
+------------+-----------------------------------
+      Total |     11,603      100.00
+  Discapacidad declarada / vacía .... removidos: 0
+  Llaves o punt_global vacíos ....... removidos: 0
+  Exámenes anulados (subpuntaje 0) ... detectados: 2
+  Registros con estu_consecutivo repetido: 0
+  Fecha de nacimiento ilegible ...... casos: 0
+  Edad fuera del rango 15-21 ........ removidos: 114
+(2 missing values generated)
+(402 missing values generated)
+(799 missing values generated)
+(1,200 missing values generated)
+(759 missing values generated)
+(388 missing values generated)
+(748 missing values generated)
+(767 missing values generated)
+(1,842 missing values generated)
+(81 missing values generated)
+(81 missing values generated)
+
+RESULTADO AÑO 2019: 11487 estudiantes (de 14248 brutos)
+                  399 sedes distintas
+                  42 municipios distintos
+  variable fec_examen was double now int
+  variable cole_calendario was str4 now str1
+  variable cole_caracter was str19 now str17
+  variable cole_naturaleza was str10 now str7
+  variable cole_nombre_sede was str87 now str86
+  variable cole_sede_principal was str2 now str1
+  variable fami_numlibros was str18 now str17
+  (195,279 bytes saved)
+file N1_saber11_2019.dta saved
+
+
+
+------------------------------------------------------------------------------
+PROCESANDO AÑO 2020
+------------------------------------------------------------------------------
+(84 vars, 12,817 obs)
+Registros en el archivo bruto: 12817
+
+--- EMBUDO DE FILTROS, AÑO 2020 ---
+  Fuera del Cauca (depto != 19) ..... removidos: 0
+
+cole_calend |
+       ario |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          A |     12,606       98.35       98.35
+          B |         15        0.12       98.47
+       OTRO |        196        1.53      100.00
+------------+-----------------------------------
+      Total |     12,817      100.00
+  Calendario distinto de A .......... removidos: 211
+  Sector no oficial ................. removidos: 1000
+
+cole_jornad |
+          a |      Freq.     Percent        Cum.
+------------+-----------------------------------
+            |        106        0.91        0.91
+   COMPLETA |      1,511       13.02       13.93
+     MANANA |      5,838       50.30       64.23
+      NOCHE |        126        1.09       65.32
+   SABATINA |         92        0.79       66.11
+      TARDE |        963        8.30       74.41
+      UNICA |      2,970       25.59      100.00
+------------+-----------------------------------
+      Total |     11,606      100.00
+  Jornada NOCHE / SABATINA / vacía .. removidos: 324
+  Grado distinto de 11 .............. removidos: 0
+
+estu_agrega |
+         do |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          N |        193        1.71        1.71
+          S |     11,089       98.29      100.00
+------------+-----------------------------------
+      Total |     11,282      100.00
+  estu_agregado != S ................ removidos: 193
+  Privados de la libertad ........... removidos: 0
+
+estu_discap |
+     acidad |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          N |     11,073       99.86       99.86
+          S |         16        0.14      100.00
+------------+-----------------------------------
+      Total |     11,089      100.00
+  Discapacidad declarada / vacía .... removidos: 16
+  Llaves o punt_global vacíos ....... removidos: 0
+  Exámenes anulados (subpuntaje 0) ... detectados: 7
+  Registros con estu_consecutivo repetido: 0
+  Fecha de nacimiento ilegible ...... casos: 0
+  Edad fuera del rango 15-21 ........ removidos: 74
+(454 missing values generated)
+(380 missing values generated)
+(378 missing values generated)
+(365 missing values generated)
+(536 missing values generated)
+(367 missing values generated)
+(356 missing values generated)
+(1,455 missing values generated)
+(91 missing values generated)
+(91 missing values generated)
+
+RESULTADO AÑO 2020: 10992 estudiantes (de 12817 brutos)
+                  406 sedes distintas
+                  42 municipios distintos
+  variable fec_examen was double now int
+  variable cole_calendario was str4 now str1
+  variable cole_caracter was str19 now str17
+  variable cole_naturaleza was str10 now str7
+  variable cole_nombre_sede was str91 now str90
+  variable cole_sede_principal was str2 now str1
+  variable fami_numlibros was str18 now str17
+  (186,864 bytes saved)
+file N1_saber11_2020.dta saved
+
+
+
+------------------------------------------------------------------------------
+PROCESANDO AÑO 2021
+------------------------------------------------------------------------------
+(85 vars, 13,390 obs)
+Registros en el archivo bruto: 13390
+
+--- EMBUDO DE FILTROS, AÑO 2021 ---
+  Fuera del Cauca (depto != 19) ..... removidos: 0
+
+cole_calend |
+       ario |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          A |     13,199       98.57       98.57
+       OTRO |        191        1.43      100.00
+------------+-----------------------------------
+      Total |     13,390      100.00
+  Calendario distinto de A .......... removidos: 191
+  Sector no oficial ................. removidos: 1141
+
+cole_jornad |
+          a |      Freq.     Percent        Cum.
+------------+-----------------------------------
+   COMPLETA |      1,789       14.84       14.84
+     MANANA |      5,996       49.73       64.56
+      NOCHE |         72        0.60       65.16
+   SABATINA |         87        0.72       65.88
+      TARDE |      1,032        8.56       74.44
+      UNICA |      3,082       25.56      100.00
+------------+-----------------------------------
+      Total |     12,058      100.00
+  Jornada NOCHE / SABATINA / vacía .. removidos: 159
+  Grado distinto de 11 .............. removidos: 0
+
+estu_agrega |
+         do |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          N |        138        1.16        1.16
+          S |     11,761       98.84      100.00
+------------+-----------------------------------
+      Total |     11,899      100.00
+  estu_agregado != S ................ removidos: 138
+  Privados de la libertad ........... removidos: 0
+
+estu_discap |
+     acidad |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          N |     11,748       99.89       99.89
+          S |         13        0.11      100.00
+------------+-----------------------------------
+      Total |     11,761      100.00
+  Discapacidad declarada / vacía .... removidos: 13
+  Llaves o punt_global vacíos ....... removidos: 0
+  Exámenes anulados (subpuntaje 0) ... detectados: 5
+  Registros con estu_consecutivo repetido: 0
+  Fecha de nacimiento ilegible ...... casos: 0
+  Edad fuera del rango 15-21 ........ removidos: 91
+(465 missing values generated)
+(909 missing values generated)
+(1,322 missing values generated)
+(901 missing values generated)
+(489 missing values generated)
+(854 missing values generated)
+(868 missing values generated)
+(1,981 missing values generated)
+(94 missing values generated)
+(94 missing values generated)
+
+RESULTADO AÑO 2021: 11652 estudiantes (de 13390 brutos)
+                  416 sedes distintas
+                  42 municipios distintos
+  variable fec_examen was double now int
+  variable cole_calendario was str4 now str1
+  variable cole_caracter was str19 now str17
+  variable cole_naturaleza was str10 now str7
+  variable cole_nombre_sede was str91 now str90
+  variable cole_sede_principal was str2 now str1
+  variable fami_numlibros was str18 now str17
+  (198,084 bytes saved)
+file N1_saber11_2021.dta saved
+
+
+
+------------------------------------------------------------------------------
+PROCESANDO AÑO 2022
+------------------------------------------------------------------------------
+(84 vars, 14,036 obs)
+Registros en el archivo bruto: 14036
+
+--- EMBUDO DE FILTROS, AÑO 2022 ---
+  Fuera del Cauca (depto != 19) ..... removidos: 0
+
+cole_calend |
+       ario |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          A |     13,811       98.40       98.40
+       OTRO |        225        1.60      100.00
+------------+-----------------------------------
+      Total |     14,036      100.00
+  Calendario distinto de A .......... removidos: 225
+  Sector no oficial ................. removidos: 1214
+
+cole_jornad |
+          a |      Freq.     Percent        Cum.
+------------+-----------------------------------
+   COMPLETA |      1,744       13.84       13.84
+     MANANA |      6,371       50.58       64.42
+      NOCHE |        147        1.17       65.59
+   SABATINA |        126        1.00       66.59
+      TARDE |      1,046        8.30       74.89
+      UNICA |      3,163       25.11      100.00
+------------+-----------------------------------
+      Total |     12,597      100.00
+  Jornada NOCHE / SABATINA / vacía .. removidos: 273
+  Grado distinto de 11 .............. removidos: 45
+
+estu_agrega |
+         do |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          N |        266        2.17        2.17
+          S |     12,013       97.83      100.00
+------------+-----------------------------------
+      Total |     12,279      100.00
+  estu_agregado != S ................ removidos: 266
+  Privados de la libertad ........... removidos: 0
+
+estu_discap |
+     acidad |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          N |     11,990       99.81       99.81
+          S |         23        0.19      100.00
+------------+-----------------------------------
+      Total |     12,013      100.00
+  Discapacidad declarada / vacía .... removidos: 23
+  Llaves o punt_global vacíos ....... removidos: 0
+  Exámenes anulados (subpuntaje 0) ... detectados: 1
+  Registros con estu_consecutivo repetido: 0
+  Fecha de nacimiento ilegible ...... casos: 0
+  Edad fuera del rango 15-21 ........ removidos: 192
+(676 missing values generated)
+(995 missing values generated)
+(1,428 missing values generated)
+(983 missing values generated)
+(675 missing values generated)
+(956 missing values generated)
+(943 missing values generated)
+(2,151 missing values generated)
+(84 missing values generated)
+(84 missing values generated)
+
+RESULTADO AÑO 2022: 11797 estudiantes (de 14036 brutos)
+                  417 sedes distintas
+                  42 municipios distintos
+  variable fec_examen was double now int
+  variable cole_calendario was str4 now str1
+  variable cole_caracter was str19 now str17
+  variable cole_naturaleza was str10 now str7
+  variable cole_nombre_sede was str91 now str90
+  variable cole_sede_principal was str2 now str1
+  variable fami_numlibros was str18 now str17
+  (200,549 bytes saved)
+file N1_saber11_2022.dta saved
+
+
+
+------------------------------------------------------------------------------
+PROCESANDO AÑO 2023
+------------------------------------------------------------------------------
+(83 vars, 14,591 obs)
+Registros en el archivo bruto: 14591
+
+--- EMBUDO DE FILTROS, AÑO 2023 ---
+  Fuera del Cauca (depto != 19) ..... removidos: 0
+
+cole_calend |
+       ario |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          A |     14,342       98.29       98.29
+          B |          3        0.02       98.31
+       OTRO |        246        1.69      100.00
+------------+-----------------------------------
+      Total |     14,591      100.00
+  Calendario distinto de A .......... removidos: 249
+  Sector no oficial ................. removidos: 1373
+
+cole_jornad |
+          a |      Freq.     Percent        Cum.
+------------+-----------------------------------
+   COMPLETA |      1,943       14.98       14.98
+     MANANA |      6,507       50.17       65.16
+      NOCHE |         84        0.65       65.80
+   SABATINA |        153        1.18       66.98
+      TARDE |        962        7.42       74.40
+      UNICA |      3,320       25.60      100.00
+------------+-----------------------------------
+      Total |     12,969      100.00
+  Jornada NOCHE / SABATINA / vacía .. removidos: 237
+  Grado distinto de 11 .............. removidos: 12
+
+estu_agrega |
+         do |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          N |        232        1.82        1.82
+          S |     12,488       98.18      100.00
+------------+-----------------------------------
+      Total |     12,720      100.00
+  estu_agregado != S ................ removidos: 232
+  Privados de la libertad ........... removidos: 0
+
+estu_discap |
+     acidad |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          N |     12,475       99.90       99.90
+          S |         13        0.10      100.00
+------------+-----------------------------------
+      Total |     12,488      100.00
+  Discapacidad declarada / vacía .... removidos: 13
+  Llaves o punt_global vacíos ....... removidos: 0
+  Exámenes anulados (subpuntaje 0) ... detectados: 3
+  Registros con estu_consecutivo repetido: 0
+  Fecha de nacimiento ilegible ...... casos: 0
+  Edad fuera del rango 15-21 ........ removidos: 106
+(880 missing values generated)
+(1,381 missing values generated)
+(1,504 missing values generated)
+(1,365 missing values generated)
+(865 missing values generated)
+(1,329 missing values generated)
+(1,331 missing values generated)
+(2,680 missing values generated)
+(91 missing values generated)
+(91 missing values generated)
+
+RESULTADO AÑO 2023: 12366 estudiantes (de 14591 brutos)
+                  421 sedes distintas
+                  42 municipios distintos
+  variable fec_examen was double now int
+  variable cole_calendario was str4 now str1
+  variable cole_caracter was str19 now str17
+  variable cole_naturaleza was str10 now str7
+  variable cole_nombre_sede was str91 now str90
+  variable cole_sede_principal was str2 now str1
+  variable fami_numlibros was str18 now str17
+  (210,222 bytes saved)
+file N1_saber11_2023.dta saved
+
+. 
+. 
+. ********************************************************************************
+. * CONSOLIDACIÓN DEL POOL 2018-2023
+. ********************************************************************************
+. 
+. display _newline(2)
+
+
+
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. display "CONSOLIDANDO EL POOL DE CORTES TRANSVERSALES REPETIDOS"
+CONSOLIDANDO EL POOL DE CORTES TRANSVERSALES REPETIDOS
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "N1_saber11_2018.dta", clear
+
+. foreach y in 2019 2020 2021 2022 2023 {
+  2.     append using "N1_saber11_`y'.dta"
+  3. }
+(variable cole_nombre_sede was str86, now str90 to accommodate using data's values)
+
+. 
+. * ----------------------------------------------------------------------
+. * [11] AGREGADOS DE COHORTE POR SEDE-AÑO (EN ESCALA ORIGINAL DEL INSE)
+. * ----------------------------------------------------------------------
+. * Se agrupa por sede Y AÑO. Agrupar solo por sede mezclaría seis cohortes
+. * distintas en un mismo promedio. El promedio se calcula sobre el INSE crudo,
+. * de modo que queda expresado en la misma escala que la variable individual y
+. * es directamente reportable en la tabla de descriptivos.
+. bysort cole_cod_dane_sede year: egen double inse_prom_sede = ///
+>     mean(estu_inse_individual)
+
+. label variable inse_prom_sede "INSE promedio de la cohorte (sede-año, escala original)"
+
+. 
+. * OJO: cuenta a los estudiantes que sobrevivieron a todos los filtros, no al
+. * total de inscritos en la sede. Es el tamaño de la cohorte ANALÍTICA.
+. bysort cole_cod_dane_sede year: egen int evaluados_sede = count(punt_global)
+
+. label variable evaluados_sede "Estudiantes evaluados en la sede-año (muestra analítica)"
+
+. 
+. * ----------------------------------------------------------------------
+. * [12] PANEL DE CONTROL DE LA FASE 1
+. * ----------------------------------------------------------------------
+. display _newline "--- CONTEO FINAL POR AÑO ---"
+
+--- CONTEO FINAL POR AÑO ---
+
+. tabulate year, missing
+
+     Año de |
+ presentaci |
+   ón de la |
+     prueba |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       2018 |     11,456       16.42       16.42
+       2019 |     11,487       16.47       32.89
+       2020 |     10,992       15.76       48.65
+       2021 |     11,652       16.71       65.36
+       2022 |     11,797       16.91       82.27
+       2023 |     12,366       17.73      100.00
+------------+-----------------------------------
+      Total |     69,750      100.00
+
+. 
+. egen byte tag_sede  = tag(cole_cod_dane_sede year)
+
+. egen byte tag_mcpio = tag(cole_cod_mcpio_ubicacion year)
+
+. 
+. display _newline "--- SEDES-AÑO Y MUNICIPIOS-AÑO ---"
+
+--- SEDES-AÑO Y MUNICIPIOS-AÑO ---
+
+. tabulate year if tag_sede == 1
+
+     Año de |
+ presentaci |
+   ón de la |
+     prueba |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       2018 |        388       15.86       15.86
+       2019 |        399       16.31       32.16
+       2020 |        406       16.59       48.75
+       2021 |        416       17.00       65.75
+       2022 |        417       17.04       82.80
+       2023 |        421       17.20      100.00
+------------+-----------------------------------
+      Total |      2,447      100.00
+
+. tabulate year if tag_mcpio == 1
+
+     Año de |
+ presentaci |
+   ón de la |
+     prueba |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       2018 |         42       16.67       16.67
+       2019 |         42       16.67       33.33
+       2020 |         42       16.67       50.00
+       2021 |         42       16.67       66.67
+       2022 |         42       16.67       83.33
+       2023 |         42       16.67      100.00
+------------+-----------------------------------
+      Total |        252      100.00
+
+. 
+. display _newline "--- VARIABLE DEPENDIENTE ---"
+
+--- VARIABLE DEPENDIENTE ---
+
+. tabstat punt_global, by(year) stat(n mean sd min max) format(%9.2f)
+
+Summary for variables: punt_global
+Group variable: year (Año de presentación de la prueba)
+
+    year |         N      Mean        SD       Min       Max
+---------+--------------------------------------------------
+    2018 |  11456.00    235.47     45.39    140.00    416.00
+    2019 |  11487.00    230.54     46.70    130.00    407.00
+    2020 |  10992.00    230.70     43.90    126.00    426.00
+    2021 |  11652.00    226.86     44.78    126.00    433.00
+    2022 |  11797.00    231.72     47.06    132.00    450.00
+    2023 |  12366.00    236.40     47.05    140.00    442.00
+---------+--------------------------------------------------
+   Total |  69750.00    232.00     45.98    126.00    450.00
+------------------------------------------------------------
+
+. 
+. display _newline "--- INSE INDIVIDUAL EN ESCALA ORIGINAL (insumo del Objetivo 1) ---"
+
+--- INSE INDIVIDUAL EN ESCALA ORIGINAL (insumo del Objetivo 1) ---
+
+. tabstat estu_inse_individual, by(year) stat(n mean sd p25 p50 p75 min max) ///
+>         format(%9.2f)
+
+Summary for variables: estu_inse_individual
+Group variable: year (Año de presentación de la prueba)
+
+    year |         N      Mean        SD       p25       p50       p75       Min       Max
+---------+--------------------------------------------------------------------------------
+    2018 |  10993.00     42.94      8.71     36.70     42.11     48.39     12.72     80.92
+    2019 |  11088.00     43.37      8.77     37.01     42.54     48.93     14.89     82.81
+    2020 |  10620.00     44.58      8.79     38.17     44.24     50.48     14.96     79.90
+    2021 |  11189.00     44.57      8.80     38.23     44.21     50.57     14.96     80.92
+    2022 |  11140.00     44.54      8.49     38.50     44.16     50.16     15.21     80.55
+    2023 |  11471.00     44.59      7.95     39.21     44.60     49.92     14.89     73.90
+---------+--------------------------------------------------------------------------------
+   Total |  66501.00     44.10      8.61     37.94     43.64     49.82     12.72     82.81
+------------------------------------------------------------------------------------------
+
+. 
+. display _newline "--- INSE PROMEDIO DE LA SEDE (sede-año) ---"
+
+--- INSE PROMEDIO DE LA SEDE (sede-año) ---
+
+. tabstat inse_prom_sede if tag_sede == 1, by(year) stat(n mean sd min max) ///
+>         format(%9.2f)
+
+Summary for variables: inse_prom_sede
+Group variable: year (Año de presentación de la prueba)
+
+    year |         N      Mean        SD       Min       Max
+---------+--------------------------------------------------
+    2018 |    388.00     40.70      4.51     31.44     61.56
+    2019 |    399.00     40.94      4.53     31.32     60.70
+    2020 |    406.00     42.08      4.68     29.73     59.27
+    2021 |    416.00     42.08      4.51     30.10     59.81
+    2022 |    417.00     42.41      4.37     32.37     57.77
+    2023 |    421.00     42.73      3.99     29.87     58.22
+---------+--------------------------------------------------
+   Total |   2447.00     41.84      4.49     29.73     61.56
+------------------------------------------------------------
+
+. 
+. display _newline "--- VALORES PERDIDOS EN NIVEL 1 (antes de MICE) ---"
+
+--- VALORES PERDIDOS EN NIVEL 1 (antes de MICE) ---
+
+. tabstat mujer_miss inse_miss trabaja_mas20_miss lectura_30min_miss ///
+>         libros_26omas_miss internet_miss compu_miss, ///
+>         by(year) stat(mean) format(%9.4f)
+
+Summary statistics: Mean
+Group variable: year (Año de presentación de la prueba)
+
+    year |  mujer_~s  inse_m~s  trabaj~s  lectur~s  libro~ss  intern~s  compu_~s
+---------+----------------------------------------------------------------------
+    2018 |    0.0000    0.0404    0.0429    0.0845    0.1191    0.0828    0.0421
+    2019 |    0.0002    0.0347    0.0350    0.0696    0.1045    0.0661    0.0338
+    2020 |    0.0000    0.0338    0.0413    0.0346    0.0344    0.0332    0.0488
+    2021 |    0.0000    0.0397    0.0399    0.0780    0.1135    0.0773    0.0420
+    2022 |    0.0000    0.0557    0.0573    0.0843    0.1210    0.0833    0.0572
+    2023 |    0.0000    0.0724    0.0712    0.1117    0.1216    0.1104    0.0699
+---------+----------------------------------------------------------------------
+   Total |    0.0000    0.0466    0.0483    0.0779    0.1032    0.0763    0.0492
+--------------------------------------------------------------------------------
+
+. 
+. display _newline "--- VERIFICACIÓN DE LLAVES ---"
+
+--- VERIFICACIÓN DE LLAVES ---
+
+. codebook cole_cod_dane_sede cole_cod_mcpio_ubicacion year, compact
+
+Variable        Obs Unique      Mean    Min    Max  Label
+--------------------------------------------------------------------------------------------
+cole_cod_d~e  69750    437         .      .      .  
+cole_cod_m~n  69750     42  19363.61  19001  19845  
+year          69750      6  2020.544   2018   2023  Año de presentación de la prueba  
+--------------------------------------------------------------------------------------------
+
+. assert !missing(cole_cod_mcpio_ubicacion)
+
+. assert cole_cod_dane_sede != ""
+
+. assert inrange(year, 2018, 2023)
+
+. display "Llaves verificadas: sin vacíos, tipos correctos."
+Llaves verificadas: sin vacíos, tipos correctos.
+
+. 
+. * Comprobación explícita de que el INSE NO quedó centrado.
+. quietly summarize estu_inse_individual, meanonly
+
+. display "Media del INSE en el pool (debe ser distinta de 0): " %6.2f r(mean)
+Media del INSE en el pool (debe ser distinta de 0):  44.10
+
+. assert abs(r(mean)) > 1
+
+. display "Confirmado: el INSE se conserva en escala original."
+Confirmado: el INSE se conserva en escala original.
+
+. 
+. * ----------------------------------------------------------------------
+. * [13] GUARDADO
+. * ----------------------------------------------------------------------
+. order estu_consecutivo cole_cod_dane_sede cole_cod_mcpio_ubicacion year ///
+>       punt_global mujer edad estu_inse_individual
+
+. 
+. compress
+  (0 bytes saved)
+
+. save "N1_Saber11_2018_2023.dta", replace
+file N1_Saber11_2018_2023.dta saved
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "FASE 1 COMPLETADA. Base de Nivel 1 lista: N1_Saber11_2018_2023.dta"
+FASE 1 COMPLETADA. Base de Nivel 1 lista: N1_Saber11_2018_2023.dta
+
+. display "El INSE queda crudo; el centrado se aplica en el do-file de estimación."
+El INSE queda crudo; el centrado se aplica en el do-file de estimación.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase1
+      name:  fase1
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_01_depuracion_N1.log
+  log type:  text
+ closed on:  22 Aug 2026, 14:26:27
+--------------------------------------------------------------------------------------------

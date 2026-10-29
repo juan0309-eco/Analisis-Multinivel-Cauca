@@ -1,0 +1,714 @@
+---------------------------------------------------------------------------------------------
+      name:  fase15b
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_15b_lecturas_20261013_1
+> 926.log
+  log type:  text
+ opened on:  13 Oct 2026, 19:26:12
+
+. display "Inicio: " c(current_date) " " c(current_time)
+Inicio: 13 Oct 2026 19:26:12
+
+. 
+. *------------------------------------------------------------------------------
+. * [1] DESCRIPTIVOS (imputación 1) Y ARCHIVO DE SEDE PARA LOS GRÁFICOS
+. *------------------------------------------------------------------------------
+. display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+
+. display "[1] DESCRIPTIVOS DE c_sd_inse, rural Y n_sa (imputación 1)"
+[1] DESCRIPTIVOS DE c_sd_inse, rural Y n_sa (imputación 1)
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "Base_Estimacion.dta", clear
+
+. mi extract 1, clear
+
+. 
+. * Mismas definiciones del bloque [0] del 15, ya sobre datos planos
+. bysort cole_cod_dane_sede year: egen double sd_inse_sede = sd(estu_inse_individual)
+(13 missing values generated)
+
+. bysort cole_cod_dane_sede year: generate int n_sa = _N
+
+. replace sd_inse_sede = 0 if n_sa == 1
+(13 real changes made)
+
+. bysort year: egen double _msd = mean(sd_inse_sede)
+
+. generate double c_sd_inse = sd_inse_sede - _msd
+
+. drop _msd
+
+. 
+. display _newline "--- Proporción de observaciones rurales ---"
+
+--- Proporción de observaciones rurales ---
+
+. summarize rural
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+       rural |     69,750    .4584373    .4982731          0          1
+
+. scalar p_rural = r(mean)
+
+. 
+. display _newline "--- Dispersión del INSE por zona ---"
+
+--- Dispersión del INSE por zona ---
+
+. tabstat sd_inse_sede c_sd_inse n_sa, by(rural) stat(n mean sd min max) format(%9.4f)
+
+Summary statistics: N, Mean, SD, Min, Max
+Group variable: rural (Sede rural (1 = sí))
+
+   rural |  sd_ins~e  c_sd_i~e      n_sa
+---------+------------------------------
+       0 |  3.78e+04  3.78e+04  3.78e+04
+         |    7.3717    0.3023   76.8695
+         |    0.9826    0.9711   38.5624
+         |    0.0000   -7.1131    1.0000
+         |   12.0166    4.9035  202.0000
+---------+------------------------------
+       1 |  3.20e+04  3.20e+04  3.20e+04
+         |    6.7112   -0.3571   28.1633
+         |    1.4704    1.4706   19.7435
+         |    0.0000   -7.2121    1.0000
+         |   17.7180   10.6049  129.0000
+---------+------------------------------
+   Total |  6.98e+04  6.98e+04  6.98e+04
+         |    7.0689   -0.0000   54.5408
+         |    1.2737    1.2689   39.6611
+         |    0.0000   -7.2121    1.0000
+         |   17.7180   10.6049  202.0000
+----------------------------------------
+
+. quietly summarize c_sd_inse
+
+. scalar sd_c = r(sd)
+
+. display _newline "DE de c_sd_inse (para los lincom): " %9.4f sd_c
+
+DE de c_sd_inse (para los lincom):    1.2689
+
+. 
+. display _newline "--- Media de c_sd_inse dentro de cada zona ---"
+
+--- Media de c_sd_inse dentro de cada zona ---
+
+. foreach z in 0 1 {
+  2.     quietly summarize c_sd_inse if rural == `z'
+  3.     display "  rural = `z' : media " %9.4f r(mean) "   n = " r(N)
+  4.     scalar m_csd_`z' = r(mean)
+  5. }
+  rural = 0 : media    0.3023   n = 37774
+  rural = 1 : media   -0.3571   n = 31976
+
+. 
+. * Archivo de sede (zona y dispersión media) para colorear las figuras
+. preserve
+
+.     collapse (mean) rural sd_inse_sede c_sd_inse n_sa, by(cole_cod_dane_sede)
+
+.     rename sd_inse_sede sd_inse_media
+
+.     rename c_sd_inse    c_sd_media
+
+.     rename n_sa         n_sa_medio
+
+.     label variable sd_inse_media "DE media del INSE dentro de la sede (imp. 1)"
+
+.     tempfile sedes
+
+.     save "`sedes'"
+file C:\Users\RYZEN5~1\AppData\Local\Temp\ST_3048_000002.tmp saved as .dta format
+
+. restore
+
+. 
+. *------------------------------------------------------------------------------
+. * [2] PENDIENTE DEL INSE POR ZONA Y POR DISPERSIÓN (lincom sobre los .ster)
+. *------------------------------------------------------------------------------
+. display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+
+. display "[2] PENDIENTE DEL INSE SEGÚN ZONA Y DISPERSIÓN"
+[2] PENDIENTE DEL INSE SEGÚN ZONA Y DISPERSIÓN
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. display "Nota: en M4c/M4d/M5c/M5d el coeficiente de cwc_inse está evaluado en"
+Nota: en M4c/M4d/M5c/M5d el coeficiente de cwc_inse está evaluado en
+
+. display "rural = 0 y c_sd_inse = 0 (dispersión media del año). Los contrastes"
+rural = 0 y c_sd_inse = 0 (dispersión media del año). Los contrastes
+
+. display "siguientes dan el gradiente en puntos interpretables, con su EE."
+siguientes dan el gradiente en puntos interpretables, con su EE.
+
+. 
+. local sdc = sd_c
+
+. local pr  = p_rural
+
+. 
+. foreach m in M4c M4d M5c M5d {
+  2.     capture estimates use "`m'_`fin'.ster"
+  3.     if _rc != 0 {
+  4.         display as error "No se encontró `m'_`fin'.ster"
+  5.         continue
+  6.     }
+  7.     display _newline "{hline 60}"
+  8.     display "--- `m' ---"
+  9. 
+.     display _newline "  (a) Urbano, dispersión media del año"
+ 10.     capture noisily lincom cwc_inse
+ 11. 
+.     display _newline "  (b) Rural, dispersión media del año"
+ 12.     capture noisily lincom cwc_inse + c.cwc_inse#c.rural
+ 13. 
+.     display _newline "  (c) Urbano, +1 DE de dispersión (`sdc')"
+ 14.     capture noisily lincom cwc_inse + (`sdc')*c.cwc_inse#c.c_sd_inse
+ 15. 
+.     display _newline "  (d) Urbano, -1 DE de dispersión"
+ 16.     capture noisily lincom cwc_inse - (`sdc')*c.cwc_inse#c.c_sd_inse
+ 17. 
+.     display _newline "  (e) Rural, con la dispersión media observada en zona rural"
+ 18.     capture noisily lincom cwc_inse + c.cwc_inse#c.rural + (m_csd_1)*c.cwc_inse#c.c_sd_i
+> nse
+ 19. 
+.     display _newline "  (f) Urbano, con la dispersión media observada en zona urbana"
+ 20.     capture noisily lincom cwc_inse + (m_csd_0)*c.cwc_inse#c.c_sd_inse
+ 21. 
+.     display _newline "  (g) Gradiente medio: promedio ponderado por la proporción rural (`p
+> r')"
+ 22.     capture noisily lincom cwc_inse + (`pr')*c.cwc_inse#c.rural
+ 23.     display "      Debe quedar cerca del cwc_inse de M4r/M5r. Es una verificación."
+ 24. }
+
+------------------------------------------------------------
+--- M4c ---
+
+  (a) Urbano, dispersión media del año
+
+ ( 1)  [punt_global]cwc_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .3527995   .0440972     8.00   0.000     .2663706    .4392284
+------------------------------------------------------------------------------
+
+  (b) Rural, dispersión media del año
+
+ ( 1)  [punt_global]cwc_inse + [punt_global]c.cwc_inse#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .0386998    .040634     0.95   0.341    -.0409413    .1183409
+------------------------------------------------------------------------------
+
+  (c) Urbano, +1 DE de dispersión (1.268915806679136)
+
+ ( 1)  [punt_global]cwc_inse + 1.268916*[punt_global]c.cwc_inse#c.c_sd_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .4381943   .0450906     9.72   0.000     .3498183    .5265703
+------------------------------------------------------------------------------
+
+  (d) Urbano, -1 DE de dispersión
+
+ ( 1)  [punt_global]cwc_inse - 1.268916*[punt_global]c.cwc_inse#c.c_sd_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .2674046   .0526679     5.08   0.000     .1641774    .3706319
+------------------------------------------------------------------------------
+
+  (e) Rural, con la dispersión media observada en zona rural
+
+ ( 1)  [punt_global]cwc_inse - .3570815*[punt_global]c.cwc_inse#c.c_sd_inse +
+       [punt_global]c.cwc_inse#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .0146691   .0415677     0.35   0.724    -.0668022    .0961404
+------------------------------------------------------------------------------
+
+  (f) Urbano, con la dispersión media observada en zona urbana
+
+ ( 1)  [punt_global]cwc_inse + .3022724*[punt_global]c.cwc_inse#c.c_sd_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .3731416   .0433864     8.60   0.000     .2881059    .4581774
+------------------------------------------------------------------------------
+
+  (g) Gradiente medio: promedio ponderado por la proporción rural (.4584372759856631)
+
+ ( 1)  [punt_global]cwc_inse + .4584373*[punt_global]c.cwc_inse#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .2088045   .0336082     6.21   0.000     .1429336    .2746753
+------------------------------------------------------------------------------
+      Debe quedar cerca del cwc_inse de M4r/M5r. Es una verificación.
+
+------------------------------------------------------------
+--- M4d ---
+
+  (a) Urbano, dispersión media del año
+
+ ( 1)  [punt_global]cwc_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .3455614   .0448441     7.71   0.000     .2576687    .4334542
+------------------------------------------------------------------------------
+
+  (b) Rural, dispersión media del año
+
+ ( 1)  [punt_global]cwc_inse + [punt_global]c.cwc_inse#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .0381469   .0427058     0.89   0.372     -.045555    .1218487
+------------------------------------------------------------------------------
+
+  (c) Urbano, +1 DE de dispersión (1.268915806679136)
+
+ ( 1)  [punt_global]cwc_inse + 1.268916*[punt_global]c.cwc_inse#c.c_sd_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .4325542   .0459275     9.42   0.000     .3425379    .5225705
+------------------------------------------------------------------------------
+
+  (d) Urbano, -1 DE de dispersión
+
+ ( 1)  [punt_global]cwc_inse - 1.268916*[punt_global]c.cwc_inse#c.c_sd_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .2585687   .0545991     4.74   0.000     .1515565    .3655809
+------------------------------------------------------------------------------
+
+  (e) Rural, con la dispersión media observada en zona rural
+
+ ( 1)  [punt_global]cwc_inse - .3570815*[punt_global]c.cwc_inse#c.c_sd_inse +
+       [punt_global]c.cwc_inse#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .0136665   .0437009     0.31   0.754    -.0719857    .0993187
+------------------------------------------------------------------------------
+
+  (f) Urbano, con la dispersión media observada en zona urbana
+
+ ( 1)  [punt_global]cwc_inse + .3022724*[punt_global]c.cwc_inse#c.c_sd_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .3662843   .0440168     8.32   0.000      .280013    .4525556
+------------------------------------------------------------------------------
+
+  (g) Gradiente medio: promedio ponderado por la proporción rural (.4584372759856631)
+
+ ( 1)  [punt_global]cwc_inse + .4584373*[punt_global]c.cwc_inse#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .2046311   .0345816     5.92   0.000     .1368524    .2724099
+------------------------------------------------------------------------------
+      Debe quedar cerca del cwc_inse de M4r/M5r. Es una verificación.
+
+------------------------------------------------------------
+--- M5c ---
+
+  (a) Urbano, dispersión media del año
+
+ ( 1)  [punt_global]cwc_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .3012975   .1048616     2.87   0.004     .0957726    .5068224
+------------------------------------------------------------------------------
+
+  (b) Rural, dispersión media del año
+
+ ( 1)  [punt_global]cwc_inse + [punt_global]c.cwc_inse#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.0011272   .0903973    -0.01   0.990    -.1783028    .1760483
+------------------------------------------------------------------------------
+
+  (c) Urbano, +1 DE de dispersión (1.268915806679136)
+
+ ( 1)  [punt_global]cwc_inse + 1.268916*[punt_global]c.cwc_inse#c.c_sd_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .3854728   .1052408     3.66   0.000     .1792045    .5917411
+------------------------------------------------------------------------------
+
+  (d) Urbano, -1 DE de dispersión
+
+ ( 1)  [punt_global]cwc_inse - 1.268916*[punt_global]c.cwc_inse#c.c_sd_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .2171222   .1087782     2.00   0.046     .0039209    .4303236
+------------------------------------------------------------------------------
+
+  (e) Rural, con la dispersión media observada en zona rural
+
+ ( 1)  [punt_global]cwc_inse - .3570815*[punt_global]c.cwc_inse#c.c_sd_inse +
+       [punt_global]c.cwc_inse#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.0248147   .0908353    -0.27   0.785    -.2028487    .1532193
+------------------------------------------------------------------------------
+
+  (f) Urbano, con la dispersión media observada en zona urbana
+
+ ( 1)  [punt_global]cwc_inse + .3022724*[punt_global]c.cwc_inse#c.c_sd_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .3213492   .1045552     3.07   0.002     .1164248    .5262735
+------------------------------------------------------------------------------
+
+  (g) Gradiente medio: promedio ponderado por la proporción rural (.4584372759856631)
+
+ ( 1)  [punt_global]cwc_inse + .4584373*[punt_global]c.cwc_inse#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .1626547   .0947536     1.72   0.086     -.023059    .3483685
+------------------------------------------------------------------------------
+      Debe quedar cerca del cwc_inse de M4r/M5r. Es una verificación.
+
+------------------------------------------------------------
+--- M5d ---
+
+  (a) Urbano, dispersión media del año
+
+ ( 1)  [punt_global]cwc_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .3137592    .110261     2.85   0.004     .0976517    .5298668
+------------------------------------------------------------------------------
+
+  (b) Rural, dispersión media del año
+
+ ( 1)  [punt_global]cwc_inse + [punt_global]c.cwc_inse#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .0139354    .096331     0.14   0.885    -.1748699    .2027407
+------------------------------------------------------------------------------
+
+  (c) Urbano, +1 DE de dispersión (1.268915806679136)
+
+ ( 1)  [punt_global]cwc_inse + 1.268916*[punt_global]c.cwc_inse#c.c_sd_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .3993079   .1109726     3.60   0.000     .1818056    .6168101
+------------------------------------------------------------------------------
+
+  (d) Urbano, -1 DE de dispersión
+
+ ( 1)  [punt_global]cwc_inse - 1.268916*[punt_global]c.cwc_inse#c.c_sd_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .2282106   .1143163     2.00   0.046     .0041548    .4522663
+------------------------------------------------------------------------------
+
+  (e) Rural, con la dispersión media observada en zona rural
+
+ ( 1)  [punt_global]cwc_inse - .3570815*[punt_global]c.cwc_inse#c.c_sd_inse +
+       [punt_global]c.cwc_inse#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |  -.0101386    .096708    -0.10   0.917    -.1996828    .1794057
+------------------------------------------------------------------------------
+
+  (f) Urbano, con la dispersión media observada en zona urbana
+
+ ( 1)  [punt_global]cwc_inse + .3022724*[punt_global]c.cwc_inse#c.c_sd_inse = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |    .334138   .1099912     3.04   0.002     .1185592    .5497168
+------------------------------------------------------------------------------
+
+  (g) Gradiente medio: promedio ponderado por la proporción rural (.4584372759856631)
+
+ ( 1)  [punt_global]cwc_inse + .4584373*[punt_global]c.cwc_inse#c.rural = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .1763088   .1003218     1.76   0.079    -.0203182    .3729358
+------------------------------------------------------------------------------
+      Debe quedar cerca del cwc_inse de M4r/M5r. Es una verificación.
+
+. 
+. * En M5r y M5c, el gradiente evaluado en las medias de planta y vulnerabilidad
+. display _newline(2) "{hline 60}"
+
+
+------------------------------------------------------------
+
+. display "--- M5c: gradiente en las medias de pct_planta e indice_vuln ---"
+--- M5c: gradiente en las medias de pct_planta e indice_vuln ---
+
+. quietly summarize pct_planta
+
+. local mpl = r(mean)
+
+. quietly summarize indice_vuln
+
+. local miv = r(mean)
+
+. display "Medias: pct_planta = " %9.4f `mpl' "   indice_vuln = " %9.4f `miv'
+Medias: pct_planta =    0.8775   indice_vuln =    0.2171
+
+. capture estimates use "M5c_`fin'.ster"
+
+. if _rc == 0 {
+.     capture noisily lincom cwc_inse + (`mpl')*c.cwc_inse#c.pct_planta        ///
+>         + (`miv')*c.cwc_inse#c.indice_vuln
+
+ ( 1)  [punt_global]cwc_inse + .8775181*[punt_global]c.cwc_inse#c.pct_planta +
+       .217089*[punt_global]c.cwc_inse#c.indice_vuln = 0
+
+------------------------------------------------------------------------------
+ punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         (1) |   .3463783   .0442662     7.82   0.000      .259618    .4331385
+------------------------------------------------------------------------------
+. }
+
+. 
+. *------------------------------------------------------------------------------
+. * [3] FIGURAS 6 Y 7 CON LOS EFECTOS ALEATORIOS DE M4r
+. *------------------------------------------------------------------------------
+. display _newline(2) "{hline 78}"
+
+
+------------------------------------------------------------------------------
+
+. display "[3] FIGURAS 6 Y 7"
+[3] FIGURAS 6 Y 7
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "Efectos_sede_M4r_`fin'.dta", clear
+
+. merge 1:1 cole_cod_dane_sede using "`sedes'", keep(master match)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               437  (_merge==3)
+    -----------------------------------------
+
+. tabulate _merge
+
+   Matching result from |
+                  merge |      Freq.     Percent        Cum.
+------------------------+-----------------------------------
+            Matched (3) |        437      100.00      100.00
+------------------------+-----------------------------------
+                  Total |        437      100.00
+
+. drop _merge
+
+. 
+. * Gradiente total de cada sede: efecto fijo de M4r + BLUP de la pendiente.
+. * 0.1949758 es el coeficiente de cwc_inse en M4r [log_15_gradiente, bloque B].
+. generate double grad_sede = 0.1949758 + b_pend
+
+. label variable grad_sede "Gradiente socioeconómico de la sede (M4r)"
+
+. summarize grad_sede, detail
+
+         Gradiente socioeconómico de la sede (M4r)
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.2463155      -.4063659
+ 5%    -.1280846      -.3433919
+10%    -.0623698       -.304351       Obs                 437
+25%     .0660026      -.2830018       Sum of wgt.         437
+
+50%     .1740692                      Mean           .1949758
+                        Largest       Std. dev.      .2126339
+75%     .3164388       .8205491
+90%     .4924708       .8855734       Variance       .0452132
+95%     .5641882       .9373061       Skewness       .4629336
+99%     .7922112       .9412563       Kurtosis        3.60063
+
+. quietly count if grad_sede < 0
+
+. display "Sedes con gradiente negativo estimado: " r(N) " de " _N
+Sedes con gradiente negativo estimado: 71 de 437
+
+. display "Nota: son BLUP encogidos hacia cero; describen el ordenamiento, no dan"
+Nota: son BLUP encogidos hacia cero; describen el ordenamiento, no dan
+
+. display "inferencia sede por sede."
+inferencia sede por sede.
+
+. 
+. * --- Figura 6: gradiente ordenado, con banda de más/menos un EE ---
+. sort grad_sede
+
+. generate int rango = _n
+
+. generate double g_lo = grad_sede - 1.96*se_pend
+
+. generate double g_hi = grad_sede + 1.96*se_pend
+
+. 
+. twoway (rarea g_lo g_hi rango, color(gs13) lwidth(none))                       ///
+>        (line grad_sede rango, lcolor(navy) lwidth(medthick))                   ///
+>        (function y = 0.1949758, range(1 `=_N') lpattern(dash) lcolor(maroon)), ///
+>     legend(order(2 "Gradiente de la sede" 1 "IC 95 %" 3 "Gradiente medio")      ///
+>            rows(1) size(small))                                                 ///
+>     ytitle("Puntos del Saber 11 por punto de INSE") xtitle("Sedes ordenadas")  ///
+>     title("Figura 6. Gradiente socioeconómico por sede")                        ///
+>     note("M4r: estructura de C1, efectos de año, REML, 20 imputaciones.") ///
+>     graphregion(color(white))
+
+. graph export "Fig6_gradiente_`f'.png", width(2000) replace
+(file Fig6_gradiente_20261013.png not found)
+file Fig6_gradiente_20261013.png saved as PNG format
+
+. 
+. * --- Figura 7: intercepto frente a pendiente, por zona ---
+. twoway (scatter b_pend b_int if rural < 0.5, mcolor(navy%50) msymbol(O))       ///
+>        (scatter b_pend b_int if rural >= 0.5, mcolor(maroon%50) msymbol(T))    ///
+>        (lfit b_pend b_int, lcolor(black) lpattern(solid)),                     ///
+>     legend(order(1 "Urbana" 2 "Rural" 3 "Ajuste lineal") rows(1) size(small))  ///
+>     xtitle("Efecto aleatorio del nivel de la sede") ///
+>     ytitle("Efecto aleatorio de la pendiente") ///
+>     title("Figura 7. Nivel y gradiente de la sede") ///
+>     note("Correlación del modelo: 0,381 [0,195; 0,540] (M4r). La correlación de" ///
+>          "los efectos predichos es mayor por el encogimiento de los BLUP.") ///
+>     graphregion(color(white))
+
+. graph export "Fig7_int_pend_`f'.png", width(2000) replace
+(file Fig7_int_pend_20261013.png not found)
+file Fig7_int_pend_20261013.png saved as PNG format
+
+. 
+. display _newline "--- Correlación de los efectos predichos, por zona ---"
+
+--- Correlación de los efectos predichos, por zona ---
+
+. correlate b_pend b_int
+(obs=437)
+
+             |   b_pend    b_int
+-------------+------------------
+      b_pend |   1.0000
+       b_int |   0.5590   1.0000
+
+
+. foreach z in 0 1 {
+  2.     display _newline "rural = `z':"
+  3.     capture noisily correlate b_pend b_int if (rural >= 0.5) == `z'
+  4. }
+
+rural = 0:
+(obs=113)
+
+             |   b_pend    b_int
+-------------+------------------
+      b_pend |   1.0000
+       b_int |   0.4135   1.0000
+
+
+rural = 1:
+(obs=324)
+
+             |   b_pend    b_int
+-------------+------------------
+      b_pend |   1.0000
+       b_int |   0.6566   1.0000
+
+
+. 
+. display _newline "--- Pendiente predicha por zona (BLUP, descriptivo) ---"
+
+--- Pendiente predicha por zona (BLUP, descriptivo) ---
+
+. tabstat grad_sede, by(rural) stat(n mean sd p25 p50 p75) format(%9.4f)
+
+Summary for variables: grad_sede
+Group variable: rural ((mean) rural)
+
+   rural |         N      Mean        SD       p25       p50       p75
+---------+------------------------------------------------------------
+       0 |  113.0000    0.3059    0.2612    0.1188    0.3174    0.5015
+       1 |  324.0000    0.1563    0.1777    0.0518    0.1484    0.2603
+---------+------------------------------------------------------------
+   Total |  437.0000    0.1950    0.2126    0.0660    0.1741    0.3164
+----------------------------------------------------------------------
+
+. 
+. display _newline "Fin: " c(current_date) " " c(current_time)
+
+Fin: 13 Oct 2026 19:26:42
+
+. log close fase15b
+      name:  fase15b
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_15b_lecturas_20261013_1
+> 926.log
+  log type:  text
+ closed on:  13 Oct 2026, 19:26:42
+---------------------------------------------------------------------------------------------

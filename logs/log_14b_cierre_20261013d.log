@@ -1,0 +1,561 @@
+---------------------------------------------------------------------------------------------
+      name:  fase14b
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_14b_cierre_20261013d.lo
+> g
+  log type:  text
+ opened on:  13 Oct 2026, 22:23:18
+
+. 
+. capture confirm file "C5_Base_CC_`fcc'.dta"
+
+. if _rc != 0 {
+.     display as error "No se encuentra C5_Base_CC_`fcc'.dta."
+.     display as error "Correr el bloque [1] del script 14 o ajustar el local fcc."
+.     exit 601
+. }
+
+. 
+. global v_n1 mujer edad repitente lectura_30min libros_26omas ///
+>             trabaja_mas20 internet_hogar computador_hogar
+
+. global v_n2 ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>             dotacion_tic rural ju_unica tecnico tecnico_academico ///
+>             cole_femenino
+
+. 
+. timer clear
+
+. timer on 1
+
+. 
+. 
+. ********************************************************************************
+. * [A] REALINEACIÓN DE c_sd_inse
+. ********************************************************************************
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[A] REALINEACION DE c_sd_inse CON EL CRITERIO DEL SCRIPT 15"
+[A] REALINEACION DE c_sd_inse CON EL CRITERIO DEL SCRIPT 15
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. use "C5_Base_CC_`fcc'.dta", clear
+
+. 
+. * Punto de partida: lo que dejó el bloque [1].
+. display _newline "--- Antes de realinear ---"
+
+--- Antes de realinear ---
+
+. quietly count if missing(_sd_inse)
+
+. display "Estudiantes sin dispersión calculable: " r(N)
+Estudiantes sin dispersión calculable: 13
+
+. tabstat c_sd_inse, stat(n mean sd min max) format(%9.4f)
+
+    Variable |         N      Mean        SD       Min       Max
+-------------+--------------------------------------------------
+   c_sd_inse |  6.97e+04    0.0000    1.3160   -7.1038   17.8125
+----------------------------------------------------------------
+
+. 
+. * Cuántos estudiantes de la cohorte tienen índice observado. Es el análogo en
+. * casos completos del `n_sa` del script 15: allí el `sd()` falla cuando la
+. * cohorte tiene un solo estudiante, aquí cuando tiene un solo estudiante CON
+. * ÍNDICE OBSERVADO.
+. capture drop n_obs_inse
+
+. bysort cole_cod_dane_sede year: egen int n_obs_inse = ///
+>     total(!missing(estu_inse_individual))
+
+. label variable n_obs_inse "Estudiantes de la cohorte con INSE observado"
+
+. 
+. display _newline "--- Cohortes de sede según el número de índices observados ---"
+
+--- Cohortes de sede según el número de índices observados ---
+
+. preserve
+
+.     egen byte _t = tag(cole_cod_dane_sede year)
+
+.     keep if _t == 1
+(67,303 observations deleted)
+
+.     tabulate n_obs_inse if n_obs_inse <= 3
+
+Estudiantes |
+      de la |
+cohorte con |
+       INSE |
+  observado |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          1 |         13       18.06       18.06
+          2 |         23       31.94       50.00
+          3 |         36       50.00      100.00
+------------+-----------------------------------
+      Total |         72      100.00
+
+.     quietly count if n_obs_inse <= 1
+
+.     display "Sede-año con uno o ningún índice observado: " r(N) " de " _N
+Sede-año con uno o ningún índice observado: 13 de 2447
+
+. restore
+
+. 
+. * Criterio del script 15: dispersión cero, no faltante.
+. replace _sd_inse = 0 if missing(_sd_inse)
+(13 real changes made)
+
+. 
+. * RECENTRADO. La media anual cambia al incorporar esas filas con cero, de modo
+. * que el centrado anterior ya no corresponde.
+. capture drop c_sd_inse
+
+. bysort year: egen double _gsd = mean(_sd_inse)
+
+. generate double c_sd_inse = _sd_inse - _gsd
+
+. drop _gsd
+
+. label variable c_sd_inse "DE del INSE en la cohorte de sede, centrada (criterio 15)"
+
+. 
+. display _newline "--- Después de realinear ---"
+
+--- Después de realinear ---
+
+. quietly count if missing(c_sd_inse)
+
+. display "Faltantes de c_sd_inse: " r(N) " (debe ser 0)"
+Faltantes de c_sd_inse: 0 (debe ser 0)
+
+. assert r(N) == 0
+
+. tabstat c_sd_inse, stat(n mean sd min max) format(%9.4f)
+
+    Variable |         N      Mean        SD       Min       Max
+-------------+--------------------------------------------------
+   c_sd_inse |  6.98e+04    0.0000    1.3194   -7.1904   17.8145
+----------------------------------------------------------------
+
+. 
+. display _newline "--- Dispersión por año, criterio alineado ---"
+
+--- Dispersión por año, criterio alineado ---
+
+. tabstat _sd_inse, by(year) stat(n mean sd min max) format(%9.4f)
+
+Summary for variables: _sd_inse
+Group variable: year (Año de presentación de la prueba)
+
+    year |         N      Mean        SD       Min       Max
+---------+--------------------------------------------------
+    2018 |  1.15e+04    7.0318    1.3986    0.0000   13.7626
+    2019 |  1.15e+04    7.1328    1.3464    0.9133   11.4566
+    2020 |  1.10e+04    7.1250    1.4026    0.0000   24.9395
+    2021 |  1.17e+04    7.1904    1.3017    0.0000   15.9992
+    2022 |  1.18e+04    7.1075    1.3276    0.0000   12.7028
+    2023 |  1.24e+04    6.8842    1.1389    0.0000   13.2386
+---------+--------------------------------------------------
+   Total |  6.98e+04    7.0763    1.3232    0.0000   24.9395
+------------------------------------------------------------
+
+. display "Comparar con el mismo cuadro del bloque [1]: las medias anuales se"
+Comparar con el mismo cuadro del bloque [1]: las medias anuales se
+
+. display "mueven en la cuarta cifra, porque entran trece filas con cero."
+mueven en la cuarta cifra, porque entran trece filas con cero.
+
+. 
+. 
+. ********************************************************************************
+. * [B] M5 CON CONTROLES, MUESTRA ALINEADA
+. ********************************************************************************
+. * Reemplaza a CC_M5_ctrl del bloque [1.3]. Debe correr sobre 58.948
+. * observaciones, las mismas que CC_M5 del bloque [1.2].
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[B] CC_M5_ctrl ALINEADO: 58.948 observaciones esperadas"
+[B] CC_M5_ctrl ALINEADO: 58.948 observaciones esperadas
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. mixed punt_global c.cwc_inse##c.pct_planta c.cwc_inse##c.indice_vuln ///
+>     c.cwc_inse##c.c_sd_inse c.cwc_inse##i.rural                      ///
+>     c_inse_prom_sede $v_n1 $v_n2 ib2018.year                         ///
+>     || mcpio_id: || mcpio_id: R.year                                 ///
+>     || sede_id: cwc_inse, covariance(unstructured)                   ///
+>     || sede_anio: , reml
+note: cwc_inse omitted because of collinearity.
+note: cwc_inse omitted because of collinearity.
+note: cwc_inse omitted because of collinearity.
+note: pct_planta omitted because of collinearity.
+note: rural omitted because of collinearity.
+
+Performing EM optimization ...
+
+Performing gradient-based optimization: 
+Iteration 0:   log restricted-likelihood = -293526.76  
+Iteration 1:   log restricted-likelihood = -293524.61  
+Iteration 2:   log restricted-likelihood =  -293524.6  
+
+Computing standard errors ...
+
+Mixed-effects REML regression                   Number of obs     =     58,948
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        159    1,403.5     12,214
+                sede_id |        423          1      139.4        978
+              sede_anio |      2,312          1       25.5        192
+        -------------------------------------------------------------
+
+                                                Wald chi2(31)     =    5500.76
+Log restricted-likelihood =  -293524.6          Prob > chi2       =     0.0000
+
+------------------------------------------------------------------------------------------
+             punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------------------+----------------------------------------------------------------
+                cwc_inse |   .3769455   .1160421     3.25   0.001     .1495072    .6043838
+              pct_planta |   9.158931   1.815326     5.05   0.000     5.600957    12.71691
+                         |
+ c.cwc_inse#c.pct_planta |   .0313458   .1130823     0.28   0.782    -.1902914     .252983
+                         |
+                cwc_inse |          0  (omitted)
+             indice_vuln |  -1.312045   .6714587    -1.95   0.051     -2.62808    .0039896
+                         |
+c.cwc_inse#c.indice_vuln |  -.0535331   .0278998    -1.92   0.055    -.1082156    .0011495
+                         |
+                cwc_inse |          0  (omitted)
+               c_sd_inse |   .2774871   .1685558     1.65   0.100    -.0528763    .6078504
+                         |
+  c.cwc_inse#c.c_sd_inse |   .0618331   .0169693     3.64   0.000      .028574    .0950923
+                         |
+                cwc_inse |          0  (omitted)
+                 1.rural |  -10.29024    1.83193    -5.62   0.000    -13.88076   -6.699726
+                         |
+        rural#c.cwc_inse |
+                      1  |  -.3179993   .0572034    -5.56   0.000     -.430116   -.2058827
+                         |
+        c_inse_prom_sede |   .2873988   .1076663     2.67   0.008     .0763768    .4984208
+                   mujer |  -8.069662   .3041405   -26.53   0.000    -8.665766   -7.473557
+                    edad |  -7.481236   .1382663   -54.11   0.000    -7.752233   -7.210239
+               repitente |   5.245602   .4519562    11.61   0.000     4.359784     6.13142
+           lectura_30min |   6.739684   .3071101    21.95   0.000     6.137759    7.341609
+           libros_26omas |   5.515519   .4105374    13.43   0.000     4.710881    6.320158
+           trabaja_mas20 |  -2.611637   .7598925    -3.44   0.001    -4.100999   -1.122275
+          internet_hogar |   .2230278   .4059573     0.55   0.583    -.5726338    1.018689
+        computador_hogar |   .6875725   .3889157     1.77   0.077    -.0746882    1.449833
+            ln_matricula |   5.113729   1.089295     4.69   0.000      2.97875    7.248709
+   ratio_alumnos_docente |  -.0934456   .0845654    -1.11   0.269    -.2591908    .0722997
+              pct_planta |          0  (omitted)
+              z_posgrado |   .0964167   .2156397     0.45   0.655    -.3262294    .5190628
+            dotacion_tic |   .7906297   1.885122     0.42   0.675    -2.904142    4.485401
+                   rural |          0  (omitted)
+                ju_unica |   .2945068    .874938     0.34   0.736     -1.42034    2.009354
+                 tecnico |  -.2327891   1.383749    -0.17   0.866    -2.944888     2.47931
+       tecnico_academico |  -5.982722   2.474422    -2.42   0.016     -10.8325   -1.132944
+           cole_femenino |   36.42482    5.41789     6.72   0.000     25.80596    47.04369
+                         |
+                    year |
+                   2019  |    -4.4263   .8214479    -5.39   0.000    -6.036308   -2.816292
+                   2020  |  -3.934613   .8755901    -4.49   0.000    -5.650738   -2.218488
+                   2021  |  -7.773818   .9015199    -8.62   0.000    -9.540764   -6.006871
+                   2022  |  -2.895171   .9485432    -3.05   0.002    -4.754282   -1.036061
+                   2023  |      .1913   1.009777     0.19   0.850    -1.787827    2.170427
+                         |
+                   _cons |    323.483   7.768576    41.64   0.000     308.2569    338.7091
+------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  var(_cons) |    174.339   44.25662       106.002    286.7314
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                 var(R.year) |   3.010911   1.243155      1.340451    6.763086
+-----------------------------+------------------------------------------------
+sede_id: Unstructured        |
+               var(cwc_inse) |    .085991   .0179434      .0571263    .1294404
+                  var(_cons) |   127.1449   11.45706      106.5607    151.7054
+         cov(cwc_inse,_cons) |   1.176116   .3515137      .4871614     1.86507
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                  var(_cons) |   21.49399   2.357719      17.33592    26.64938
+-----------------------------+------------------------------------------------
+               var(Residual) |   1197.675   7.099561      1183.841    1211.671
+------------------------------------------------------------------------------
+LR test vs. linear model: chi2(6) = 11218.45              Prob > chi2 = 0.0000
+
+Note: LR test is conservative and provided only for reference.
+
+. 
+. display "Observaciones utilizadas: " e(N) "  (esperadas: 58.948)"
+Observaciones utilizadas: 58948  (esperadas: 58.948)
+
+. estimates save "C5_CC_M5_ctrl_alin_`hoy'.ster", replace
+(note: file C5_CC_M5_ctrl_alin_20261013d.ster not found)
+file C5_CC_M5_ctrl_alin_20261013d.ster saved
+
+. 
+. display _newline "Contraste conjunto de las dos interacciones declaradas:"
+
+Contraste conjunto de las dos interacciones declaradas:
+
+. testparm c.cwc_inse#c.pct_planta c.cwc_inse#c.indice_vuln
+
+ ( 1)  [punt_global]c.cwc_inse#c.pct_planta = 0
+ ( 2)  [punt_global]c.cwc_inse#c.indice_vuln = 0
+
+           chi2(  2) =    3.71
+         Prob > chi2 =    0.1567
+
+. 
+. display _newline "Referencias de comparación:"
+
+Referencias de comparación:
+
+. display "  Bloque [1.3] sin alinear : 0,0313 (0,1131), conjunto p = 0,1578"
+  Bloque [1.3] sin alinear : 0,0313 (0,1131), conjunto p = 0,1578
+
+. display "  Tabla 25b, cuarta fila   : 0,063 (0,101), p 0,537, conjunto 0,194"
+  Tabla 25b, cuarta fila   : 0,063 (0,101), p 0,537, conjunto 0,194
+
+. 
+. 
+. ********************************************************************************
+. * [C] M5 CON CONTROLES, COHORTES DE AL MENOS DIEZ, CON EL CONTRASTE CONJUNTO
+. ********************************************************************************
+. * Reemplaza a CC_M5_ctrl10 del bloque [1.4] y añade el `testparm` que allí
+. * faltaba.
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "[C] CC_M5_ctrl10 ALINEADO, CON CONTRASTE CONJUNTO"
+[C] CC_M5_ctrl10 ALINEADO, CON CONTRASTE CONJUNTO
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. mixed punt_global c.cwc_inse##c.pct_planta c.cwc_inse##c.indice_vuln ///
+>     c.cwc_inse##c.c_sd_inse c.cwc_inse##i.rural                      ///
+>     c_inse_prom_sede $v_n1 $v_n2 ib2018.year if coh10 == 1           ///
+>     || mcpio_id: || mcpio_id: R.year                                 ///
+>     || sede_id: cwc_inse, covariance(unstructured)                   ///
+>     || sede_anio: , reml
+note: cwc_inse omitted because of collinearity.
+note: cwc_inse omitted because of collinearity.
+note: cwc_inse omitted because of collinearity.
+note: pct_planta omitted because of collinearity.
+note: rural omitted because of collinearity.
+
+Performing EM optimization ...
+
+Performing gradient-based optimization: 
+Iteration 0:   log restricted-likelihood = -282401.76  
+Iteration 1:   log restricted-likelihood = -282400.54  
+Iteration 2:   log restricted-likelihood = -282400.54  
+
+Computing standard errors ...
+
+Mixed-effects REML regression                   Number of obs     =     56,663
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        133    1,349.1     12,117
+                sede_id |        376          7      150.7        978
+              sede_anio |      1,882          4       30.1        192
+        -------------------------------------------------------------
+
+                                                Wald chi2(31)     =    5302.70
+Log restricted-likelihood = -282400.54          Prob > chi2       =     0.0000
+
+------------------------------------------------------------------------------------------
+             punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------------------+----------------------------------------------------------------
+                cwc_inse |   .4084542   .1211509     3.37   0.001     .1710028    .6459056
+              pct_planta |   8.372961   1.954899     4.28   0.000     4.541429    12.20449
+                         |
+ c.cwc_inse#c.pct_planta |  -.0094374   .1187612    -0.08   0.937    -.2422051    .2233304
+                         |
+                cwc_inse |          0  (omitted)
+             indice_vuln |  -1.167115   .6933048    -1.68   0.092    -2.525968    .1917371
+                         |
+c.cwc_inse#c.indice_vuln |  -.0478388   .0288124    -1.66   0.097    -.1043102    .0086325
+                         |
+                cwc_inse |          0  (omitted)
+               c_sd_inse |   .2636753   .1913389     1.38   0.168    -.1113421    .6386927
+                         |
+  c.cwc_inse#c.c_sd_inse |   .0626865   .0186694     3.36   0.001     .0260951    .0992778
+                         |
+                cwc_inse |          0  (omitted)
+                 1.rural |   -9.86651   1.860408    -5.30   0.000    -13.51284   -6.220177
+                         |
+        rural#c.cwc_inse |
+                      1  |  -.3125461   .0588139    -5.31   0.000    -.4278193   -.1972729
+                         |
+        c_inse_prom_sede |   .3954403   .1187938     3.33   0.001     .1626087    .6282719
+                   mujer |  -8.228083   .3119088   -26.38   0.000    -8.839414   -7.616753
+                    edad |  -7.553244   .1423937   -53.04   0.000     -7.83233   -7.274157
+               repitente |    5.01142   .4583599    10.93   0.000     4.113051    5.909789
+           lectura_30min |   6.904621   .3143373    21.97   0.000     6.288531     7.52071
+           libros_26omas |   5.527531   .4190096    13.19   0.000     4.706287    6.348775
+           trabaja_mas20 |  -2.479144   .7815841    -3.17   0.002    -4.011021   -.9472673
+          internet_hogar |   .2948326   .4156055     0.71   0.478    -.5197391    1.109404
+        computador_hogar |   .6860372   .3978866     1.72   0.085    -.0938063    1.465881
+            ln_matricula |   4.998523   1.198796     4.17   0.000     2.648926     7.34812
+   ratio_alumnos_docente |  -.0414768   .0888352    -0.47   0.641    -.2155905    .1326369
+              pct_planta |          0  (omitted)
+              z_posgrado |   .0510034   .2251756     0.23   0.821    -.3903327    .4923394
+            dotacion_tic |  -.0897934   2.071943    -0.04   0.965    -4.150727     3.97114
+                   rural |          0  (omitted)
+                ju_unica |   .4534829   .9057252     0.50   0.617    -1.321706    2.228672
+                 tecnico |  -.0321659   1.453932    -0.02   0.982     -2.88182    2.817489
+       tecnico_academico |  -6.191969   2.512553    -2.46   0.014    -11.11648   -1.267455
+           cole_femenino |   35.92635   5.414308     6.64   0.000      25.3145     46.5382
+                         |
+                    year |
+                   2019  |  -4.566226   .8505143    -5.37   0.000    -6.233203   -2.899248
+                   2020  |  -4.340936   .9118286    -4.76   0.000    -6.128087   -2.553785
+                   2021  |  -8.210319   .9383854    -8.75   0.000    -10.04952   -6.371117
+                   2022  |  -3.263143   .9858973    -3.31   0.001    -5.195467    -1.33082
+                   2023  |  -.2241714   1.050917    -0.21   0.831    -2.283932    1.835589
+                         |
+                   _cons |   325.4673   8.433475    38.59   0.000      308.938    341.9966
+------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  var(_cons) |   176.8742   45.93895      106.3126    294.2688
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                 var(R.year) |   3.089421   1.280248      1.371329    6.960057
+-----------------------------+------------------------------------------------
+sede_id: Unstructured        |
+               var(cwc_inse) |   .0878056   .0186213      .0579435    .1330578
+                  var(_cons) |   126.3867   12.16193      104.6627    152.6197
+         cov(cwc_inse,_cons) |   1.222078   .3645131      .5076455    1.936511
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                  var(_cons) |    21.8401   2.435131      17.55283    27.17453
+-----------------------------+------------------------------------------------
+               var(Residual) |   1209.617   7.306088      1195.382    1224.022
+------------------------------------------------------------------------------
+LR test vs. linear model: chi2(6) = 10641.79              Prob > chi2 = 0.0000
+
+Note: LR test is conservative and provided only for reference.
+
+. 
+. display "Observaciones utilizadas: " e(N)
+Observaciones utilizadas: 56663
+
+. estimates save "C5_CC_M5_ctrl10_alin_`hoy'.ster", replace
+(note: file C5_CC_M5_ctrl10_alin_20261013d.ster not found)
+file C5_CC_M5_ctrl10_alin_20261013d.ster saved
+
+. 
+. display _newline "Contraste conjunto de las dos interacciones declaradas:"
+
+Contraste conjunto de las dos interacciones declaradas:
+
+. testparm c.cwc_inse#c.pct_planta c.cwc_inse#c.indice_vuln
+
+ ( 1)  [punt_global]c.cwc_inse#c.pct_planta = 0
+ ( 2)  [punt_global]c.cwc_inse#c.indice_vuln = 0
+
+           chi2(  2) =    2.79
+         Prob > chi2 =    0.2478
+
+. 
+. display _newline "Referencias de comparación:"
+
+Referencias de comparación:
+
+. display "  Bloque [1.4] sin alinear : -0,0094 (0,1188), sin contraste conjunto"
+  Bloque [1.4] sin alinear : -0,0094 (0,1188), sin contraste conjunto
+
+. display "  Tabla 25b, quinta fila   : 0,040 (0,107), p 0,707, conjunto 0,386"
+  Tabla 25b, quinta fila   : 0,040 (0,107), p 0,707, conjunto 0,386
+
+. 
+. 
+. ********************************************************************************
+. * CIERRE
+. ********************************************************************************
+. 
+. save "C5_Base_CC_alin_`hoy'.dta", replace
+(file C5_Base_CC_alin_20261013d.dta not found)
+file C5_Base_CC_alin_20261013d.dta saved
+
+. 
+. timer off 1
+
+. display _newline "Tiempo total:"
+
+Tiempo total:
+
+. timer list 1
+   1:    345.61 /        1 =     345.6100
+
+. 
+. display _newline "{hline 78}"
+
+------------------------------------------------------------------------------
+
+. display "SCRIPT 14B TERMINADO."
+SCRIPT 14B TERMINADO.
+
+. display ""
+
+
+. display "La regla de decision de C5 ya se aplico sobre el bloque [1] y su"
+La regla de decision de C5 ya se aplico sobre el bloque [1] y su
+
+. display "resultado no depende de esta corrida. Si alguna de las dos"
+resultado no depende de esta corrida. Si alguna de las dos
+
+. display "interacciones de arriba resultara MAYOR en valor absoluto que su"
+interacciones de arriba resultara MAYOR en valor absoluto que su
+
+. display "contraparte imputada, hay que volver a aplicar las reglas 5 y 6 antes"
+contraparte imputada, hay que volver a aplicar las reglas 5 y 6 antes
+
+. display "de dar C5 por cerrada."
+de dar C5 por cerrada.
+
+. display "{hline 78}"
+------------------------------------------------------------------------------
+
+. 
+. log close fase14b
+      name:  fase14b
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_14b_cierre_20261013d.lo
+> g
+  log type:  text
+ closed on:  13 Oct 2026, 22:29:04
+---------------------------------------------------------------------------------------------
