@@ -2,8 +2,9 @@
 * PROYECTO : Desempeño Saber 11 en sedes oficiales del Cauca, 2018-2023
 * SCRIPT   : 04 - FASE 4. PANEL MUNICIPAL (NIVEL 3)
 * ENTRADA  : IPC anual desde el año 1955 a 2025.xlsx
-*            Panel_homicidios.xlsx, Hectareas Coca.xlsx
+*            Panel_homicidios.xlsx (homicidios y población)
 *            Panel_inversion.xlsx  (hojas Panel_inversion y Panel_caracterizacion)
+*            Hectareas Coca.xlsx ya no se lee: la coca sale de TerriData (bloque [6])
 * SALIDA   : N3_Municipios_2018_2023.dta
 * STATA    : 17
 * VERSIÓN  : 5 - añade la tasa de homicidios suavizada por Bayes empírico (C7)
