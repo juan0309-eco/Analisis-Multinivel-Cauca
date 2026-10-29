@@ -1,0 +1,26 @@
+# Datos y resultados de estimación: no se publican
+*.dta
+*.ster
+*.xlsx
+*.xls
+*.csv
+*.txt
+*.zip
+*.rtf
+*.gph
+*.png
+*.smcl
+
+# Documentos de la tesis
+*.docx
+*.pdf
+
+# Carpetas que no van al repositorio
+/verificacion/
+temp/
+salidas/
+viejos/
+pre_paso4/
+
+# Herramienta local para armar la carpeta
+armar_repo.ps1
