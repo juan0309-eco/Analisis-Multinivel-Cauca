@@ -1,0 +1,333 @@
+---------------------------------------------------------------------------------------------
+      name:  fase17
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_17_diagnosticos_C7_2026
+> 1119.log
+  log type:  text
+ opened on:  19 Nov 2026, 14:18:46
+
+. display "Tarea: `tarea'   salida: `hoy'   " c(current_date) " " c(current_time)
+Tarea: 17_diagnosticos_C7   salida: 20261119   19 Nov 2026 14:18:46
+
+. 
+. timer clear
+
+. timer on 1
+
+. 
+. global v_n1 mujer edad repitente lectura_30min libros_26omas ///
+>             trabaja_mas20 internet_hogar computador_hogar
+
+. global v_n2 ln_matricula ratio_alumnos_docente pct_planta z_posgrado ///
+>             dotacion_tic rural ju_unica tecnico tecnico_academico ///
+>             cole_femenino
+
+. global v_mun tasa_homicidios_bar tasa_homicidios_dev ln_coca_bar ///
+>              ln_coca_dev ln_inversion_pc_bar ln_inversion_pc_dev
+
+. 
+. 
+. ********************************************************************************
+. * [2] ML3b SOBRE LA PRIMERA IMPUTACION
+. ********************************************************************************
+. use "Base_Estimacion.dta", clear
+
+. mi extract 1, clear
+
+. 
+. capture drop mcpio_anio sede_anio
+
+. egen long mcpio_anio = group(cole_cod_mcpio_ubicacion year)
+
+. egen long sede_anio  = group(cole_cod_dane_sede year)
+
+. 
+. confirm variable vuln_bar indice_vuln mcpio_id sede_id
+
+. 
+. timer on 2
+
+. mixed punt_global c_inse $v_n1 $v_n2 $v_mun ib2018.year              ///
+>     || mcpio_id: || mcpio_id: R.year                                 ///
+>     || sede_id: || sede_anio: , reml
+
+Performing EM optimization ...
+
+Performing gradient-based optimization: 
+Iteration 0:   log restricted-likelihood =    -346676  
+Iteration 1:   log restricted-likelihood = -346674.76  
+Iteration 2:   log restricted-likelihood = -346674.75  
+
+Computing standard errors ...
+
+Mixed-effects REML regression                   Number of obs     =     69,750
+
+        Grouping information
+        -------------------------------------------------------------
+                        |     No. of       Observations per group
+         Group variable |     groups    Minimum    Average    Maximum
+        ----------------+--------------------------------------------
+               mcpio_id |         42        248    1,660.7     13,962
+                sede_id |        437          1      159.6      1,109
+              sede_anio |      2,447          1       28.5        202
+        -------------------------------------------------------------
+
+                                                Wald chi2(30)     =    7370.92
+Log restricted-likelihood = -346674.75          Prob > chi2       =     0.0000
+
+---------------------------------------------------------------------------------------
+          punt_global | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+               c_inse |   .2831854   .0265972    10.65   0.000     .2310559     .335315
+                mujer |  -8.227366    .276517   -29.75   0.000     -8.76933   -7.685403
+                 edad |  -7.475618   .1240339   -60.27   0.000     -7.71872   -7.232516
+            repitente |   5.929199   .4163067    14.24   0.000     5.113253    6.745145
+        lectura_30min |   6.823822     .28094    24.29   0.000      6.27319    7.374454
+        libros_26omas |   5.383882   .3749661    14.36   0.000     4.648961    6.118802
+        trabaja_mas20 |  -3.222239   .6889508    -4.68   0.000    -4.572558    -1.87192
+       internet_hogar |   .2577185   .3673112     0.70   0.483    -.4621983    .9776353
+     computador_hogar |   .5073803   .3542991     1.43   0.152    -.1870332    1.201794
+         ln_matricula |   5.252609   1.032697     5.09   0.000     3.228559    7.276658
+ratio_alumnos_docente |  -.0919124    .079113    -1.16   0.245     -.246971    .0631462
+           pct_planta |   9.502558   1.665042     5.71   0.000     6.239135    12.76598
+           z_posgrado |   .0470362   .2015717     0.23   0.815    -.3480371    .4421095
+         dotacion_tic |   1.625904   1.662913     0.98   0.328    -1.633345    4.885153
+                rural |  -10.72648   1.789492    -5.99   0.000    -14.23382   -7.219138
+             ju_unica |    .287567    .824514     0.35   0.727    -1.328451    1.903585
+              tecnico |    -.82494   1.308627    -0.63   0.528    -3.389802    1.739922
+    tecnico_academico |  -5.787893   2.373707    -2.44   0.015    -10.44027   -1.135513
+        cole_femenino |   35.90418   5.556342     6.46   0.000     25.01395    46.79441
+  tasa_homicidios_bar |   .0015349   .0662796     0.02   0.982    -.1283708    .1314405
+  tasa_homicidios_dev |  -.0086687   .0097111    -0.89   0.372    -.0277021    .0103647
+          ln_coca_bar |  -1.047362   .8147195    -1.29   0.199    -2.644183    .5494588
+          ln_coca_dev |  -.0573504    .263159    -0.22   0.827    -.5731326    .4584318
+  ln_inversion_pc_bar |  -.5104114   3.106504    -0.16   0.869    -6.599047    5.578224
+  ln_inversion_pc_dev |   2.811711   1.611123     1.75   0.081     -.346033    5.969454
+                      |
+                 year |
+                2019  |  -4.783628   .7846335    -6.10   0.000    -6.321481   -3.245774
+                2020  |  -3.344376   .8446978    -3.96   0.000    -4.999954   -1.688799
+                2021  |  -7.658418    .861362    -8.89   0.000    -9.346656   -5.970179
+                2022  |   -3.18307   .9092922    -3.50   0.000     -4.96525    -1.40089
+                2023  |   .1627711   .9958652     0.16   0.870    -1.789089    2.114631
+                      |
+                _cons |   329.7747   36.46668     9.04   0.000     258.3014    401.2481
+---------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  var(_cons) |   188.3901   49.20322      112.9129    314.3205
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                 var(R.year) |   3.138899   1.160861      1.520467     6.48004
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                  var(_cons) |   127.3776   10.78365      107.9025    150.3678
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                  var(_cons) |   21.59938   2.118565       17.8218    26.17767
+-----------------------------+------------------------------------------------
+               var(Residual) |   1180.667    6.40926      1168.172    1193.296
+------------------------------------------------------------------------------
+LR test vs. linear model: chi2(4) = 12395.92              Prob > chi2 = 0.0000
+
+Note: LR test is conservative and provided only for reference.
+
+. timer off 2
+
+. estimates save "ML3b_m1_diag_`hoy'.ster"
+file ML3b_m1_diag_20261119.ster saved
+
+. 
+. display _newline "--- CONTROL: varianzas (Anexo H: 188,390 / 3,139 / 127,378 / 21,599 / 1.1
+> 80,667) ---"
+
+--- CONTROL: varianzas (Anexo H: 188,390 / 3,139 / 127,378 / 21,599 / 1.180,667) ---
+
+. estat sd, variance
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                  var(_cons) |   188.3901   49.20322      112.9129    314.3205
+-----------------------------+------------------------------------------------
+mcpio_id: Identity           |
+                 var(R.year) |   3.138899   1.160861      1.520467     6.48004
+-----------------------------+------------------------------------------------
+sede_id: Identity            |
+                  var(_cons) |   127.3776   10.78365      107.9025    150.3678
+-----------------------------+------------------------------------------------
+sede_anio: Identity          |
+                  var(_cons) |   21.59938   2.118565       17.8218    26.17767
+-----------------------------+------------------------------------------------
+               var(Residual) |   1180.667    6.40926      1168.172    1193.296
+------------------------------------------------------------------------------
+
+. 
+. 
+. ********************************************************************************
+. * [2.1] EFECTOS PREDICHOS, IDENTIFICADOS POR SU NIVEL
+. ********************************************************************************
+. predict double re_*, reffects
+
+. describe re_*
+
+Variable      Storage   Display    Value
+    name         type    format    label      Variable label
+---------------------------------------------------------------------------------------------
+re_1            double  %10.0g                BLUP r.e. for mcpio_id: _cons
+re_2            double  %10.0g                BLUP r.e. for mcpio_id: R.year
+re_3            double  %10.0g                BLUP r.e. for sede_id: _cons
+re_4            double  %10.0g                BLUP r.e. for sede_anio: _cons
+
+. 
+. * El efecto permanente del municipio es la unica variable re_* constante
+. * dentro de mcpio_id. Se busca, no se supone su posicion.
+. local re_m ""
+
+. foreach v of varlist re_* {
+  2.     tempvar s
+  3.     quietly bysort mcpio_id: egen double `s' = sd(`v')
+  4.     quietly count if `s' > 1e-8 & !missing(`s')
+  5.     if r(N) == 0 & "`re_m'" == "" local re_m `v'
+  6.     drop `s'
+  7. }
+
+. display _newline "Efecto permanente del municipio: `re_m'"
+
+Efecto permanente del municipio: re_1
+
+. assert "`re_m'" != ""
+
+. rename `re_m' re_mcpio
+
+. 
+. 
+. ********************************************************************************
+. * [2.2] COLA INFERIOR DE LA FIGURA 8
+. ********************************************************************************
+. egen byte _tm = tag(mcpio_id)
+
+. 
+. * Indice del primer ano, solo como referencia de la version 2
+. bysort mcpio_id (year): generate double _iv2018 = indice_vuln[1]
+
+. 
+. capture confirm variable cole_mcpio_ubicacion
+
+. local nom = cond(_rc == 0, "cole_mcpio_ubicacion", "")
+
+. 
+. preserve
+
+.     keep if _tm == 1
+(69,708 observations deleted)
+
+.     keep mcpio_id cole_cod_mcpio_ubicacion `nom' re_mcpio vuln_bar _iv2018
+
+. 
+.     quietly count
+
+.     display _newline "Municipios: " r(N) " (esperados: 42)"
+
+Municipios: 42 (esperados: 42)
+
+.     assert r(N) == 42
+
+. 
+.     gsort re_mcpio
+
+.     generate int orden = _n
+
+. 
+.     display _newline "--- Los ocho efectos mas bajos ---"
+
+--- Los ocho efectos mas bajos ---
+
+.     list orden cole_cod_mcpio_ubicacion `nom' re_mcpio vuln_bar in 1/8, ///
+>         clean noobs abbreviate(24)
+
+    orden   cole_cod_mcpio_ubicacion   cole_mcpio_ubicacion     re_mcpio     vuln_bar  
+        1                      19573          PUERTO TEJADA   -26.547738    .92855576  
+        2                      19418         LOPEZ DE MICAY   -24.914203    .08248452  
+        3                      19318                  GUAPI   -23.015214    .21337888  
+        4                      19809               TIMBIQUI   -22.488061    .30318509  
+        5                      19513                PADILLA   -21.130705   -.27490603  
+        6                      19300               GUACHENE   -19.761287   -.13965496  
+        7                      19845             VILLA RICA   -16.920495   -.10980994  
+        8                      19821                TORIBIO   -13.734246   -.26897066  
+
+. 
+.     display _newline "--- Salto entre el octavo y el noveno ---"
+
+--- Salto entre el octavo y el noveno ---
+
+.     display "  re_mcpio[8] = " %8.3f re_mcpio[8] "   re_mcpio[9] = " %8.3f re_mcpio[9]
+  re_mcpio[8] =  -13.734   re_mcpio[9] =   -8.663
+
+. 
+.     display _newline "--- Signo del indice (promedio del periodo) entre los ocho ---"
+
+--- Signo del indice (promedio del periodo) entre los ocho ---
+
+.     quietly count if orden <= 8 & vuln_bar > 0
+
+.     display "  Con vuln_bar > 0: " r(N) " de 8"
+  Con vuln_bar > 0: 4 de 8
+
+. 
+.     display _newline "--- Correlacion del efecto del municipio con el indice ---"
+
+--- Correlacion del efecto del municipio con el indice ---
+
+.     correlate re_mcpio vuln_bar
+(obs=42)
+
+             | re_mcpio vuln_bar
+-------------+------------------
+    re_mcpio |   1.0000
+    vuln_bar |  -0.0000   1.0000
+
+
+.     display "  Con el promedio del periodo (vuln_bar): " %7.4f r(rho)
+  Con el promedio del periodo (vuln_bar): -0.0000
+
+.     quietly correlate re_mcpio _iv2018
+
+.     display "  Con indice_vuln de 2018 (como en v2):   " %7.4f r(rho)
+  Con indice_vuln de 2018 (como en v2):   -0.0704
+
+. 
+.     save "Cola_inferior_ML3b_`hoy'.dta", replace
+(file Cola_inferior_ML3b_20261119.dta not found)
+file Cola_inferior_ML3b_20261119.dta saved
+
+. restore
+
+. 
+. display _newline "LECTURA: descriptiva. Los efectos predichos estan encogidos hacia"
+
+LECTURA: descriptiva. Los efectos predichos estan encogidos hacia
+
+. display "la media. Pasar los codigos DANE a nombres con DIVIPOLA y comparar con"
+la media. Pasar los codigos DANE a nombres con DIVIPOLA y comparar con
+
+. display "la lista del Anexo H, parrafo 11, antes de conservarla."
+la lista del Anexo H, parrafo 11, antes de conservarla.
+
+. 
+. timer off 1
+
+. timer list
+   1:     96.59 /        1 =      96.5860
+   2:     81.50 /        1 =      81.5010
+
+. log close fase17
+      name:  fase17
+       log:  C:\Users\RYZEN 5\Desktop\Tesis Multinivel\Objetivo 2\log_17_diagnosticos_C7_2026
+> 1119.log
+  log type:  text
+ closed on:  19 Nov 2026, 14:20:23
+---------------------------------------------------------------------------------------------
