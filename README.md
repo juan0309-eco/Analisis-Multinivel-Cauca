@@ -14,7 +14,7 @@ El repositorio contiene los do-files, los registros de ejecución (logs) y este 
 
 | Carpeta o archivo | Qué es |
 |---|---|
-| `do/` | Los 30 do-files de la cadena, del `01` al `18`, y cuatro herramientas: `00_config.do`, `00_master.do`, `00_validar.do` y `99_huella.do` |
+| `do/` | Los 30 do-files de la cadena, del `01` al `18`, más el complemento 17_diagnosticos_C7_v3.do, y cuatro herramientas: `00_config.do`, `00_master.do`, `00_validar.do` y `99_huella.do` |
 | `do/archivo/` | Siete versiones superadas que conservan la evidencia de logs citados (apartado 6) |
 | `logs/` | Los registros de ejecución que respaldan las cifras del informe, con su nombre original |
 | `logs/verificacion/` | El registro de la prueba de la cadena completa en la carpeta de verificación |
@@ -125,6 +125,7 @@ Tiempos de los cronómetros de cada log; «—» = sin cronómetro.
 | 16a | `16a_rehacer_base.do` | Base de estimación con el Nivel 3 ampliado | 137,08 s |
 | 16 | `16_territorial.do` | Validez de los indicadores territoriales | 3.409,31 s |
 | 17 | `17_diagnosticos_C7_v2.do` | Diagnósticos de los municipios sin homicidios registrados; Figuras 8 a 10 | 160,83 s |
+| 17 (complemento) | `17_diagnosticos_C7_v3.do` | Cola inferior de la Figura 8 (Anexo H): ocho municipios, signos del índice y correlación con vuln_bar. No lo corre el master | 96,59 s |
 | 18 | `18_robustez_R1R3.do` | R1b y R3b con cuatro componentes | 2.899,32 s |
 | 09 | `09_tablas_graficos_v6.do` | Tablas 12 y 42, tabla del Objetivo 4, robustez y figuras | — |
 
@@ -160,3 +161,4 @@ Resultados:
 - Prueba de la cadena en `verificacion/`: 15 scripts terminados con código 0 (`logs/verificacion/log_00_master_20261024v.log`).
 - Validador al 29-10-2026: 33 do-files revisados, 0 hallazgos abiertos y 0 de 33 archivos ausentes (`log_00_validar_20261029b.log`).
 - El 09 v6 reproduce las cifras de control del informe (`log_09_tablas_20261029.log`; figuras con coma decimal en `log_09_tablas_20261029b.log`).
+- - La cola inferior del Anexo H se reproduce con 17_diagnosticos_C7_v3.do: varianzas idénticas a las del Anexo H, los mismos ocho municipios en el mismo orden (log_17_diagnosticos_C7_20261119.log).
